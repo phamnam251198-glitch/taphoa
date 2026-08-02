@@ -930,22 +930,26 @@ function apiGetRaw(sheet){
 
 // ── INIT ──
 (async()=>{
-  const raw=await apiGetRaw('TonKho');
-  // null = lỗi kết nối, không init
-  if(raw===null){
-    toast('Không kết nối được Google Sheets — kiểm tra mạng','err');
-    document.getElementById('sync').innerHTML='Trạng thái: <b style="color:var(--red)">Mất kết nối</b>';
-    loadDash();return;
-  }
-  // Chỉ init khi sheet HOÀN TOÀN trống (kể cả không có header)
-  if(raw.length===0){
-    toast('Đang khởi tạo dữ liệu...');
-    await apiPost({sheet:'TonKho',action:'append',row:['TenSanPham','SoLuong','DonVi','GiaNhap','GiaBan','HanSD','NgayCapNhat','Nguong','NCC']});
-    const init=[['Bim',110,'gói',3000,5000,'','',10,''],['Moon',42,'hộp',8000,12000,'','',10,''],['BaoNgoc',9,'gói',5000,8000,'','',10,''],['Fami',6,'gói',4000,6000,'','',10,''],['LuongKho',20,'gói',15000,22000,'','',10,''],['Pina',12,'hộp',10000,15000,'','',10,''],['Sua',47,'hộp',12000,18000,'','',10,''],['Nabati',9,'gói',8000,12000,'','',10,''],['Tra',81,'chai',5000,8000,'','',10,''],['Nutri',45,'hộp',15000,22000,'','',10,''],['G',60,'chai',8000,12000,'','',10,''],['Orio',8,'gói',10000,15000,'','',10,''],['XX',69,'chai',7000,10000,'','',10,''],['Kokomi',25,'gói',5000,8000,'','',10,''],['Morden',26,'gói',20000,30000,'','',10,''],['Omachi',68,'gói',6000,9000,'','',10,''],['Haohao',3,'gói',5000,8000,'','',10,''],['Cafe',33,'gói',15000,22000,'','',10,''],['BH',79,'hộp',25000,38000,'','',10,''],['Staff',5,'gói',30000,45000,'','',10,''],['HoaCuc',2,'hộp',20000,30000,'','',10,''],['Probi',65,'hộp',18000,28000,'','',10,'']];
-    for(const r of init)await apiPost({sheet:'TonKho',action:'append',row:r});
-    for(const[s,h]of[['NhapHang',['SanPham','SoLuong','GiaNhap','NCC','NgayNhap','GhiChu','NguoiNhap']],['BanHang',['SanPham','GiaBan','SoLuong','NgayBan','ThanhTien','GhiChu']],['ThuChi',['ThoiGian','Loai','SoTien','NoiDung','DanhMuc','Ngay']],['NhaCungCap',['TenNCC','SDT','MatHang','DiaChi','GhiChu']],['User',['HoTen','SDT','VaiTro','GhiChu']]])
-      await apiPost({sheet:s,action:'append',row:h});
-    toast('Khởi tạo xong!');
+  // Kiểm tra cờ đã init chưa qua sheet CaiDat
+  const caidat=await apiGet('CaiDat');
+  const initialized=caidat.some(r=>r[0]==='initialized'&&r[1]==='true');
+  if(!initialized){
+    // Kiểm tra TonKho có data chưa (tránh ghi đè data thật)
+    const tk=await apiGet('TonKho');
+    if(tk.length===0){
+      toast('Đang khởi tạo dữ liệu...');
+      await apiPost({sheet:'TonKho',action:'append',row:['TenSanPham','SoLuong','DonVi','GiaNhap','GiaBan','HanSD','NgayCapNhat','Nguong','NCC']});
+      const init=[['Bim',110,'gói',3000,5000,'','',10,''],['Moon',42,'hộp',8000,12000,'','',10,''],['BaoNgoc',9,'gói',5000,8000,'','',10,''],['Fami',6,'gói',4000,6000,'','',10,''],['LuongKho',20,'gói',15000,22000,'','',10,''],['Pina',12,'hộp',10000,15000,'','',10,''],['Sua',47,'hộp',12000,18000,'','',10,''],['Nabati',9,'gói',8000,12000,'','',10,''],['Tra',81,'chai',5000,8000,'','',10,''],['Nutri',45,'hộp',15000,22000,'','',10,''],['G',60,'chai',8000,12000,'','',10,''],['Orio',8,'gói',10000,15000,'','',10,''],['XX',69,'chai',7000,10000,'','',10,''],['Kokomi',25,'gói',5000,8000,'','',10,''],['Morden',26,'gói',20000,30000,'','',10,''],['Omachi',68,'gói',6000,9000,'','',10,''],['Haohao',3,'gói',5000,8000,'','',10,''],['Cafe',33,'gói',15000,22000,'','',10,''],['BH',79,'hộp',25000,38000,'','',10,''],['Staff',5,'gói',30000,45000,'','',10,''],['HoaCuc',2,'hộp',20000,30000,'','',10,''],['Probi',65,'hộp',18000,28000,'','',10,'']];
+      for(const r of init)await apiPost({sheet:'TonKho',action:'append',row:r});
+      for(const[s,h]of[['NhapHang',['SanPham','SoLuong','GiaNhap','NCC','NgayNhap','GhiChu','NguoiNhap']],['BanHang',['SanPham','GiaBan','SoLuong','NgayBan','ThanhTien','GhiChu']],['ThuChi',['ThoiGian','Loai','SoTien','NoiDung','DanhMuc','Ngay']],['NhaCungCap',['TenNCC','SDT','MatHang','DiaChi','GhiChu']],['User',['HoTen','SDT','VaiTro','GhiChu']]])
+        await apiPost({sheet:s,action:'append',row:h});
+      // Ghi cờ đã init vào CaiDat
+      await apiPost({sheet:'CaiDat',action:'append',row:['initialized','true',new Date().toISOString()]});
+      toast('Khởi tạo xong!');
+    } else {
+      // Có data rồi, chỉ ghi cờ thôi
+      await apiPost({sheet:'CaiDat',action:'append',row:['initialized','true',new Date().toISOString()]});
+    }
   }
   loadDash();
 })();
