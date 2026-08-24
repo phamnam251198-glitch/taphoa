@@ -185,16 +185,18 @@ tr:hover td{background:#f8fafc}
   .mb{padding:16px;width:94vw;border-radius:10px}
   .fr,.fr3{grid-template-columns:1fr}
 
-  /* ── Bảng "Lịch sử xếp hàng" (#xh-tbl): chuyển từ bảng ngang sang danh sách dạng card,
-     tránh phải cuộn ngang khó dùng trên điện thoại ── */
-  #xh-tbl table,#xh-tbl thead,#xh-tbl tbody,#xh-tbl th,#xh-tbl td,#xh-tbl tr{display:block}
-  #xh-tbl thead{display:none}
-  #xh-tbl tr{background:#fff;border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:10px 12px}
-  #xh-tbl tr:last-child{margin-bottom:0}
-  #xh-tbl td{border-bottom:none;padding:5px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;text-align:right}
-  #xh-tbl td::before{content:attr(data-label);color:var(--text2);font-weight:500;font-size:11px;text-align:left}
-  #xh-tbl td:last-child{justify-content:flex-end;padding-top:8px;margin-top:4px;border-top:1px solid var(--border)}
-  #xh-tbl td:last-child::before{content:none}
+  /* ── Mọi bảng danh sách (.m-tbl): chuyển từ bảng ngang sang danh sách dạng card,
+     tránh phải cuộn ngang khó dùng trên điện thoại. Chỉ hiện tối đa 4 trường quan trọng
+     nhất trên mỗi thẻ — trường nào đánh dấu .mobile-hide sẽ ẩn hẳn, chỉ xem đầy đủ ở desktop ── */
+  .m-tbl,.m-tbl thead,.m-tbl tbody,.m-tbl th,.m-tbl td,.m-tbl tr{display:block}
+  .m-tbl thead{display:none}
+  .m-tbl tr{background:#fff;border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:10px 12px}
+  .m-tbl tr:last-child{margin-bottom:0}
+  .m-tbl td{border-bottom:none;padding:5px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;text-align:right}
+  .m-tbl td::before{content:attr(data-label);color:var(--text2);font-weight:500;font-size:11px;text-align:left}
+  .m-tbl td:last-child{justify-content:flex-end;padding-top:8px;margin-top:4px;border-top:1px solid var(--border)}
+  .m-tbl td:last-child::before{content:none}
+  .mobile-hide{display:none}
 
   /* Modal Tạo/Sửa phiếu xếp hàng: bảng chọn SP/SL gọn hơn */
   .item-table th{padding:6px 4px;font-size:10px}

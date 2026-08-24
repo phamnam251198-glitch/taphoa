@@ -117,6 +117,7 @@
           <option value="0">Tất cả</option>
         </select>
         <button class="btn btn-g" onclick="loadNH()">↻ Làm mới</button>
+        <button class="btn btn-d" id="nh-delsel-btn" onclick="delSelNH()" style="display:none">🗑 Xóa đã chọn (<span id="nh-selcnt">0</span>)</button>
       </div>
       </details>
       <div id="nh-sum"></div>
@@ -141,6 +142,7 @@
           <option value="0">Tất cả</option>
         </select>
         <button class="btn btn-g" onclick="loadXH()">↻ Làm mới</button>
+        <button class="btn btn-d" id="xh-delsel-btn" onclick="delSelXH()" style="display:none">🗑 Xóa đã chọn (<span id="xh-selcnt">0</span>)</button>
       </div>
       </details>
       <div id="xh-sum"></div>
@@ -154,6 +156,7 @@
       <div class="sb">
         <input type="text" id="q-ncc" placeholder="Tìm nhà cung cấp..." oninput="fNCC()">
         <button class="btn btn-g" onclick="loadNCC()">↻ Làm mới</button>
+        <button class="btn btn-d" id="ncc-delsel-btn" onclick="delSelNCC()" style="display:none">🗑 Xóa đã chọn (<span id="ncc-selcnt">0</span>)</button>
       </div>
       </details>
       <div class="card"><div class="ch"><h2>Danh sách nhà cung cấp</h2></div><div id="ncc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
@@ -166,6 +169,7 @@
       <div class="sb">
         <input type="text" id="q-gh" placeholder="Tìm gian hàng..." oninput="fGH()">
         <button class="btn btn-g" onclick="loadGH()">↻ Làm mới</button>
+        <button class="btn btn-d" id="gh-delsel-btn" onclick="delSelGH()" style="display:none">🗑 Xóa đã chọn (<span id="gh-selcnt">0</span>)</button>
       </div>
       </details>
       <div class="card"><div class="ch"><h2>Danh sách gian hàng</h2></div><div id="gh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
@@ -177,6 +181,7 @@
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
         <button class="btn btn-g" onclick="loadUser()">↻ Làm mới</button>
+        <button class="btn btn-d" id="user-delsel-btn" onclick="delSelUser()" style="display:none">🗑 Xóa đã chọn (<span id="user-selcnt">0</span>)</button>
       </div>
       </details>
       <div class="card"><div class="ch"><h2>Danh sách người dùng</h2></div><div id="user-tbl"><div class="ld"><div class="spin"></div></div></div></div>

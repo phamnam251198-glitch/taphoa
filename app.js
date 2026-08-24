@@ -122,6 +122,20 @@ function ym(d){return d?String(d).slice(0,7):'';}
 function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',2500);}
 function om(id){document.getElementById(id).classList.add('on');}
 function cm(id){document.getElementById(id).classList.remove('on');}
+// Cập nhật hiện/ẩn nút "Xóa đã chọn" + số lượng đang chọn — dùng chung cho mọi bảng có checkbox chọn nhiều
+function updateSelUI(btnId,cntId,size){
+  document.getElementById(cntId).textContent=size;
+  document.getElementById(btnId).style.display=size?'inline-flex':'none';
+}
+// Cập nhật trạng thái checkbox "chọn tất cả" (tick/indeterminate) theo các checkbox đang hiển thị — dùng chung
+function updateSelAllTri(allId,chkClass,selSet){
+  const all=document.getElementById(allId);
+  if(!all)return;
+  const chks=[...document.querySelectorAll('.'+chkClass)];
+  const checkedCnt=chks.filter(c=>selSet.has(Number(c.dataset.idx))).length;
+  all.checked=chks.length>0&&checkedCnt===chks.length;
+  all.indeterminate=checkedCnt>0&&checkedCnt<chks.length;
+}
 function mkMonths(data,di,sel){
   const months=[...new Set(data.map(r=>ym(r[di])).filter(Boolean))].sort().reverse();
   const cur=sel.value;
@@ -322,13 +336,13 @@ function rTK(data){
     const on=tkSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortTKClick('${c.key}')">${c.label} <span class="sort-ic">${on?(tkSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
-  el.innerHTML=`<table><thead><tr><th style="width:30px"><input type="checkbox" id="tk-selall" onchange="toggleAllTK(this)"></th><th style="width:40px">STT</th>${ths}<th></th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="tk-selall" onchange="toggleAllTK(this)"></th><th style="width:40px">STT</th>${ths}<th></th></tr></thead><tbody>`+
     data.map((r,i)=>{
       const gi=C.TK.indexOf(r);// vị trí thật trong C.TK, tránh lệch dòng khi đang lọc/sắp xếp
       const sl=Number(r[1]||0),gn=Number(r[3]||0);
       const chk=selTK.has(r[0])?'checked':'';
-      return`<tr><td><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td>${i+1}</td><td>${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td><b>${r[0]}</b></td><td><b>${sl}</b></td><td>${gn?fmt(gn)+'đ':''}</td><td>${r[5]||''}</td><td>${statusBadge(r)}</td>
-      <td style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2},'${r[0]}')">Xóa</button></td></tr>`;
+      return`<tr><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2},'${r[0]}')">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
   updateTKSelUI();
 }
@@ -624,8 +638,10 @@ async function saveNHEdit(){
   toast('Đã cập nhật phiếu nhập!');cm('m-nh-edit');setTimeout(loadNH,800);
 }
 
+let selNH=new Set();
 async function loadNH(){
   document.getElementById('nh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selNH.clear();updateSelUI('nh-delsel-btn','nh-selcnt',0);
   const data=await apiGet('NhapHang');C.NH=data;
   rNH(data);
 }
@@ -660,15 +676,52 @@ function rNH(data){
     const on=nhSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortNHClick('${c.key}')">${c.label} <span class="sort-ic">${on?(nhSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
-  el.innerHTML=`<table><thead><tr>${ths}<th></th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="nh-selall" onchange="toggleAllNH(this)"></th>${ths}<th></th></tr></thead><tbody>`+
     [...data].map((r)=>{
       const gi=C.NH.indexOf(r);// vị trí thật trong C.NH, tránh lệch dòng khi đang lọc/tìm kiếm
-      return`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${fmt(r[2])}đ</td>
-      <td><span class="bg bg-b">${fmt(Number(r[1]||0)*Number(r[2]||0))}đ</span></td>
-      <td>${r[7]?`<span class="bg bg-y">${r[7]}</span>`:''}</td>
-      <td>${r[3]||''}</td><td>${r[4]||''}</td><td><span class="bg bg-p">${r[6]||''}</span></td><td>${r[5]||''}</td>
-      <td style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delNH(${gi+2},'${r[0]}',${Number(r[1]||0)})">Xóa</button></td></tr>`;
+      const chk=selNH.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="nh-chk" data-idx="${gi}" ${chk} onchange="toggleNHChk(this)"></td><td data-label="Sản phẩm"><b>${r[0]}</b></td><td data-label="SL">${r[1]}</td><td class="mobile-hide" data-label="Giá nhập">${fmt(r[2])}đ</td>
+      <td data-label="Thành tiền"><span class="bg bg-b">${fmt(Number(r[1]||0)*Number(r[2]||0))}đ</span></td>
+      <td class="mobile-hide" data-label="Hạn SD">${r[7]?`<span class="bg bg-y">${r[7]}</span>`:''}</td>
+      <td class="mobile-hide" data-label="NCC">${r[3]||''}</td><td data-label="Ngày">${r[4]||''}</td><td class="mobile-hide" data-label="Người nhập"><span class="bg bg-p">${r[6]||''}</span></td><td class="mobile-hide" data-label="Ghi chú">${r[5]||''}</td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delNH(${gi+2},'${r[0]}',${Number(r[1]||0)})">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
+  updateSelUI('nh-delsel-btn','nh-selcnt',selNH.size);
+  updateSelAllTri('nh-selall','nh-chk',selNH);
+}
+function toggleNHChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selNH.add(idx);else selNH.delete(idx);
+  updateSelUI('nh-delsel-btn','nh-selcnt',selNH.size);
+  updateSelAllTri('nh-selall','nh-chk',selNH);
+}
+function toggleAllNH(el){
+  document.querySelectorAll('.nh-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selNH.add(idx);else selNH.delete(idx);
+  });
+  updateSelUI('nh-delsel-btn','nh-selcnt',selNH.size);
+}
+async function delSelNH(){
+  if(!selNH.size){toast('Chưa chọn phiếu nào','err');return;}
+  confirmDel(`Xóa ${selNH.size} phiếu nhập đã chọn? Tồn kho sẽ được điều chỉnh (trừ lại) tương ứng.`,async()=>{
+    toast('Đang xóa '+selNH.size+' phiếu...');
+    const idxs=[...selNH].sort((a,b)=>b-a);// xóa từ index lớn → nhỏ để tránh lệch vị trí
+    for(const idx of idxs){
+      const r=C.NH[idx];if(!r)continue;
+      await apiPost({sheet:'NhapHang',action:'delete',row:idx+2});
+      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(spIdx>=0){
+        const newSL=Math.max(0,Number(C.TK[spIdx][1]||0)-Number(r[1]||0));
+        const upd=[...C.TK[spIdx]];upd[1]=newSL;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=newSL;
+      }
+    }
+    selNH.clear();
+    toast('Đã xóa '+idxs.length+' phiếu nhập!');setTimeout(loadNH,800);
+  });
 }
 function fNH(){
   const q=document.getElementById('q-nh').value.toLowerCase();
@@ -741,8 +794,10 @@ async function saveXH(){
   toast('Đã xếp '+items.length+' sản phẩm!');cm('m-xh');setTimeout(loadXH,800);
 }
 
+let selXH=new Set();
 async function loadXH(){
   document.getElementById('xh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selXH.clear();updateSelUI('xh-delsel-btn','xh-selcnt',0);
   const data=await apiGet('XepHang');C.XH=data;
   rXH(data);
 }
@@ -771,12 +826,49 @@ function rXH(data){
     const on=xhSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortXHClick('${c.key}')">${c.label} <span class="sort-ic">${on?(xhSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
-  el.innerHTML=`<table><thead><tr>${ths}<th></th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="xh-selall" onchange="toggleAllXH(this)"></th>${ths}<th></th></tr></thead><tbody>`+
     [...data].map(r=>{
       const gi=C.XH.indexOf(r);
-      return`<tr><td data-label="Sản phẩm"><b>${r[0]}</b></td><td data-label="SL">${r[1]}</td><td data-label="Gian hàng"><span class="bg bg-p">${r[2]||''}</span></td><td data-label="Ngày xếp">${r[3]||''}</td><td data-label="Ghi chú">${r[4]||''}</td>
+      const chk=selXH.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="xh-chk" data-idx="${gi}" ${chk} onchange="toggleXHChk(this)"></td><td data-label="Sản phẩm"><b>${r[0]}</b></td><td data-label="SL">${r[1]}</td><td data-label="Gian hàng"><span class="bg bg-p">${r[2]||''}</span></td><td data-label="Ngày xếp">${r[3]||''}</td><td class="mobile-hide" data-label="Ghi chú">${r[4]||''}</td>
       <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editXH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delXH(${gi+2},'${r[0]}',${Number(r[1]||0)})">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
+  updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
+  updateSelAllTri('xh-selall','xh-chk',selXH);
+}
+function toggleXHChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selXH.add(idx);else selXH.delete(idx);
+  updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
+  updateSelAllTri('xh-selall','xh-chk',selXH);
+}
+function toggleAllXH(el){
+  document.querySelectorAll('.xh-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selXH.add(idx);else selXH.delete(idx);
+  });
+  updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
+}
+async function delSelXH(){
+  if(!selXH.size){toast('Chưa chọn phiếu nào','err');return;}
+  confirmDel(`Xóa ${selXH.size} phiếu xếp đã chọn? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
+    toast('Đang xóa '+selXH.size+' phiếu...');
+    const idxs=[...selXH].sort((a,b)=>b-a);
+    for(const idx of idxs){
+      const r=C.XH[idx];if(!r)continue;
+      await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
+      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(spIdx>=0){
+        const newSL=Number(C.TK[spIdx][1]||0)+Number(r[1]||0);
+        const upd=[...C.TK[spIdx]];upd[1]=newSL;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=newSL;
+      }
+    }
+    selXH.clear();
+    toast('Đã xóa '+idxs.length+' phiếu xếp!');setTimeout(loadXH,800);
+  });
 }
 function fXH(){
   const q=document.getElementById('q-xh').value.toLowerCase();
@@ -865,8 +957,10 @@ async function delXH(row,tenSP,sl){
 }
 
 // ══ NHÀ CUNG CẤP ══
+let selNCC=new Set();
 async function loadNCC(){
   document.getElementById('ncc-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selNCC.clear();updateSelUI('ncc-delsel-btn','ncc-selcnt',0);
   const data=await apiGet('NhaCungCap');C.NCC=data;rNCC(data);
 }
 const NCC_COLS=[
@@ -885,12 +979,39 @@ function rNCC(data){
     const on=nccSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortNCCClick('${c.key}')">${c.label} <span class="sort-ic">${on?(nccSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
-  el.innerHTML=`<table><thead><tr>${ths}<th></th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="ncc-selall" onchange="toggleAllNCC(this)"></th>${ths}<th></th></tr></thead><tbody>`+
     data.map(r=>{
       const gi=C.NCC.indexOf(r);// vị trí thật, tránh lệch dòng khi đang lọc/sắp xếp
-      return`<tr><td><b>${r[0]}</b></td><td>${r[1]||''}</td><td>${r[2]||''}</td><td>${r[3]||''}</td><td>${r[4]||''}</td>
-      <td style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNCC(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('NhaCungCap',${gi+2},'NCC')">Xóa</button></td></tr>`;
+      const chk=selNCC.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="ncc-chk" data-idx="${gi}" ${chk} onchange="toggleNCCChk(this)"></td><td data-label="Tên NCC"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Mặt hàng">${r[2]||''}</td><td data-label="Địa chỉ">${r[3]||''}</td><td class="mobile-hide" data-label="Ghi chú">${r[4]||''}</td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNCC(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('NhaCungCap',${gi+2},'NCC')">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
+  updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
+  updateSelAllTri('ncc-selall','ncc-chk',selNCC);
+}
+function toggleNCCChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selNCC.add(idx);else selNCC.delete(idx);
+  updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
+  updateSelAllTri('ncc-selall','ncc-chk',selNCC);
+}
+function toggleAllNCC(el){
+  document.querySelectorAll('.ncc-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selNCC.add(idx);else selNCC.delete(idx);
+  });
+  updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
+}
+async function delSelNCC(){
+  if(!selNCC.size){toast('Chưa chọn NCC nào','err');return;}
+  confirmDel(`Xóa ${selNCC.size} nhà cung cấp đã chọn?`,async()=>{
+    toast('Đang xóa '+selNCC.size+' NCC...');
+    const idxs=[...selNCC].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'NhaCungCap',action:'delete',row:idx+2});
+    selNCC.clear();
+    toast('Đã xóa '+idxs.length+' NCC!');setTimeout(loadNCC,800);
+  });
 }
 function fNCC(){
   const q=document.getElementById('q-ncc').value.toLowerCase();
@@ -909,8 +1030,10 @@ async function saveNCC(){
 }
 
 // ══ GIAN HÀNG ══
+let selGH=new Set();
 async function loadGH(){
   document.getElementById('gh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selGH.clear();updateSelUI('gh-delsel-btn','gh-selcnt',0);
   const data=await apiGet('GianHang');C.GH=data;fGH();
 }
 let ghSortDir=1;
@@ -918,12 +1041,39 @@ function sortGHClick(){ghSortDir*=-1;fGH();}
 function rGH(data){
   const el=document.getElementById('gh-tbl');
   if(!data.length){el.innerHTML='<div class="empty">🏬 Chưa có gian hàng</div>';return;}
-  el.innerHTML=`<table><thead><tr><th class="th-sort th-sort-on" onclick="sortGHClick()">Tên gian hàng <span class="sort-ic">${ghSortDir===1?'▲':'▼'}</span></th><th></th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="gh-selall" onchange="toggleAllGH(this)"></th><th class="th-sort th-sort-on" onclick="sortGHClick()">Tên gian hàng <span class="sort-ic">${ghSortDir===1?'▲':'▼'}</span></th><th></th></tr></thead><tbody>`+
     data.map(r=>{
       const gi=C.GH.indexOf(r);
-      return`<tr><td><b>${r[0]}</b></td>
-      <td style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('GianHang',${gi+2},'gian hàng')">Xóa</button></td></tr>`;
+      const chk=selGH.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="gh-chk" data-idx="${gi}" ${chk} onchange="toggleGHChk(this)"></td><td data-label="Tên gian hàng"><b>${r[0]}</b></td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('GianHang',${gi+2},'gian hàng')">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
+  updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
+  updateSelAllTri('gh-selall','gh-chk',selGH);
+}
+function toggleGHChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selGH.add(idx);else selGH.delete(idx);
+  updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
+  updateSelAllTri('gh-selall','gh-chk',selGH);
+}
+function toggleAllGH(el){
+  document.querySelectorAll('.gh-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selGH.add(idx);else selGH.delete(idx);
+  });
+  updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
+}
+async function delSelGH(){
+  if(!selGH.size){toast('Chưa chọn gian hàng nào','err');return;}
+  confirmDel(`Xóa ${selGH.size} gian hàng đã chọn?`,async()=>{
+    toast('Đang xóa '+selGH.size+' gian hàng...');
+    const idxs=[...selGH].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'GianHang',action:'delete',row:idx+2});
+    selGH.clear();
+    toast('Đã xóa '+idxs.length+' gian hàng!');setTimeout(loadGH,800);
+  });
 }
 function fGH(){
   const q=document.getElementById('q-gh').value.toLowerCase();
@@ -956,8 +1106,10 @@ function renderUserSorted(){
   if(userSortCol)d.sort((a,b)=>userCompare(a,b,userSortCol)*userSortDir);
   rUser(d);
 }
+let selUser=new Set();
 async function loadUser(){
   document.getElementById('user-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selUser.clear();updateSelUI('user-delsel-btn','user-selcnt',0);
   const data=await apiGet('User');C.USER=data;renderUserSorted();
 }
 function rUser(data){
@@ -967,12 +1119,39 @@ function rUser(data){
     const on=userSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortUserClick('${c.key}')">${c.label} <span class="sort-ic">${on?(userSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
-  el.innerHTML=`<table><thead><tr>${ths}<th></th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="user-selall" onchange="toggleAllUser(this)"></th>${ths}<th></th></tr></thead><tbody>`+
     data.map(r=>{
       const gi=C.USER.indexOf(r);
-      return`<tr><td><b>${r[0]}</b></td><td>${r[1]||''}</td><td>${r[2]?`<span class="bg bg-p">${r[2]}</span>`:''}</td><td>${r[3]||''}</td>
-      <td style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editUser(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('User',${gi+2},'người dùng')">Xóa</button></td></tr>`;
+      const chk=selUser.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="user-chk" data-idx="${gi}" ${chk} onchange="toggleUserChk(this)"></td><td data-label="Họ tên"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Vai trò">${r[2]?`<span class="bg bg-p">${r[2]}</span>`:''}</td><td data-label="Ghi chú">${r[3]||''}</td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editUser(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('User',${gi+2},'người dùng')">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
+  updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
+  updateSelAllTri('user-selall','user-chk',selUser);
+}
+function toggleUserChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selUser.add(idx);else selUser.delete(idx);
+  updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
+  updateSelAllTri('user-selall','user-chk',selUser);
+}
+function toggleAllUser(el){
+  document.querySelectorAll('.user-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selUser.add(idx);else selUser.delete(idx);
+  });
+  updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
+}
+async function delSelUser(){
+  if(!selUser.size){toast('Chưa chọn người dùng nào','err');return;}
+  confirmDel(`Xóa ${selUser.size} người dùng đã chọn?`,async()=>{
+    toast('Đang xóa '+selUser.size+' người dùng...');
+    const idxs=[...selUser].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'User',action:'delete',row:idx+2});
+    selUser.clear();
+    toast('Đã xóa '+idxs.length+' người dùng!');setTimeout(loadUser,800);
+  });
 }
 function initUser(){document.getElementById('m-user-t').textContent='Thêm người dùng';['user-ten','user-sdt','user-vaitro','user-gc'].forEach(id=>document.getElementById(id).value='');document.getElementById('user-row').value='';om('m-user');}
 function editUser(row){const r=C.USER[row-2];document.getElementById('m-user-t').textContent='Sửa người dùng';document.getElementById('user-ten').value=r[0]||'';document.getElementById('user-sdt').value=r[1]||'';document.getElementById('user-vaitro').value=r[2]||'';document.getElementById('user-gc').value=r[3]||'';document.getElementById('user-row').value=row;om('m-user');}
