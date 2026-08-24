@@ -196,7 +196,7 @@ tr:hover td{background:#f8fafc}
   .m-tbl td::before{content:attr(data-label);color:var(--text2);font-weight:500;font-size:11px;text-align:left}
   .m-tbl td:last-child{justify-content:flex-end;padding-top:8px;margin-top:4px;border-top:1px solid var(--border)}
   .m-tbl td:last-child::before{content:none}
-  .mobile-hide{display:none}
+  .m-tbl td.mobile-hide{display:none}
 
   /* Modal Tạo/Sửa phiếu xếp hàng: bảng chọn SP/SL gọn hơn */
   .item-table th{padding:6px 4px;font-size:10px}
