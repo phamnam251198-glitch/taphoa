@@ -35,6 +35,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 #acts{display:flex;gap:8px;align-items:center}
 #content{flex:1;overflow-y:auto;padding:22px}
 .sec{display:none}.sec.on{display:block}
+.set-tab{display:none}.set-tab.on{display:block}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
@@ -44,6 +45,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .kpi .sub{font-size:11px;color:var(--text2);margin-top:3px}
 .kpi.g .val{color:var(--green)}.kpi.r .val{color:var(--red)}.kpi.b .val{color:var(--blue)}.kpi.y .val{color:var(--yellow)}.kpi.p .val{color:var(--purple)}
 .card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px}
+/* Khối "xổ" (accordion) theo từng nhóm (VD: Loại hàng) — LUÔN bấm được để đóng/mở ở mọi kích thước màn hình
+   (khác .sb-wrap/.sb-toggle vốn chỉ dùng cho ô tìm kiếm và chỉ ẩn/hiện được trên mobile) */
+.acc-group{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;border-left:4px solid var(--acc-c,#c3c2b7)}
+.acc-group>summary{list-style:none;cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;background:var(--acc-bg,transparent)}
+.acc-group>summary::-webkit-details-marker{display:none}
+.acc-group>summary .acc-cnt{font-weight:400;color:var(--text2);font-size:12px}
+.acc-group>summary::after{content:'▾';margin-left:auto;color:var(--text2);transition:transform .2s}
+.acc-group:not([open])>summary::after{transform:rotate(-90deg)}
+.acc-group[open]>summary{border-bottom:1px solid var(--border)}
+/* Bảng màu xoay vòng cho từng khối Loại hàng — gán theo thứ tự để mỗi loại 1 màu, dễ phân biệt nhanh */
+.acc-c0{--acc-c:#0ca30c;--acc-bg:#dcfce7}
+.acc-c1{--acc-c:#2563eb;--acc-bg:#dbeafe}
+.acc-c2{--acc-c:#d03b3b;--acc-bg:#fee2e2}
+.acc-c3{--acc-c:#c68a00;--acc-bg:#fef9c3}
+.acc-c4{--acc-c:#7c3aed;--acc-bg:#ede9fe}
+.acc-c5{--acc-c:#ea580c;--acc-bg:#ffedd5}
+.acc-c6{--acc-c:#0891b2;--acc-bg:#cffafe}
+.acc-c7{--acc-c:#db2777;--acc-bg:#fce7f3}
+.acc-cx{--acc-c:#9ca3af;--acc-bg:#f3f4f6}
 .ch{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .ch h2{font-size:13px;font-weight:600}
 table{width:100%;border-collapse:collapse}
@@ -70,6 +90,7 @@ tr:hover td{background:#f8fafc}
 .mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto}
 .mb h3{font-size:15px;font-weight:600;margin-bottom:18px}
 .mb-sm{width:420px}
+.mb-lg{width:1080px}
 .fg{margin-bottom:13px}
 .fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500}
 .fg input,.fg select,.fg textarea{width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none}
@@ -81,6 +102,12 @@ tr:hover td{background:#f8fafc}
 .sb input{flex:1;min-width:160px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none}
 .sb input:focus{border-color:var(--blue)}
 .sb select{padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none}
+/* Ô gõ-tìm tự chế (Sản phẩm/Loại hàng/NCC) — thay cho <datalist> vì datalist để trình duyệt tự quyết
+   hiện bao nhiêu dòng (có thể xổ ra cả danh sách dài); cái này giới hạn ~10 dòng rồi cuộn */
+.ac-menu{position:fixed;z-index:300;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow-y:auto;display:none}
+.ac-item{padding:8px 12px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-item:hover,.ac-item.hi{background:var(--bg)}
+.ac-empty{padding:8px 12px;font-size:12px;color:var(--text2)}
 #toast{position:fixed;bottom:22px;right:22px;background:#1e293b;color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s}
 #toast.show{transform:translateY(0);opacity:1}
 #toast.ok{background:var(--green)}#toast.err{background:var(--red)}
@@ -135,7 +162,7 @@ tr:hover td{background:#f8fafc}
 .donut-row-pct{color:var(--text2);font-size:13px}
 .chart-tip{position:fixed;display:none;background:#0b0b0b;color:#fff;font-size:12px;line-height:1.5;padding:6px 10px;border-radius:6px;pointer-events:none;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,.25)}
 .chart-tip b{font-size:13px;font-weight:600}
-.scroll-tbl{max-height:400px;overflow-y:auto}
+.scroll-tbl{max-height:400px;overflow-y:auto;overflow-x:auto}
 .scroll-tbl table thead th{position:sticky;top:0;z-index:1}
 
 /* Nút hamburger + backdrop: ẩn hoàn toàn ở desktop, chỉ hiện trong media query mobile bên dưới */

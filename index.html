@@ -14,7 +14,7 @@
     <div class="login-logo">
       <span class="icon">🏪</span>
       <h2>Tạp Hóa</h2>
-      <p>Đăng nhập để tiếp tục</p>
+      <p>Đăng nhập để tiếp tụ c</p>
     </div>
     <div class="fg"><label>Email</label><input id="login-email" type="email" placeholder="email@taphoa.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fg"><label>Mật khẩu</label><input id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -25,15 +25,15 @@
 
 <div id="mnu-backdrop" onclick="closeMenu()"></div>
 <div id="sb" style="display:none">
-  <div class="logo"><b>🏪 Tạp Hóa</b><small id="user-email-display"></small></div>
+  <div class="logo"><b>🏪 Tạp Hóa D5</b><small id="user-email-display"></small></div>
   <nav>
     <a onclick="go('dash')" class="on" id="n-dash">📊 Tổng quan</a>
     <a onclick="go('tk')" id="n-tk">📦 Tồn kho <span class="nbadge" id="lbadge" style="display:none">!</span></a>
     <a onclick="go('nh')" id="n-nh">⬇️ Nhập hàng</a>
     <a onclick="go('xh')" id="n-xh">🏷️ Xếp hàng</a>
-    <a onclick="go('ncc')" id="n-ncc">🚚 Nhà cung cấp</a>
-    <a onclick="go('gh')" id="n-gh">🏬 Gian hàng</a>
-    <a onclick="go('user')" id="n-user">👤 Người dùng</a>
+    <a onclick="go('ghk')" id="n-ghk">🗄️ Đồ gian hàng</a>
+    <a onclick="go('bc')" id="n-bc">📊 Báo cáo</a>
+    <a onclick="go('log')" id="n-log">📜 Nhật ký</a>
     <a onclick="go('setting')" id="n-setting">⚙️ Cài đặt</a>
   </nav>
   <div id="sb-logout-wrap" style="padding:10px 16px;border-top:1px solid #2a3547">
@@ -47,8 +47,9 @@
 
     <!-- DASHBOARD -->
     <div class="sec on" id="s-dash">
-      <div class="grid3">
+      <div class="grid4">
         <div class="kpi b"><div class="lb">Tổng sản phẩm</div><div class="val" id="d-sp">—</div></div>
+        <div class="kpi r"><div class="lb">Hết hàng</div><div class="val" id="d-het">—</div></div>
         <div class="kpi y"><div class="lb">Hàng sắp hết</div><div class="val" id="d-sh">—</div></div>
         <div class="kpi r"><div class="lb">Sắp hết hạn</div><div class="val" id="d-hsd">—</div></div>
       </div>
@@ -61,7 +62,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="ch"><h2>Hàng cần nhập gấp</h2>
+          <div class="ch"><h2>Hàng cần nhập</h2>
             <select id="srt-dash" onchange="renderDLow()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;outline:none">
               <option value="status">Trạng thái (khẩn cấp trước)</option>
               <option value="name">Tên A-Z</option>
@@ -89,6 +90,9 @@
           <option value="sap">Sắp hết</option>
           <option value="con">Còn hàng</option>
         </select>
+        <select id="loai-tk" onchange="fTK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả loại hàng</option>
+        </select>
         <button class="btn btn-g" onclick="loadTK()">↻ Làm mới</button>
         <button class="btn btn-d" id="tk-delsel-btn" onclick="delSelTK()" style="display:none">🗑 Xóa đã chọn (<span id="tk-selcnt">0</span>)</button>
       </div>
@@ -104,16 +108,19 @@
       <details class="sb-wrap">
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
-        <input type="text" id="q-nh" placeholder="Tìm sản phẩm, NCC..." oninput="fNH()">
+        <input type="text" id="q-nh" placeholder="Tìm sản phẩm, NCC, loại hàng..." oninput="fNH()">
         <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
         <input type="date" id="from-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
         <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
         <input type="date" id="to-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
-        <button class="btn btn-g" onclick="document.getElementById('from-nh').value='';document.getElementById('to-nh').value='';fNH()">✕</button>
+        <button class="btn btn-g" onclick="document.getElementById('from-nh').value='';document.getElementById('to-nh').value='';document.getElementById('user-nh').value='';fNH()">✕</button>
+        <select id="user-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả người nhập</option>
+        </select>
         <select id="pg-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
-          <option value="30">30 dòng</option>
-          <option value="50">50 dòng</option>
-          <option value="100">100 dòng</option>
+          <option value="30">30 ngày</option>
+          <option value="50">50 ngày</option>
+          <option value="100">100 ngày</option>
           <option value="0">Tất cả</option>
         </select>
         <button class="btn btn-g" onclick="loadNH()">↻ Làm mới</button>
@@ -136,9 +143,9 @@
         <input type="date" id="to-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
         <button class="btn btn-g" onclick="document.getElementById('from-xh').value='';document.getElementById('to-xh').value='';fXH()">✕</button>
         <select id="pg-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
-          <option value="30">30 dòng</option>
-          <option value="50">50 dòng</option>
-          <option value="100">100 dòng</option>
+          <option value="30">30 ngày</option>
+          <option value="50">50 ngày</option>
+          <option value="100">100 ngày</option>
           <option value="0">Tất cả</option>
         </select>
         <button class="btn btn-g" onclick="loadXH()">↻ Làm mới</button>
@@ -149,62 +156,170 @@
       <div class="card"><div class="ch"><h2>Lịch sử xếp hàng</h2></div><div id="xh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
-    <!-- NHÀ CUNG CẤP -->
-    <div class="sec" id="s-ncc">
-      <details class="sb-wrap">
-      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+    <!-- ĐỒ GIAN HÀNG -->
+    <div class="sec" id="s-ghk">
+      <div class="tabs" id="ghk-tabs"></div>
       <div class="sb">
-        <input type="text" id="q-ncc" placeholder="Tìm nhà cung cấp..." oninput="fNCC()">
-        <button class="btn btn-g" onclick="loadNCC()">↻ Làm mới</button>
-        <button class="btn btn-d" id="ncc-delsel-btn" onclick="delSelNCC()" style="display:none">🗑 Xóa đã chọn (<span id="ncc-selcnt">0</span>)</button>
+        <input type="text" id="q-ghk" placeholder="Tìm sản phẩm trong gian hàng này..." oninput="rGHKView()">
       </div>
-      </details>
-      <div class="card"><div class="ch"><h2>Danh sách nhà cung cấp</h2></div><div id="ncc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+      <div id="ghk-pane"><div class="ld"><div class="spin"></div></div></div>
     </div>
 
-    <!-- GIAN HÀNG -->
-    <div class="sec" id="s-gh">
-      <details class="sb-wrap">
-      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
-      <div class="sb">
-        <input type="text" id="q-gh" placeholder="Tìm gian hàng..." oninput="fGH()">
-        <button class="btn btn-g" onclick="loadGH()">↻ Làm mới</button>
-        <button class="btn btn-d" id="gh-delsel-btn" onclick="delSelGH()" style="display:none">🗑 Xóa đã chọn (<span id="gh-selcnt">0</span>)</button>
+    <!-- BÁO CÁO THEO THÁNG -->
+    <div class="sec" id="s-bc">
+      <div class="card">
+        <div class="ch"><h2>Bộ lọc thời gian</h2></div>
+        <div style="padding:14px 18px">
+          <div class="fr3">
+            <div class="fg"><label>Từ ngày</label><input type="date" id="bc-tu" onchange="loadBC()"></div>
+            <div class="fg"><label>Đến ngày</label><input type="date" id="bc-den" onchange="loadBC()"></div>
+            <div class="fg"><label>Hoặc chọn nhanh theo tháng</label><input type="month" id="bc-thang" onchange="bcSetMonth()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label>Người nhập</label><select id="bc-user" onchange="loadBC()"><option value="">Tất cả người nhập</option></select></div>
+          </div>
+          <div class="mf" style="border-top:none;padding-top:8px">
+            <button class="btn btn-g" onclick="bcShiftMonth(-1)">◀ Tháng trước</button>
+            <button class="btn btn-g" onclick="bcShiftMonth(1)">Tháng sau ▶</button>
+            <button class="btn btn-p" onclick="loadBC()">Xem báo cáo</button>
+          </div>
+        </div>
       </div>
-      </details>
-      <div class="card"><div class="ch"><h2>Danh sách gian hàng</h2></div><div id="gh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+      <div id="bc-sum"></div>
+      <div class="card"><div class="ch"><h2>Tổng tiền đã thanh toán theo Người nhập</h2></div><div id="bc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
-    <!-- NGƯỜI DÙNG -->
-    <div class="sec" id="s-user">
+    <!-- NHẬT KÝ HOẠT ĐỘNG -->
+    <div class="sec" id="s-log">
       <details class="sb-wrap">
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
-        <button class="btn btn-g" onclick="loadUser()">↻ Làm mới</button>
-        <button class="btn btn-d" id="user-delsel-btn" onclick="delSelUser()" style="display:none">🗑 Xóa đã chọn (<span id="user-selcnt">0</span>)</button>
+        <input type="text" id="q-log" placeholder="Tìm người dùng, chi tiết..." oninput="fLog()">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+        <input type="date" id="from-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+        <input type="date" id="to-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <select id="act-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả hành động</option>
+          <option value="Tạo mới">Tạo mới</option>
+          <option value="Cập nhật">Cập nhật</option>
+          <option value="Xóa">Xóa</option>
+        </select>
+        <select id="obj-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả đối tượng</option>
+          <option value="Tồn kho">Tồn kho</option>
+          <option value="Nhập hàng">Nhập hàng</option>
+          <option value="Xếp hàng">Xếp hàng</option>
+          <option value="Đồ gian hàng">Đồ gian hàng</option>
+        </select>
+        <select id="pg-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="50">50 dòng</option>
+          <option value="100">100 dòng</option>
+          <option value="200">200 dòng</option>
+          <option value="0">Tất cả</option>
+        </select>
+        <button class="btn btn-g" onclick="document.getElementById('q-log').value='';document.getElementById('from-log').value='';document.getElementById('to-log').value='';document.getElementById('act-log').value='';document.getElementById('obj-log').value='';fLog()">✕</button>
+        <button class="btn btn-g" onclick="loadLog()">↻ Làm mới</button>
       </div>
       </details>
-      <div class="card"><div class="ch"><h2>Danh sách người dùng</h2></div><div id="user-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+      <div class="card"><div class="ch"><h2>Nhật ký hoạt động</h2></div><div id="log-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
     <!-- CÀI ĐẶT -->
     <div class="sec" id="s-setting">
-      <div class="card">
-        <div class="ch"><h2>Ngưỡng cảnh báo mặc định</h2></div>
-        <div style="padding:18px">
-          <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Áp dụng cho những sản phẩm <b>không đặt ngưỡng riêng</b> (để trống ở form Sửa sản phẩm). Sản phẩm nào đã đặt ngưỡng riêng thì dùng ngưỡng riêng đó, không dùng số mặc định này.</p>
-          <div class="fr">
-            <div class="fg"><label>Ngưỡng "Sắp hết" mặc định</label><input id="set-saphet" type="number" placeholder="10"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Sắp hết"</small></div>
-            <div class="fg"><label>Ngưỡng "Gần hết" mặc định</label><input id="set-ganhet" type="number" placeholder="3"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Gần hết" (khẩn cấp hơn)</small></div>
+      <div class="tabs">
+        <div class="tab on" id="st-nguong" onclick="goSetTab('nguong')">Ngưỡng cảnh báo</div>
+        <div class="tab" id="st-user" onclick="goSetTab('user')">Người dùng</div>
+        <div class="tab" id="st-ncc" onclick="goSetTab('ncc')">Nhà cung cấp</div>
+        <div class="tab" id="st-gh" onclick="goSetTab('gh')">Gian hàng</div>
+        <div class="tab" id="st-loai" onclick="goSetTab('loai')">Loại hàng</div>
+      </div>
+
+      <div class="set-tab on" id="set-nguong">
+        <div class="card">
+          <div class="ch"><h2>Ngưỡng cảnh báo mặc định</h2></div>
+          <div style="padding:18px">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Áp dụng cho những sản phẩm <b>không đặt ngưỡng riêng</b> (để trống ở form Sửa sản phẩm). Sản phẩm nào đã đặt ngưỡng riêng thì dùng ngưỡng riêng đó, không dùng số mặc định này.</p>
+            <div class="fr">
+              <div class="fg"><label>Ngưỡng "Sắp hết" mặc định</label><input id="set-saphet" type="number" placeholder="10"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Sắp hết"</small></div>
+              <div class="fg"><label>Ngưỡng "Gần hết" mặc định</label><input id="set-ganhet" type="number" placeholder="3"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Gần hết" (khẩn cấp hơn)</small></div>
+            </div>
+            <p style="font-size:12px;color:var(--text2);margin:18px 0 16px;padding-top:16px;border-top:1px solid var(--border)">Áp dụng cho card <b>"Hàng sắp hết hạn sử dụng"</b> ở Tổng quan — chỉ tính sản phẩm có ghi Hạn sử dụng.</p>
+            <div class="fr">
+              <div class="fg"><label>Sắp hết hạn trong (ngày)</label><input id="set-hsdsap" type="number" placeholder="30"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → liệt kê vào danh sách</small></div>
+              <div class="fg"><label>Gấp nếu còn ≤ (ngày)</label><input id="set-hsdgan" type="number" placeholder="7"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → đánh dấu đỏ (khẩn cấp)</small></div>
+            </div>
+            <div class="mf" style="border-top:none;padding-top:8px">
+              <button class="btn btn-p" onclick="saveCaiDat()">💾 Lưu cài đặt</button>
+            </div>
           </div>
-          <p style="font-size:12px;color:var(--text2);margin:18px 0 16px;padding-top:16px;border-top:1px solid var(--border)">Áp dụng cho card <b>"Hàng sắp hết hạn sử dụng"</b> ở Tổng quan — chỉ tính sản phẩm có ghi Hạn sử dụng.</p>
-          <div class="fr">
-            <div class="fg"><label>Sắp hết hạn trong (ngày)</label><input id="set-hsdsap" type="number" placeholder="30"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → liệt kê vào danh sách</small></div>
-            <div class="fg"><label>Gấp nếu còn ≤ (ngày)</label><input id="set-hsdgan" type="number" placeholder="7"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → đánh dấu đỏ (khẩn cấp)</small></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-user">
+        <div class="card">
+          <div class="ch"><h2>Người dùng</h2><button class="btn btn-p btn-sm" onclick="initUser()">+ Thêm người dùng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <button class="btn btn-g" onclick="loadUser()">↻ Làm mới</button>
+              <button class="btn btn-d" id="user-delsel-btn" onclick="delSelUser()" style="display:none">🗑 Xóa đã chọn (<span id="user-selcnt">0</span>)</button>
+            </div>
+            </details>
           </div>
-          <div class="mf" style="border-top:none;padding-top:8px">
-            <button class="btn btn-p" onclick="saveCaiDat()">💾 Lưu cài đặt</button>
+          <div id="user-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-ncc">
+        <div class="card">
+          <div class="ch"><h2>Nhà cung cấp</h2><button class="btn btn-p btn-sm" onclick="initNCC()">+ Thêm NCC</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-ncc" placeholder="Tìm nhà cung cấp..." oninput="fNCC()">
+              <button class="btn btn-g" onclick="loadNCC()">↻ Làm mới</button>
+              <button class="btn btn-d" id="ncc-delsel-btn" onclick="delSelNCC()" style="display:none">🗑 Xóa đã chọn (<span id="ncc-selcnt">0</span>)</button>
+            </div>
+            </details>
           </div>
+          <div id="ncc-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-gh">
+        <div class="card">
+          <div class="ch"><h2>Gian hàng</h2><button class="btn btn-p btn-sm" onclick="initGH()">+ Thêm gian hàng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-gh" placeholder="Tìm gian hàng..." oninput="fGH()">
+              <button class="btn btn-g" onclick="loadGH()">↻ Làm mới</button>
+              <button class="btn btn-d" id="gh-delsel-btn" onclick="delSelGH()" style="display:none">🗑 Xóa đã chọn (<span id="gh-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="gh-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-loai">
+        <div class="card">
+          <div class="ch"><h2>Loại hàng</h2><button class="btn btn-p btn-sm" onclick="initLoai()">+ Thêm loại hàng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-loai" placeholder="Tìm loại hàng..." oninput="fLoai()">
+              <button class="btn btn-g" onclick="loadLoai()">↻ Làm mới</button>
+              <button class="btn btn-d" id="loai-delsel-btn" onclick="delSelLoai()" style="display:none">🗑 Xóa đã chọn (<span id="loai-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="loai-tbl"><div class="ld"><div class="spin"></div></div></div>
         </div>
       </div>
     </div>
@@ -237,7 +352,10 @@
       <div class="fg"><label>Sắp hết hạn trong (ngày) riêng</label><input id="sp-hsdsap" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
       <div class="fg"><label>Gấp nếu còn ≤ (ngày) riêng</label><input id="sp-hsdgan" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
     </div>
-    <div class="fg"><label>Nhà cung cấp</label><input id="sp-ncc" list="ncc-datalist" placeholder="Tên NCC" autocomplete="off"></div>
+    <div class="fr">
+      <div class="fg"><label>Nhà cung cấp</label><input id="sp-ncc" placeholder="Tên NCC" autocomplete="off"></div>
+      <div class="fg"><label>Loại hàng</label><input id="sp-loai" placeholder="Gõ để tìm loại hàng..." autocomplete="off"></div>
+    </div>
     <div class="mf">
       <button class="btn btn-g" onclick="cm('m-sp')">Hủy</button>
       <button class="btn btn-p" onclick="saveSP()">Lưu</button>
@@ -247,19 +365,19 @@
 
 <!-- MODAL NHẬP HÀNG NHIỀU DÒNG -->
 <div class="mo" id="m-nh">
-  <div class="mb">
+  <div class="mb mb-lg">
     <h3>Tạo phiếu nhập hàng</h3>
     <div class="fr3">
       <div class="fg"><label>Người nhập *</label><select id="nh-user"><option value="">-- Chọn --</option></select></div>
-      <div class="fg"><label>Nhà cung cấp</label><input id="nh-ncc" list="ncc-datalist" placeholder="Tên NCC" autocomplete="off"></div>
+      <div class="fg"><label>Nhà cung cấp</label><input id="nh-ncc" placeholder="Tên NCC" autocomplete="off"></div>
       <div class="fg"><label>Ngày nhập</label><input id="nh-ngay" type="date"></div>
     </div>
     <div class="fg"><label>Ghi chú</label><input id="nh-gc" placeholder="Ghi chú thêm..."></div>
     <label style="font-size:11px;color:var(--text2);font-weight:500;display:block;margin-bottom:6px">Danh sách hàng nhập *</label>
-    <table class="item-table">
-      <thead><tr><th>Sản phẩm</th><th>Số lượng</th><th>Giá nhập (đ)</th><th>Tổng giá nhập (đ)</th><th>Hạn SD</th><th></th></tr></thead>
+    <div class="scroll-tbl"><table class="item-table">
+      <thead><tr><th>Sản phẩm</th><th>Số lượng</th><th>Giá nhập (đ)</th><th>Tổng giá nhập (đ)</th><th>Hạn SD</th><th>Loại hàng</th><th></th></tr></thead>
       <tbody id="nh-rows"></tbody>
-    </table>
+    </table></div>
     <button class="add-row-btn" onclick="addNHRow()">+ Thêm sản phẩm</button>
     <div class="total-bar" id="nh-total">
       <span>Tổng SL: <b id="nh-tsl">0</b></span>
@@ -272,27 +390,26 @@
   </div>
 </div>
 
-<!-- MODAL SỬA PHIẾU NHẬP HÀNG -->
-<div class="mo" id="m-nh-edit">
-  <div class="mb mb-sm">
-    <h3>Sửa phiếu nhập hàng</h3>
-    <input type="hidden" id="nhe-row">
-    <div class="fg"><label>Sản phẩm *</label><select id="nhe-sp"></select></div>
-    <div class="fr3">
-      <div class="fg"><label>Số lượng *</label><input id="nhe-sl" type="number" placeholder="0" oninput="nheCalc('sl')"></div>
-      <div class="fg"><label>Giá nhập (đ)</label><input id="nhe-gia" type="number" placeholder="0" oninput="nheCalc('gia')"></div>
-      <div class="fg"><label>Tổng giá nhập (đ)</label><input id="nhe-tong" type="number" placeholder="0" oninput="nheCalc('tong')"></div>
+<!-- MODAL CHI TIẾT NHẬP HÀNG THEO NGÀY -->
+<div class="mo" id="m-nh-day">
+  <div class="mb mb-lg">
+    <h3 id="nh-day-t">Phiếu nhập ngày ...</h3>
+    <div id="nh-day-sum"></div>
+    <div class="sb">
+      <input type="text" id="nh-day-q" placeholder="🔍 Tìm sản phẩm trong phiếu này..." oninput="renderNHDayDetail()">
+      <label style="font-size:12px;color:var(--text2);white-space:nowrap">Hạn SD từ</label>
+      <input type="date" id="nh-day-hsd-from" onchange="renderNHDayDetail()">
+      <label style="font-size:12px;color:var(--text2);white-space:nowrap">đến</label>
+      <input type="date" id="nh-day-hsd-to" onchange="renderNHDayDetail()">
+      <button class="btn btn-g" onclick="document.getElementById('nh-day-hsd-from').value='';document.getElementById('nh-day-hsd-to').value='';renderNHDayDetail()">✕</button>
+      <select id="nh-day-user-q" onchange="renderNHDayDetail()"><option value="">Tất cả người nhập</option></select>
     </div>
-    <div class="fr">
-      <div class="fg"><label>Nhà cung cấp</label><input id="nhe-ncc" list="ncc-datalist" placeholder="Tên NCC" autocomplete="off"></div>
-      <div class="fg"><label>Ngày nhập</label><input id="nhe-ngay" type="date"></div>
-    </div>
-    <div class="fg"><label>Hạn sử dụng</label><input id="nhe-hsd" type="date"></div>
-    <div class="fg"><label>Người nhập *</label><select id="nhe-user"></select></div>
-    <div class="fg"><label>Ghi chú</label><input id="nhe-gc" placeholder="Ghi chú thêm..."></div>
+    <div id="nh-day-tbl"></div>
+    <button class="add-row-btn" onclick="addNHDayRow()">+ Thêm sản phẩm</button>
     <div class="mf">
-      <button class="btn btn-g" onclick="cm('m-nh-edit')">Hủy</button>
-      <button class="btn btn-p" onclick="saveNHEdit()">Lưu</button>
+      <button class="btn btn-d" style="margin-right:auto" onclick="delNHDay()">🗑 Xóa cả phiếu này</button>
+      <button class="btn btn-g" onclick="cm('m-nh-day')">Đóng</button>
+      <button class="btn btn-p" onclick="saveNHDayAll()">💾 Lưu tất cả</button>
     </div>
   </div>
 </div>
@@ -322,21 +439,36 @@
   </div>
 </div>
 
-<!-- MODAL SỬA PHIẾU XẾP HÀNG -->
-<div class="mo" id="m-xh-edit">
-  <div class="mb mb-sm">
-    <h3>Sửa phiếu xếp hàng</h3>
-    <input type="hidden" id="xhe-row">
-    <div class="fg"><label>Sản phẩm *</label><select id="xhe-sp"></select></div>
-    <div class="fr">
-      <div class="fg"><label>Số lượng *</label><input id="xhe-sl" type="number" placeholder="0"></div>
-      <div class="fg"><label>Gian hàng *</label><select id="xhe-gh"></select></div>
+<!-- MODAL CHI TIẾT XẾP HÀNG THEO NGÀY -->
+<div class="mo" id="m-xh-day">
+  <div class="mb mb-lg">
+    <h3 id="xh-day-t">Phiếu xếp hàng ngày ...</h3>
+    <div id="xh-day-sum"></div>
+    <div class="sb">
+      <input type="text" id="xh-day-q" placeholder="🔍 Tìm sản phẩm trong phiếu này..." oninput="renderXHDayDetail()">
+      <select id="xh-day-gh-q" onchange="renderXHDayDetail()"><option value="">Tất cả gian hàng</option></select>
     </div>
-    <div class="fg"><label>Ngày xếp hàng</label><input id="xhe-ngay" type="date"></div>
-    <div class="fg"><label>Ghi chú</label><input id="xhe-gc" placeholder="Ghi chú thêm..."></div>
+    <div id="xh-day-tbl"></div>
+    <button class="add-row-btn" onclick="addXHDayRow()">+ Thêm sản phẩm</button>
     <div class="mf">
-      <button class="btn btn-g" onclick="cm('m-xh-edit')">Hủy</button>
-      <button class="btn btn-p" onclick="saveXHEdit()">Lưu</button>
+      <button class="btn btn-d" style="margin-right:auto" onclick="delXHDay()">🗑 Xóa cả phiếu này</button>
+      <button class="btn btn-g" onclick="cm('m-xh-day')">Đóng</button>
+      <button class="btn btn-p" onclick="saveXHDayAll()">💾 Lưu tất cả</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ĐỒ GIAN HÀNG -->
+<div class="mo" id="m-ghk">
+  <div class="mb mb-sm">
+    <h3>Sửa đồ gian hàng</h3>
+    <div class="fg"><label>Gian hàng *</label><select id="ghk-gh-sel"></select></div>
+    <div class="fg"><label>Sản phẩm *</label><select id="ghk-sp"></select></div>
+    <div class="fg"><label>Số lượng *</label><input id="ghk-sl" type="number" placeholder="0"></div>
+    <small style="color:var(--text2);font-size:11px">Số lượng ở đây chỉ chỉnh riêng cho gian hàng này (dùng để kiểm kê lại cho đúng thực tế) — không ảnh hưởng tới Tồn kho.</small>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-ghk')">Hủy</button>
+      <button class="btn btn-p" onclick="saveGHK()">Lưu</button>
     </div>
   </div>
 </div>
@@ -373,6 +505,19 @@
   </div>
 </div>
 
+<!-- MODAL LOẠI HÀNG -->
+<div class="mo" id="m-loai">
+  <div class="mb mb-sm">
+    <h3 id="m-loai-t">Thêm loại hàng</h3>
+    <input type="hidden" id="loai-row">
+    <div class="fg"><label>Tên loại hàng *</label><input id="loai-ten" placeholder="VD: Đồ uống, Bánh kẹo..."></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-loai')">Hủy</button>
+      <button class="btn btn-p" onclick="saveLoai()">Lưu</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL USER -->
 <div class="mo" id="m-user">
   <div class="mb mb-sm">
@@ -381,16 +526,23 @@
     <div class="fg"><label>Họ tên *</label><input id="user-ten" placeholder="Nguyễn Văn A"></div>
     <div class="fg"><label>Số điện thoại</label><input id="user-sdt" placeholder="0xxx..."></div>
     <div class="fg"><label>Vai trò</label><input id="user-vaitro" placeholder="Chủ cửa hàng, Nhân viên..."></div>
+    <div class="fg"><label>Email đăng nhập</label><input id="user-email" type="email" placeholder="email@vidu.com" autocomplete="off"></div>
+    <div class="fg" id="user-pass-wrap">
+      <label>Mật khẩu đăng nhập</label>
+      <div style="display:flex;gap:6px">
+        <input id="user-pass" type="password" placeholder="Từ 6 ký tự" autocomplete="new-password" style="flex:1">
+        <button type="button" class="btn btn-g btn-sm" onclick="toggleUserPassInput()">👁️</button>
+      </div>
+      <small style="color:var(--text2);font-size:11px" id="user-pass-hint">Nhập cả Email &amp; Mật khẩu nếu muốn người này tự đăng nhập được vào app. Để trống nếu chỉ cần lưu tên tham khảo. Nếu email đã có tài khoản từ trước (VD: tài khoản admin gốc), chỉ cần gõ email đó — hệ thống sẽ tự liên kết vào đây.</small>
+    </div>
     <div class="fg"><label>Ghi chú</label><textarea id="user-gc" rows="2"></textarea></div>
     <div class="mf">
+      <button class="btn btn-g" id="user-reset-btn" onclick="sendUserResetPass()" style="display:none">🔑 Gửi email đặt lại mật khẩu</button>
       <button class="btn btn-g" onclick="cm('m-user')">Hủy</button>
       <button class="btn btn-p" onclick="saveUser()">Lưu</button>
     </div>
   </div>
 </div>
-
-<datalist id="ncc-datalist"></datalist>
-
 <div id="toast"></div>
 
 <div id="toast"></div>
