@@ -67,7 +67,7 @@ async function doLogout(){
   }
 }
 
-let C={TK:[],NH:[],NCC:[],USER:[],GH:[],XH:[]};
+let C={TK:[],NH:[],NCC:[],USER:[],GH:[],XH:[],LOG:[],GHK:[]};
 let SETTINGS={sapHet:10,ganHet:3,hsdSap:30,hsdGan:7};// ngưỡng mặc định dùng chung, SP nào không đặt riêng thì dùng cái này
 
 // ── FIREBASE API ──
@@ -118,6 +118,33 @@ async function apiGetRaw(sheet){
 
 function fmt(n){return Number(n||0).toLocaleString('vi-VN');}
 function td(){return new Date().toISOString().slice(0,10);}
+
+// ── XÁC ĐỊNH NGƯỜI ĐANG ĐĂNG NHẬP ── map email tài khoản Firebase Auth đang dùng ↔ bản ghi "Người dùng"
+// để tự động biết "ai đang thao tác" thay vì bắt chọn tay mỗi lần
+function findUserByEmail(email){
+  if(!email)return null;
+  return C.USER.find(r=>(r[4]||'').toLowerCase()===String(email).toLowerCase())||null;
+}
+function currentUserName(){
+  const u=auth&&auth.currentUser;
+  if(!u)return'';
+  const rec=findUserByEmail(u.email);
+  return rec?rec[0]:(u.email||'');
+}
+
+// ── NHẬT KÝ HOẠT ĐỘNG (Log) ── ghi lại ai vừa tạo mới/cập nhật/xóa gì, khi nào
+// Không await/chặn luồng chính — ghi log lỗi (mất mạng...) không được làm hỏng thao tác chính của người dùng
+function logAction(hanhDong,doiTuong,moTa){
+  const nguoiDung=(auth&&auth.currentUser&&auth.currentUser.email)||'';
+  const thoiGian=new Date().toISOString();
+  apiPost({sheet:'Log',action:'append',row:[thoiGian,nguoiDung,hanhDong,doiTuong,moTa]}).catch(()=>{});
+}
+function fmtDT(iso){
+  if(!iso)return'';
+  const d=new Date(iso);
+  if(isNaN(d))return iso;
+  return d.toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
 function ym(d){return d?String(d).slice(0,7):'';}
 function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',2500);}
 function om(id){document.getElementById(id).classList.add('on');}
@@ -172,27 +199,32 @@ function go(name){
   document.querySelectorAll('#sb nav a').forEach(a=>a.classList.remove('on'));
   document.getElementById('s-'+name).classList.add('on');
   document.getElementById('n-'+name).classList.add('on');
-  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ncc:'Nhà cung cấp',gh:'Gian hàng',user:'Người dùng',setting:'Cài đặt'};
+  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
   document.getElementById('ptitle').textContent=titles[name];
   const btns={
     tk:`<button class="btn btn-p" onclick="initSPForm();om('m-sp')">+ Thêm sản phẩm</button>`,
     nh:`<button class="btn btn-s" onclick="openNH()">+ Tạo phiếu nhập</button>`,
     xh:`<button class="btn btn-s" onclick="openXH()">+ Tạo phiếu xếp</button>`,
-    ncc:`<button class="btn btn-p" onclick="initNCC()">+ Thêm NCC</button>`,
-    gh:`<button class="btn btn-p" onclick="initGH()">+ Thêm gian hàng</button>`,
-    user:`<button class="btn btn-p" onclick="initUser()">+ Thêm người dùng</button>`,
+    ghk:`<button class="btn btn-g" onclick="loadGHK()">↻ Làm mới</button>`,
     dash:`<button class="btn btn-g" onclick="loadDash()">↻ Làm mới</button>`,
+    log:`<button class="btn btn-g" onclick="loadLog()">↻ Làm mới</button>`,
     setting:''
   };
   document.getElementById('acts').innerHTML=btns[name]||'';
   if(name==='tk')loadTK();
   else if(name==='nh')loadNH();
   else if(name==='xh')loadXH();
-  else if(name==='ncc')loadNCC();
-  else if(name==='gh')loadGH();
-  else if(name==='user')loadUser();
-  else if(name==='setting')loadCaiDat();
+  else if(name==='ghk')loadGHK();
+  else if(name==='log')loadLog();
+  else if(name==='setting'){loadCaiDat();loadUser();loadNCC();loadGH();}
   else loadDash();
+}
+// Tab con trong màn Cài đặt: Ngưỡng cảnh báo / Người dùng / Nhà cung cấp / Gian hàng
+function goSetTab(name){
+  document.querySelectorAll('#s-setting .tabs .tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#s-setting .set-tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('st-'+name).classList.add('on');
+  document.getElementById('set-'+name).classList.add('on');
 }
 
 // ══ DASHBOARD ══
@@ -423,6 +455,7 @@ async function delSelTK(){
     for(const i of idxs){
       await apiPost({sheet:'TonKho',action:'delete',row:i+2});
     }
+    logAction('Xóa','Tồn kho',`Xóa hàng loạt ${idxs.length} sản phẩm: ${names.join(', ')}`);
     selTK.clear();
     toast('Đã xóa '+idxs.length+' sản phẩm!');setTimeout(loadTK,800);
   });
@@ -450,6 +483,7 @@ async function delSP(row,name){
   confirmDel(`Xóa sản phẩm "${name}"?`,async()=>{
     toast('Đang xóa...');
     await apiPost({sheet:'TonKho',action:'delete',row:Number(row)});
+    logAction('Xóa','Tồn kho',`Sản phẩm "${name}"`);
     toast('Đã xóa '+name);setTimeout(loadTK,800);
   });
 }
@@ -463,6 +497,7 @@ async function saveSP(){
   const er=document.getElementById('sp-row').value;
   toast('Đang lưu...');
   await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
+  logAction(er?'Cập nhật':'Tạo mới','Tồn kho',`Sản phẩm "${ten}", SL: ${row[1]}`);
   toast(er?'Đã cập nhật':'Đã thêm sản phẩm');cm('m-sp');setTimeout(loadTK,800);
 }
 
@@ -522,6 +557,9 @@ async function openNH(){
   if(!C.TK.length)await loadTK();
   if(!C.USER.length)await loadUser();
   document.getElementById('nh-user').innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(r=>`<option>${r[0]}</option>`).join('');
+  // Tự điền sẵn "Người nhập" theo tài khoản đang đăng nhập (nếu tài khoản này có gắn với 1 Người dùng) — đỡ phải chọn tay
+  const cur=currentUserName();
+  if(cur&&C.USER.some(u=>u[0]===cur))document.getElementById('nh-user').value=cur;
   document.getElementById('nh-ngay').value=td();
   document.getElementById('nh-ncc').value='';
   document.getElementById('nh-gc').value='';
@@ -557,6 +595,7 @@ async function saveNH(){
     await apiPost({sheet:'TonKho',action:'update',row:it.idx+2,data:upd});
     C.TK[it.idx][1]=newSL;if(it.gia>0)C.TK[it.idx][3]=it.gia;if(it.hsd)C.TK[it.idx][5]=it.hsd;if(ncc)C.TK[it.idx][8]=ncc;
   }
+  logAction('Tạo mới','Nhập hàng',`Người nhập: ${user} — ${items.map(it=>`${it.sp[0]} x${it.sl}`).join(', ')}`);
   toast('Đã nhập '+items.length+' sản phẩm thành công!');cm('m-nh');setTimeout(loadNH,800);
 }
 
@@ -609,6 +648,10 @@ async function saveNHEdit(){
   if(!user){toast('Chọn người nhập','err');return;}
   toast('Đang lưu...');
   await apiPost({sheet:'NhapHang',action:'update',row,data:[sp[0],sl,gia,ncc,ngay,gc,user,hsd]});
+  // đồng bộ ngay vào cache C.NH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi
+  // setTimeout(loadNH,800) bên dưới kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và
+  // tồn kho bị cộng dồn sai (trừ hụt phần chênh lệch của lần sửa trước)
+  C.NH[row-2]=[sp[0],sl,gia,ncc,ngay,gc,user,hsd];
   // điều chỉnh lại tồn kho theo chênh lệch số lượng (và đổi sản phẩm nếu có)
   const oldIdx=C.TK.findIndex(t=>t[0]===old[0]);
   const oldSL=Number(old[1]||0);
@@ -635,6 +678,7 @@ async function saveNHEdit(){
     await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:updNew});
     C.TK[spIdx][1]=newStockNew;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;
   }
+  logAction('Cập nhật','Nhập hàng',`"${old[0]}" SL ${old[1]}→${sl}, Giá ${old[2]}→${gia} — sửa bởi: ${user}`);
   toast('Đã cập nhật phiếu nhập!');cm('m-nh-edit');setTimeout(loadNH,800);
 }
 
@@ -708,8 +752,10 @@ async function delSelNH(){
   confirmDel(`Xóa ${selNH.size} phiếu nhập đã chọn? Tồn kho sẽ được điều chỉnh (trừ lại) tương ứng.`,async()=>{
     toast('Đang xóa '+selNH.size+' phiếu...');
     const idxs=[...selNH].sort((a,b)=>b-a);// xóa từ index lớn → nhỏ để tránh lệch vị trí
+    const delNames=[];
     for(const idx of idxs){
       const r=C.NH[idx];if(!r)continue;
+      delNames.push(`${r[0]} x${r[1]}`);
       await apiPost({sheet:'NhapHang',action:'delete',row:idx+2});
       const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
       if(spIdx>=0){
@@ -719,6 +765,7 @@ async function delSelNH(){
         C.TK[spIdx][1]=newSL;
       }
     }
+    logAction('Xóa','Nhập hàng',`Xóa hàng loạt ${delNames.length} phiếu: ${delNames.join(', ')}`);
     selNH.clear();
     toast('Đã xóa '+idxs.length+' phiếu nhập!');setTimeout(loadNH,800);
   });
@@ -791,6 +838,7 @@ async function saveXH(){
     await apiPost({sheet:'TonKho',action:'update',row:it.idx+2,data:upd});
     C.TK[it.idx][1]=newSL;
   }
+  logAction('Tạo mới','Xếp hàng',`Gian hàng: ${gh} — ${items.map(it=>`${it.sp[0]} x${it.sl}`).join(', ')}`);
   toast('Đã xếp '+items.length+' sản phẩm!');cm('m-xh');setTimeout(loadXH,800);
 }
 
@@ -855,8 +903,10 @@ async function delSelXH(){
   confirmDel(`Xóa ${selXH.size} phiếu xếp đã chọn? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
     toast('Đang xóa '+selXH.size+' phiếu...');
     const idxs=[...selXH].sort((a,b)=>b-a);
+    const delNames=[];
     for(const idx of idxs){
       const r=C.XH[idx];if(!r)continue;
+      delNames.push(`${r[0]} x${r[1]}`);
       await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
       const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
       if(spIdx>=0){
@@ -866,6 +916,7 @@ async function delSelXH(){
         C.TK[spIdx][1]=newSL;
       }
     }
+    logAction('Xóa','Xếp hàng',`Xóa hàng loạt ${delNames.length} phiếu: ${delNames.join(', ')}`);
     selXH.clear();
     toast('Đã xóa '+idxs.length+' phiếu xếp!');setTimeout(loadXH,800);
   });
@@ -920,6 +971,10 @@ async function saveXHEdit(){
   }
   toast('Đang lưu...');
   await apiPost({sheet:'XepHang',action:'update',row,data:[sp[0],sl,gh,ngay,gc]});
+  // đồng bộ ngay vào cache C.XH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi
+  // setTimeout(loadXH,800) bên dưới kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và
+  // tồn kho bị tính sai (cộng/trừ dư phần chênh lệch của lần sửa trước)
+  C.XH[row-2]=[sp[0],sl,gh,ngay,gc];
   if(oldIdx>=0&&oldIdx===spIdx){
     const newStock=Math.max(0,Number(C.TK[spIdx][1]||0)+oldSL-sl);
     const upd=[...C.TK[spIdx]];upd[1]=newStock;
@@ -937,6 +992,8 @@ async function saveXHEdit(){
     await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:updNew});
     C.TK[spIdx][1]=newStockNew;
   }
+  // (Không cần tự tay cập nhật "Đồ gian hàng" — màn đó tính thẳng từ lịch sử Xếp hàng mỗi lần hiển thị)
+  logAction('Cập nhật','Xếp hàng',`"${old[0]}" SL ${old[1]}→${sl}, Gian hàng: ${gh}`);
   toast('Đã cập nhật phiếu xếp hàng!');cm('m-xh-edit');setTimeout(loadXH,800);
 }
 
@@ -952,8 +1009,91 @@ async function delXH(row,tenSP,sl){
       await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
       C.TK[spIdx][1]=newSL;
     }
+    logAction('Xóa','Xếp hàng',`Phiếu xếp "${tenSP}" x${sl}`);
     toast('Đã xóa & hoàn tồn kho!');setTimeout(loadXH,800);
   });
+}
+
+// ══ ĐỒ GIAN HÀNG ══ số lượng mỗi sản phẩm đang có tại mỗi gian hàng.
+// KHÔNG dùng 1 bảng riêng cộng dồn dần (dễ thiếu dữ liệu cũ, dễ lệch) — mà TÍNH THẲNG từ lịch sử Xếp hàng
+// (C.XH) mỗi lần hiển thị: gộp theo (Sản phẩm, Gian hàng) rồi cộng SL → tự động có đủ mọi phiếu xếp,
+// kể cả những phiếu đã xếp từ TRƯỚC khi có màn hình này, không cần "backfill" gì cả.
+// C.GHK chỉ còn dùng để lưu phần CHÊNH LỆCH khi người dùng tự "Sửa" (kiểm kê lại cho đúng thực tế) —
+// mỗi dòng là 1 độ lệch (offset, có thể âm) cộng thêm vào số tính từ Xếp hàng, không phải số tuyệt đối.
+function ghkBase(tenSP,gianHang){
+  return C.XH.filter(r=>r[0]===tenSP&&r[2]===gianHang).reduce((s,r)=>s+Number(r[1]||0),0);
+}
+function ghkOffset(tenSP,gianHang){
+  const r=C.GHK.find(r=>r[0]===tenSP&&r[1]===gianHang);
+  return r?Number(r[2]||0):0;
+}
+function ghkQty(tenSP,gianHang){
+  return Math.max(0,ghkBase(tenSP,gianHang)+ghkOffset(tenSP,gianHang));
+}
+let ghkActiveTab=null;
+async function loadGHK(){
+  if(!C.GH.length)await loadGH();
+  // luôn lấy XepHang mới nhất — đây là nguồn dữ liệu chính để tính số lượng, phải tươi
+  C.XH=await apiGet('XepHang');
+  C.GHK=await apiGet('GianHangKho');
+  rGHKView();
+}
+function goGHKTab(name){ghkActiveTab=name;rGHKView();}
+function rGHKView(){
+  const tabsEl=document.getElementById('ghk-tabs'),paneEl=document.getElementById('ghk-pane');
+  if(!tabsEl||!paneEl)return;
+  if(!C.GH.length){
+    tabsEl.innerHTML='';
+    paneEl.innerHTML='<div class="empty">🏬 Chưa có gian hàng nào — vào Cài đặt → Gian hàng để thêm trước</div>';
+    return;
+  }
+  if(!ghkActiveTab||!C.GH.some(g=>g[0]===ghkActiveTab))ghkActiveTab=C.GH[0][0];
+  // Danh sách sản phẩm của 1 gian hàng = mọi SP từng có phiếu Xếp hàng vào đó, hợp với mọi SP có sửa tay riêng
+  function namesOf(gh){
+    const s=new Set(C.XH.filter(r=>r[2]===gh).map(r=>r[0]));
+    C.GHK.filter(r=>r[1]===gh).forEach(r=>s.add(r[0]));
+    return[...s];
+  }
+  tabsEl.innerHTML=C.GH.map(g=>{
+    const cnt=namesOf(g[0]).length;
+    return`<div class="tab${g[0]===ghkActiveTab?' on':''}" onclick="goGHKTab('${esc(g[0])}')">${esc(g[0])}${cnt?` (${cnt})`:''}</div>`;
+  }).join('');
+  const q=(document.getElementById('q-ghk')?.value||'').toLowerCase();
+  let names=namesOf(ghkActiveTab);
+  if(q)names=names.filter(n=>n.toLowerCase().includes(q));
+  const items=names.map(n=>[n,ghkQty(n,ghkActiveTab)]).sort((a,b)=>a[0].localeCompare(b[0]));
+  const total=items.reduce((s,r)=>s+r[1],0);
+  const body=!items.length
+    ?`<div class="empty">🗄️ "${esc(ghkActiveTab)}" chưa có hàng nào (tự có khi Xếp hàng ra gian hàng này)</div>`
+    :`<table class="m-tbl"><thead><tr><th>Sản phẩm</th><th>Số lượng</th><th></th></tr></thead><tbody>`+
+      items.map(([ten,sl])=>
+        `<tr><td data-label="Sản phẩm"><b>${ten}</b></td><td data-label="Số lượng"><b>${fmt(sl)}</b></td><td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Sửa</button></td></tr>`
+      ).join('')+'</tbody></table>';
+  paneEl.innerHTML=`<div class="card"><div class="ch"><h2>${esc(ghkActiveTab)}</h2><span style="font-size:11px;color:var(--text2)">Tổng SL: ${fmt(total)}</span></div>${body}</div>`;
+}
+function editGHK(tenSP,gianHang){
+  document.getElementById('ghk-sp').innerHTML=`<option>${tenSP}</option>`;
+  document.getElementById('ghk-gh-sel').innerHTML=`<option>${gianHang}</option>`;
+  document.getElementById('ghk-sp').disabled=true;document.getElementById('ghk-gh-sel').disabled=true;// chỉ sửa số lượng
+  document.getElementById('ghk-sl').value=ghkQty(tenSP,gianHang);
+  om('m-ghk');
+}
+async function saveGHK(){
+  const ten=document.getElementById('ghk-sp').value;
+  const gh=document.getElementById('ghk-gh-sel').value;
+  const target=Number(document.getElementById('ghk-sl').value||0);
+  if(!ten||!gh){toast('Thiếu thông tin sản phẩm/gian hàng','err');return;}
+  if(target<0){toast('Số lượng không được âm','err');return;}
+  // Lưu lại phần CHÊNH LỆCH so với số tính từ lịch sử Xếp hàng — không ghi đè số tuyệt đối,
+  // để sau này có thêm phiếu Xếp hàng mới thì vẫn cộng đúng lên trên nền đã kiểm kê
+  const offset=target-ghkBase(ten,gh);
+  toast('Đang lưu...');
+  const idx=C.GHK.findIndex(r=>r[0]===ten&&r[1]===gh);
+  const row=[ten,gh,offset];
+  await apiPost(idx>=0?{sheet:'GianHangKho',action:'update',row:idx+2,data:row}:{sheet:'GianHangKho',action:'append',row});
+  if(idx>=0)C.GHK[idx]=row;else C.GHK.push(row);
+  logAction('Cập nhật','Đồ gian hàng',`"${ten}" tại "${gh}": chỉnh về SL = ${target}`);
+  toast('Đã cập nhật');cm('m-ghk');rGHKView();
 }
 
 // ══ NHÀ CUNG CẤP ══
@@ -1093,12 +1233,12 @@ async function saveGH(){
 
 // ══ NGƯỜI DÙNG ══
 const USER_COLS=[
-  {key:'ten',label:'Họ tên'},{key:'sdt',label:'SĐT'},{key:'vaitro',label:'Vai trò'},{key:'gc',label:'Ghi chú'}
+  {key:'ten',label:'Họ tên'},{key:'sdt',label:'SĐT'},{key:'vaitro',label:'Vai trò'},{key:'email',label:'Email đăng nhập'},{key:'pass',label:'Mật khẩu'},{key:'gc',label:'Ghi chú'}
 ];
 let userSortCol=null,userSortDir=1;
 function sortUserClick(col){if(userSortCol===col)userSortDir*=-1;else{userSortCol=col;userSortDir=1;}renderUserSorted();}
 function userCompare(a,b,col){
-  const idx={ten:0,sdt:1,vaitro:2,gc:3}[col];
+  const idx={ten:0,sdt:1,vaitro:2,email:4,pass:5,gc:3}[col];
   return(a[idx]||'').localeCompare(b[idx]||'');
 }
 function renderUserSorted(){
@@ -1123,7 +1263,10 @@ function rUser(data){
     data.map(r=>{
       const gi=C.USER.indexOf(r);
       const chk=selUser.has(gi)?'checked':'';
-      return`<tr><td data-label=""><input type="checkbox" class="user-chk" data-idx="${gi}" ${chk} onchange="toggleUserChk(this)"></td><td data-label="Họ tên"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Vai trò">${r[2]?`<span class="bg bg-p">${r[2]}</span>`:''}</td><td data-label="Ghi chú">${r[3]||''}</td>
+      const passCell=r[5]
+        ?`<span id="pwm-${gi}">••••••••</span><span id="pwr-${gi}" style="display:none">${esc(r[5])}</span> <button class="btn btn-g btn-sm" onclick="toggleUserPass(${gi})" title="Xem/ẩn mật khẩu">👁️</button>`
+        :'<span style="color:var(--text2);font-size:11px">—</span>';
+      return`<tr><td data-label=""><input type="checkbox" class="user-chk" data-idx="${gi}" ${chk} onchange="toggleUserChk(this)"></td><td data-label="Họ tên"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Vai trò">${r[2]?`<span class="bg bg-p">${r[2]}</span>`:''}</td><td data-label="Email đăng nhập">${r[4]?`<span class="bg bg-b">${r[4]}</span>`:'<span style="color:var(--text2);font-size:11px">Chưa có</span>'}</td><td data-label="Mật khẩu">${passCell}</td><td class="mobile-hide" data-label="Ghi chú">${r[3]||''}</td>
       <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editUser(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('User',${gi+2},'người dùng')">Xóa</button></td></tr>`;
     }).join('')+'</tbody></table>';
   updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
@@ -1143,6 +1286,16 @@ function toggleAllUser(el){
   });
   updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
 }
+function toggleUserPass(gi){
+  const m=document.getElementById('pwm-'+gi),r=document.getElementById('pwr-'+gi);
+  if(!m||!r)return;
+  const show=r.style.display==='none';
+  r.style.display=show?'':'none';m.style.display=show?'none':'';
+}
+function toggleUserPassInput(){
+  const el=document.getElementById('user-pass');
+  el.type=el.type==='password'?'text':'password';
+}
 async function delSelUser(){
   if(!selUser.size){toast('Chưa chọn người dùng nào','err');return;}
   confirmDel(`Xóa ${selUser.size} người dùng đã chọn?`,async()=>{
@@ -1153,14 +1306,88 @@ async function delSelUser(){
     toast('Đã xóa '+idxs.length+' người dùng!');setTimeout(loadUser,800);
   });
 }
-function initUser(){document.getElementById('m-user-t').textContent='Thêm người dùng';['user-ten','user-sdt','user-vaitro','user-gc'].forEach(id=>document.getElementById(id).value='');document.getElementById('user-row').value='';om('m-user');}
-function editUser(row){const r=C.USER[row-2];document.getElementById('m-user-t').textContent='Sửa người dùng';document.getElementById('user-ten').value=r[0]||'';document.getElementById('user-sdt').value=r[1]||'';document.getElementById('user-vaitro').value=r[2]||'';document.getElementById('user-gc').value=r[3]||'';document.getElementById('user-row').value=row;om('m-user');}
+function initUser(){
+  document.getElementById('m-user-t').textContent='Thêm người dùng';
+  ['user-ten','user-sdt','user-vaitro','user-gc','user-email','user-pass'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('user-row').value='';
+  document.getElementById('user-pass').type='password';
+  document.getElementById('user-pass-hint').textContent='Nhập cả Email & Mật khẩu nếu muốn người này tự đăng nhập được vào app. Để trống nếu chỉ cần lưu tên tham khảo. Nếu email đã có tài khoản từ trước (VD: tài khoản admin gốc), chỉ cần gõ email đó — hệ thống sẽ tự liên kết vào đây.';
+  document.getElementById('user-reset-btn').style.display='none';
+  om('m-user');
+}
+function editUser(row){
+  const r=C.USER[row-2];
+  document.getElementById('m-user-t').textContent='Sửa người dùng';
+  document.getElementById('user-ten').value=r[0]||'';
+  document.getElementById('user-sdt').value=r[1]||'';
+  document.getElementById('user-vaitro').value=r[2]||'';
+  document.getElementById('user-gc').value=r[3]||'';
+  document.getElementById('user-email').value=r[4]||'';
+  document.getElementById('user-pass').value=r[5]||'';// mật khẩu tham khảo đã lưu — chỉ để xem lại, không tự đổi được mật khẩu đăng nhập thật
+  document.getElementById('user-pass').type='password';
+  document.getElementById('user-row').value=row;
+  // Sửa người dùng đã có: KHÔNG thể tự đổi mật khẩu đăng nhập thật của tài khoản này từ đây (giới hạn của
+  // Firebase phía client) — ô này chỉ sửa bản ghi lưu tham khảo. Muốn đổi mật khẩu thật, dùng nút gửi email bên dưới.
+  document.getElementById('user-pass-hint').textContent='Đây là bản ghi mật khẩu lưu tham khảo — sửa ở đây KHÔNG đổi được mật khẩu đăng nhập thật của tài khoản (giới hạn kỹ thuật). Muốn đổi mật khẩu thật, dùng nút "Gửi email đặt lại mật khẩu" bên dưới.';
+  document.getElementById('user-reset-btn').style.display=r[4]?'':'none';
+  om('m-user');
+}
+// Tạo tài khoản đăng nhập mới (Firebase Auth) mà KHÔNG làm mất phiên đăng nhập hiện tại của admin —
+// dùng 1 app Firebase phụ riêng để tạo, vì createUserWithEmailAndPassword sẽ tự đăng nhập vào app được gọi trên đó
+async function createAuthUser(email,pass){
+  await initFirebase();
+  try{
+    const secApp=firebase.apps.find(a=>a.name==='Secondary')||firebase.initializeApp(firebaseConfig,'Secondary');
+    const secAuth=secApp.auth();
+    await secAuth.createUserWithEmailAndPassword(email,pass);
+    await secAuth.signOut();
+    return{ok:true};
+  }catch(e){return{ok:false,code:e.code};}
+}
+function authErrMsg(code){
+  const m={
+    'auth/email-already-in-use':'Email này đã được đăng ký cho tài khoản khác',
+    'auth/invalid-email':'Email không hợp lệ',
+    'auth/weak-password':'Mật khẩu quá yếu (tối thiểu 6 ký tự)',
+    'auth/user-not-found':'Không tìm thấy tài khoản đăng nhập với email này',
+    'auth/network-request-failed':'Lỗi kết nối mạng, thử lại sau'
+  };
+  return m[code]||'Có lỗi xảy ra, thử lại sau';
+}
+async function sendUserResetPass(){
+  const email=document.getElementById('user-email').value.trim();
+  if(!email){toast('Người dùng này chưa có Email đăng nhập','err');return;}
+  toast('Đang gửi email...');
+  try{
+    await auth.sendPasswordResetEmail(email);
+    toast('Đã gửi email đặt lại mật khẩu tới '+email);
+  }catch(e){toast(authErrMsg(e.code),'err');}
+}
 async function saveUser(){
   const ten=document.getElementById('user-ten').value.trim();if(!ten){toast('Nhập tên người dùng','err');return;}
-  const row=[ten,document.getElementById('user-sdt').value,document.getElementById('user-vaitro').value,document.getElementById('user-gc').value];
   const er=document.getElementById('user-row').value;
+  const email=document.getElementById('user-email').value.trim();
+  const pass=document.getElementById('user-pass').value;
+  if(!er&&(email||pass)){
+    if(!email||!pass){toast('Cần nhập đủ cả Email và Mật khẩu để tạo tài khoản đăng nhập','err');return;}
+    if(pass.length<6){toast('Mật khẩu phải từ 6 ký tự trở lên','err');return;}
+  }
+  const row=[ten,document.getElementById('user-sdt').value,document.getElementById('user-vaitro').value,document.getElementById('user-gc').value,email,pass];
+  toast('Đang lưu...');
+  let linked=false;
+  if(!er&&email&&pass){
+    const r=await createAuthUser(email,pass);
+    if(!r.ok){
+      if(r.code==='auth/email-already-in-use'){
+        // Email này đã có tài khoản đăng nhập từ trước (VD: tài khoản admin gốc tạo tay trên Firebase Console,
+        // hoặc tạo qua form này trước đó) — không tạo trùng, chỉ liên kết email vào bản ghi Người dùng để hiển thị
+        linked=true;
+      } else {toast(authErrMsg(r.code),'err');return;}
+    }
+  }
   await apiPost(er?{sheet:'User',action:'update',row:Number(er),data:row}:{sheet:'User',action:'append',row});
-  toast(er?'Đã cập nhật':'Đã thêm người dùng');cm('m-user');setTimeout(loadUser,800);
+  toast(er?'Đã cập nhật':linked?'Đã thêm & liên kết với tài khoản đăng nhập có sẵn':('Đã thêm người dùng'+(email&&pass?' & tạo tài khoản đăng nhập':'')));
+  cm('m-user');setTimeout(loadUser,800);
 }
 
 // ══ XÓA NHẬP HÀNG → trừ lại tồn kho ══
@@ -1176,6 +1403,7 @@ async function delNH(row,tenSP,sl){
       await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
       C.TK[spIdx][1]=newSL;
     }
+    logAction('Xóa','Nhập hàng',`Phiếu nhập "${tenSP}" x${sl}`);
     toast('Đã xóa & cập nhật tồn kho!');setTimeout(loadNH,800);
   });
 }
@@ -1241,6 +1469,47 @@ async function saveCaiDat(){
   toast('Đã lưu cài đặt!');
 }
 
+// ══ NHẬT KÝ HOẠT ĐỘNG ══ xem lại ai đã tạo mới/cập nhật/xóa gì ở Tồn kho, Nhập hàng, Xếp hàng
+async function loadLog(){
+  document.getElementById('log-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  if(!C.USER.length)await loadUser();// cần để tra tên hiển thị từ email đăng nhập ghi trong nhật ký
+  const data=await apiGet('Log');
+  C.LOG=[...data].reverse();// mới nhất lên đầu
+  fLog();
+}
+const LOG_ACT_BG={'Tạo mới':'bg-g','Cập nhật':'bg-b','Xóa':'bg-r'};
+function fLog(){
+  const q=document.getElementById('q-log').value.toLowerCase();
+  const from=document.getElementById('from-log').value;
+  const to=document.getElementById('to-log').value;
+  const act=document.getElementById('act-log').value;
+  const obj=document.getElementById('obj-log').value;
+  const pg=Number(document.getElementById('pg-log').value);
+  let d=C.LOG.filter(r=>{
+    const ngay=(r[0]||'').slice(0,10);
+    if(from&&ngay<from)return false;
+    if(to&&ngay>to)return false;
+    if(act&&r[2]!==act)return false;
+    if(obj&&r[3]!==obj)return false;
+    const ten=(findUserByEmail(r[1])||[])[0]||'';
+    if(q&&!((r[1]||'').toLowerCase().includes(q)||ten.toLowerCase().includes(q)||(r[4]||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+  if(pg>0)d=d.slice(0,pg);
+  rLog(d);
+}
+function rLog(data){
+  const el=document.getElementById('log-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">📜 Chưa có nhật ký hoạt động</div>';return;}
+  el.innerHTML='<table class="m-tbl"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>'+
+    data.map(r=>{
+      const rec=findUserByEmail(r[1]);
+      const who=rec?`${rec[0]}<br><small style="opacity:.75">${esc(r[1]||'')}</small>`:esc(r[1]||'');
+      return`<tr><td data-label="Thời gian">${fmtDT(r[0])}</td><td data-label="Người dùng"><span class="bg bg-p">${who}</span></td><td class="mobile-hide" data-label="Hành động"><span class="bg ${LOG_ACT_BG[r[2]]||'bg-b'}">${r[2]||''}</span></td><td data-label="Đối tượng">${r[3]||''}</td><td class="mobile-hide" data-label="Chi tiết">${esc(r[4]||'')}</td></tr>`;
+    }).join('')+
+    '</tbody></table>';
+}
+
 // ── INIT ──
 (async()=>{
   await initFirebase();
@@ -1252,6 +1521,11 @@ async function saveCaiDat(){
       document.getElementById('sb').style.display='flex';
       document.getElementById('main').style.display='flex';
       document.getElementById('user-email-display').textContent=user.email;
+      // Nạp sẵn danh sách Người dùng để nhận diện "ai đang đăng nhập" (map theo email) — dùng để
+      // tự điền "Người nhập" trong Nhập hàng và hiển thị tên thân thiện thay vì email trần trong Nhật ký
+      C.USER=await apiGet('User');
+      const curRec=findUserByEmail(user.email);
+      if(curRec)document.getElementById('user-email-display').textContent=`${curRec[0]} · ${user.email}`;
       // Khởi tạo data nếu chưa có
       const snap=await db.ref('_initialized').once('value');
       if(!snap.val()){

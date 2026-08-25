@@ -25,15 +25,14 @@
 
 <div id="mnu-backdrop" onclick="closeMenu()"></div>
 <div id="sb" style="display:none">
-  <div class="logo"><b>🏪 Tạp Hóa</b><small id="user-email-display"></small></div>
+  <div class="logo"><b>🏪 Tạp Hóa D5</b><small id="user-email-display"></small></div>
   <nav>
     <a onclick="go('dash')" class="on" id="n-dash">📊 Tổng quan</a>
     <a onclick="go('tk')" id="n-tk">📦 Tồn kho <span class="nbadge" id="lbadge" style="display:none">!</span></a>
     <a onclick="go('nh')" id="n-nh">⬇️ Nhập hàng</a>
     <a onclick="go('xh')" id="n-xh">🏷️ Xếp hàng</a>
-    <a onclick="go('ncc')" id="n-ncc">🚚 Nhà cung cấp</a>
-    <a onclick="go('gh')" id="n-gh">🏬 Gian hàng</a>
-    <a onclick="go('user')" id="n-user">👤 Người dùng</a>
+    <a onclick="go('ghk')" id="n-ghk">🗄️ Đồ gian hàng</a>
+    <a onclick="go('log')" id="n-log">📜 Nhật ký</a>
     <a onclick="go('setting')" id="n-setting">⚙️ Cài đặt</a>
   </nav>
   <div id="sb-logout-wrap" style="padding:10px 16px;border-top:1px solid #2a3547">
@@ -149,62 +148,128 @@
       <div class="card"><div class="ch"><h2>Lịch sử xếp hàng</h2></div><div id="xh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
-    <!-- NHÀ CUNG CẤP -->
-    <div class="sec" id="s-ncc">
-      <details class="sb-wrap">
-      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+    <!-- ĐỒ GIAN HÀNG -->
+    <div class="sec" id="s-ghk">
+      <div class="tabs" id="ghk-tabs"></div>
       <div class="sb">
-        <input type="text" id="q-ncc" placeholder="Tìm nhà cung cấp..." oninput="fNCC()">
-        <button class="btn btn-g" onclick="loadNCC()">↻ Làm mới</button>
-        <button class="btn btn-d" id="ncc-delsel-btn" onclick="delSelNCC()" style="display:none">🗑 Xóa đã chọn (<span id="ncc-selcnt">0</span>)</button>
+        <input type="text" id="q-ghk" placeholder="Tìm sản phẩm trong gian hàng này..." oninput="rGHKView()">
       </div>
-      </details>
-      <div class="card"><div class="ch"><h2>Danh sách nhà cung cấp</h2></div><div id="ncc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+      <div id="ghk-pane"><div class="ld"><div class="spin"></div></div></div>
     </div>
 
-    <!-- GIAN HÀNG -->
-    <div class="sec" id="s-gh">
+    <!-- NHẬT KÝ HOẠT ĐỘNG -->
+    <div class="sec" id="s-log">
       <details class="sb-wrap">
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
-        <input type="text" id="q-gh" placeholder="Tìm gian hàng..." oninput="fGH()">
-        <button class="btn btn-g" onclick="loadGH()">↻ Làm mới</button>
-        <button class="btn btn-d" id="gh-delsel-btn" onclick="delSelGH()" style="display:none">🗑 Xóa đã chọn (<span id="gh-selcnt">0</span>)</button>
+        <input type="text" id="q-log" placeholder="Tìm người dùng, chi tiết..." oninput="fLog()">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+        <input type="date" id="from-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+        <input type="date" id="to-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <select id="act-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả hành động</option>
+          <option value="Tạo mới">Tạo mới</option>
+          <option value="Cập nhật">Cập nhật</option>
+          <option value="Xóa">Xóa</option>
+        </select>
+        <select id="obj-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả đối tượng</option>
+          <option value="Tồn kho">Tồn kho</option>
+          <option value="Nhập hàng">Nhập hàng</option>
+          <option value="Xếp hàng">Xếp hàng</option>
+          <option value="Đồ gian hàng">Đồ gian hàng</option>
+        </select>
+        <select id="pg-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="50">50 dòng</option>
+          <option value="100">100 dòng</option>
+          <option value="200">200 dòng</option>
+          <option value="0">Tất cả</option>
+        </select>
+        <button class="btn btn-g" onclick="document.getElementById('q-log').value='';document.getElementById('from-log').value='';document.getElementById('to-log').value='';document.getElementById('act-log').value='';document.getElementById('obj-log').value='';fLog()">✕</button>
+        <button class="btn btn-g" onclick="loadLog()">↻ Làm mới</button>
       </div>
       </details>
-      <div class="card"><div class="ch"><h2>Danh sách gian hàng</h2></div><div id="gh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
-    </div>
-
-    <!-- NGƯỜI DÙNG -->
-    <div class="sec" id="s-user">
-      <details class="sb-wrap">
-      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
-      <div class="sb">
-        <button class="btn btn-g" onclick="loadUser()">↻ Làm mới</button>
-        <button class="btn btn-d" id="user-delsel-btn" onclick="delSelUser()" style="display:none">🗑 Xóa đã chọn (<span id="user-selcnt">0</span>)</button>
-      </div>
-      </details>
-      <div class="card"><div class="ch"><h2>Danh sách người dùng</h2></div><div id="user-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+      <div class="card"><div class="ch"><h2>Nhật ký hoạt động</h2></div><div id="log-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
     <!-- CÀI ĐẶT -->
     <div class="sec" id="s-setting">
-      <div class="card">
-        <div class="ch"><h2>Ngưỡng cảnh báo mặc định</h2></div>
-        <div style="padding:18px">
-          <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Áp dụng cho những sản phẩm <b>không đặt ngưỡng riêng</b> (để trống ở form Sửa sản phẩm). Sản phẩm nào đã đặt ngưỡng riêng thì dùng ngưỡng riêng đó, không dùng số mặc định này.</p>
-          <div class="fr">
-            <div class="fg"><label>Ngưỡng "Sắp hết" mặc định</label><input id="set-saphet" type="number" placeholder="10"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Sắp hết"</small></div>
-            <div class="fg"><label>Ngưỡng "Gần hết" mặc định</label><input id="set-ganhet" type="number" placeholder="3"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Gần hết" (khẩn cấp hơn)</small></div>
+      <div class="tabs">
+        <div class="tab on" id="st-nguong" onclick="goSetTab('nguong')">Ngưỡng cảnh báo</div>
+        <div class="tab" id="st-user" onclick="goSetTab('user')">Người dùng</div>
+        <div class="tab" id="st-ncc" onclick="goSetTab('ncc')">Nhà cung cấp</div>
+        <div class="tab" id="st-gh" onclick="goSetTab('gh')">Gian hàng</div>
+      </div>
+
+      <div class="set-tab on" id="set-nguong">
+        <div class="card">
+          <div class="ch"><h2>Ngưỡng cảnh báo mặc định</h2></div>
+          <div style="padding:18px">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Áp dụng cho những sản phẩm <b>không đặt ngưỡng riêng</b> (để trống ở form Sửa sản phẩm). Sản phẩm nào đã đặt ngưỡng riêng thì dùng ngưỡng riêng đó, không dùng số mặc định này.</p>
+            <div class="fr">
+              <div class="fg"><label>Ngưỡng "Sắp hết" mặc định</label><input id="set-saphet" type="number" placeholder="10"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Sắp hết"</small></div>
+              <div class="fg"><label>Ngưỡng "Gần hết" mặc định</label><input id="set-ganhet" type="number" placeholder="3"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Gần hết" (khẩn cấp hơn)</small></div>
+            </div>
+            <p style="font-size:12px;color:var(--text2);margin:18px 0 16px;padding-top:16px;border-top:1px solid var(--border)">Áp dụng cho card <b>"Hàng sắp hết hạn sử dụng"</b> ở Tổng quan — chỉ tính sản phẩm có ghi Hạn sử dụng.</p>
+            <div class="fr">
+              <div class="fg"><label>Sắp hết hạn trong (ngày)</label><input id="set-hsdsap" type="number" placeholder="30"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → liệt kê vào danh sách</small></div>
+              <div class="fg"><label>Gấp nếu còn ≤ (ngày)</label><input id="set-hsdgan" type="number" placeholder="7"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → đánh dấu đỏ (khẩn cấp)</small></div>
+            </div>
+            <div class="mf" style="border-top:none;padding-top:8px">
+              <button class="btn btn-p" onclick="saveCaiDat()">💾 Lưu cài đặt</button>
+            </div>
           </div>
-          <p style="font-size:12px;color:var(--text2);margin:18px 0 16px;padding-top:16px;border-top:1px solid var(--border)">Áp dụng cho card <b>"Hàng sắp hết hạn sử dụng"</b> ở Tổng quan — chỉ tính sản phẩm có ghi Hạn sử dụng.</p>
-          <div class="fr">
-            <div class="fg"><label>Sắp hết hạn trong (ngày)</label><input id="set-hsdsap" type="number" placeholder="30"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → liệt kê vào danh sách</small></div>
-            <div class="fg"><label>Gấp nếu còn ≤ (ngày)</label><input id="set-hsdgan" type="number" placeholder="7"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → đánh dấu đỏ (khẩn cấp)</small></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-user">
+        <div class="card">
+          <div class="ch"><h2>Người dùng</h2><button class="btn btn-p btn-sm" onclick="initUser()">+ Thêm người dùng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <button class="btn btn-g" onclick="loadUser()">↻ Làm mới</button>
+              <button class="btn btn-d" id="user-delsel-btn" onclick="delSelUser()" style="display:none">🗑 Xóa đã chọn (<span id="user-selcnt">0</span>)</button>
+            </div>
+            </details>
           </div>
-          <div class="mf" style="border-top:none;padding-top:8px">
-            <button class="btn btn-p" onclick="saveCaiDat()">💾 Lưu cài đặt</button>
+          <div id="user-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-ncc">
+        <div class="card">
+          <div class="ch"><h2>Nhà cung cấp</h2><button class="btn btn-p btn-sm" onclick="initNCC()">+ Thêm NCC</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-ncc" placeholder="Tìm nhà cung cấp..." oninput="fNCC()">
+              <button class="btn btn-g" onclick="loadNCC()">↻ Làm mới</button>
+              <button class="btn btn-d" id="ncc-delsel-btn" onclick="delSelNCC()" style="display:none">🗑 Xóa đã chọn (<span id="ncc-selcnt">0</span>)</button>
+            </div>
+            </details>
           </div>
+          <div id="ncc-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-gh">
+        <div class="card">
+          <div class="ch"><h2>Gian hàng</h2><button class="btn btn-p btn-sm" onclick="initGH()">+ Thêm gian hàng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-gh" placeholder="Tìm gian hàng..." oninput="fGH()">
+              <button class="btn btn-g" onclick="loadGH()">↻ Làm mới</button>
+              <button class="btn btn-d" id="gh-delsel-btn" onclick="delSelGH()" style="display:none">🗑 Xóa đã chọn (<span id="gh-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="gh-tbl"><div class="ld"><div class="spin"></div></div></div>
         </div>
       </div>
     </div>
@@ -341,6 +406,21 @@
   </div>
 </div>
 
+<!-- MODAL ĐỒ GIAN HÀNG -->
+<div class="mo" id="m-ghk">
+  <div class="mb mb-sm">
+    <h3>Sửa đồ gian hàng</h3>
+    <div class="fg"><label>Gian hàng *</label><select id="ghk-gh-sel"></select></div>
+    <div class="fg"><label>Sản phẩm *</label><select id="ghk-sp"></select></div>
+    <div class="fg"><label>Số lượng *</label><input id="ghk-sl" type="number" placeholder="0"></div>
+    <small style="color:var(--text2);font-size:11px">Số lượng ở đây chỉ chỉnh riêng cho gian hàng này (dùng để kiểm kê lại cho đúng thực tế) — không ảnh hưởng tới Tồn kho.</small>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-ghk')">Hủy</button>
+      <button class="btn btn-p" onclick="saveGHK()">Lưu</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NCC -->
 <div class="mo" id="m-ncc">
   <div class="mb mb-sm">
@@ -381,8 +461,18 @@
     <div class="fg"><label>Họ tên *</label><input id="user-ten" placeholder="Nguyễn Văn A"></div>
     <div class="fg"><label>Số điện thoại</label><input id="user-sdt" placeholder="0xxx..."></div>
     <div class="fg"><label>Vai trò</label><input id="user-vaitro" placeholder="Chủ cửa hàng, Nhân viên..."></div>
+    <div class="fg"><label>Email đăng nhập</label><input id="user-email" type="email" placeholder="email@vidu.com" autocomplete="off"></div>
+    <div class="fg" id="user-pass-wrap">
+      <label>Mật khẩu đăng nhập</label>
+      <div style="display:flex;gap:6px">
+        <input id="user-pass" type="password" placeholder="Từ 6 ký tự" autocomplete="new-password" style="flex:1">
+        <button type="button" class="btn btn-g btn-sm" onclick="toggleUserPassInput()">👁️</button>
+      </div>
+      <small style="color:var(--text2);font-size:11px" id="user-pass-hint">Nhập cả Email &amp; Mật khẩu nếu muốn người này tự đăng nhập được vào app. Để trống nếu chỉ cần lưu tên tham khảo. Nếu email đã có tài khoản từ trước (VD: tài khoản admin gốc), chỉ cần gõ email đó — hệ thống sẽ tự liên kết vào đây.</small>
+    </div>
     <div class="fg"><label>Ghi chú</label><textarea id="user-gc" rows="2"></textarea></div>
     <div class="mf">
+      <button class="btn btn-g" id="user-reset-btn" onclick="sendUserResetPass()" style="display:none">🔑 Gửi email đặt lại mật khẩu</button>
       <button class="btn btn-g" onclick="cm('m-user')">Hủy</button>
       <button class="btn btn-p" onclick="saveUser()">Lưu</button>
     </div>
