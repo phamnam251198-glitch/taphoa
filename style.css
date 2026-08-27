@@ -187,10 +187,12 @@ tr:hover td{background:#f8fafc}
   #mnu-backdrop.on{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150}
 
   #main{width:100%;min-height:0}
-  #topbar{padding:0 14px;height:48px}
+  /* Ghim header cố định trên cùng viewport (không phụ thuộc 100vh/thanh địa chỉ co giãn trên di động) —
+     bù lại bằng padding-top cho #content để nội dung không bị header đè lên */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:120;padding:0 14px;height:48px}
   #topbar h1{font-size:14px}
   #acts .btn{padding:6px 10px;font-size:12px}
-  #content{padding:12px}
+  #content{padding:12px;padding-top:calc(48px + 12px)}
 
   /* Các lưới KPI/2-3-4 cột → xếp dọc 1 cột cho dễ đọc */
   .grid4,.grid3,.grid2{grid-template-columns:1fr}

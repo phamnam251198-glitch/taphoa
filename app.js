@@ -242,6 +242,7 @@ async function loadDash(){
   const tk=await apiGet('TonKho');
   C.TK=tk;
   document.getElementById('d-sp').textContent=tk.length;
+  document.getElementById('d-het').textContent=tk.filter(r=>stTK(r)==='het').length;
   dashLow=tk.filter(r=>Number(r[1]||0)<=getSapHet(r));
   document.getElementById('d-sh').textContent=dashLow.length;
   document.getElementById('lbadge').style.display=dashLow.length?'inline':'none';
@@ -524,7 +525,7 @@ function statusLabel(r){return STATUS_DEF[stTK(r)].label;}
 function statusBadge(r){const d=STATUS_DEF[stTK(r)];return`<span class="bg ${d.cls}">${d.label}</span>`;}
 // Mức độ khẩn cấp dạng số (0=khẩn cấp nhất) — dùng để sắp xếp
 function statusRank(r){return STATUS_ORDER.indexOf(stTK(r));}
-// Sắp xếp dùng chung cho Tồn kho + danh sách "Hàng cần nhập gấp" ở Tổng quan
+// Sắp xếp dùng chung cho Tồn kho + danh sách "Hàng cần nhập" ở Tổng quan
 function sortByMode(data,mode){
   const arr=[...data];
   if(mode==='name')arr.sort((a,b)=>(a[0]||'').localeCompare(b[0]||''));
