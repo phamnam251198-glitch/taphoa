@@ -2333,6 +2333,7 @@ let kkCurrentList=[];// danh sách [{key,label,maSP,soSach}] đang render — tr
 async function openKKNew(){
   kkEntries={};
   document.getElementById('kk-ngay').value=td();
+  document.getElementById('kk-moc').value='';
   const userSel=document.getElementById('kk-user');
   userSel.innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
   if(!C.GH.length)await loadGH();
@@ -2401,6 +2402,7 @@ async function saveKKNew(){
   const ngay=document.getElementById('kk-ngay').value;
   const nguoi=document.getElementById('kk-user').value;
   const target=document.getElementById('kk-target').value;// '' = Kho tổng, khác thì là tên Gian hàng
+  const moc=document.getElementById('kk-moc').value;// ''/'dau'/'cuoi' — mốc kỳ cho Bestseller, tùy chọn
   if(!ngay){toast('Chọn ngày kiểm kê','err');return;}
   if(!nguoi){toast('Chọn người kiểm kê','err');return;}
   const entries=Object.entries(kkEntries).filter(([,e])=>e.tt!==undefined&&e.tt!=='');
@@ -2411,7 +2413,7 @@ async function saveKKNew(){
     const soSach=Number(e.soSach||0);
     const thucTe=Number(e.tt||0);
     const chenh=thucTe-soSach;
-    const row=[ngay,e.maSP||'',e.label,soSach,thucTe,chenh,e.gc||'',nguoi,target];
+    const row=[ngay,e.maSP||'',e.label,soSach,thucTe,chenh,e.gc||'',nguoi,target,moc];
     await apiPost({sheet:'KiemKe',action:'append',row});
     C.KK.push(row);
     if(chenh===0)continue;
@@ -2435,7 +2437,8 @@ async function saveKKNew(){
     }
   }
   const doiTuongTxt=target?`Gian hàng "${target}"`:'Kho tổng';
-  logAction('Tạo mới','Kiểm kê',`Kiểm kê ${doiTuongTxt} ngày ${ngay} bởi ${nguoi}: ${entries.length} SP đã đếm, ${soLech} SP lệch.`);
+  const mocTxt=moc==='dau'?' [Đánh dấu: Đầu kỳ]':moc==='cuoi'?' [Đánh dấu: Cuối kỳ]':'';
+  logAction('Tạo mới','Kiểm kê',`Kiểm kê ${doiTuongTxt} ngày ${ngay} bởi ${nguoi}: ${entries.length} SP đã đếm, ${soLech} SP lệch.${mocTxt}`);
   toast(`Đã lưu kiểm kê: ${entries.length} SP đã đếm, ${soLech} SP lệch!`);
   cm('m-kk');kkEntries={};
   setTimeout(()=>{loadKK();if(!target)loadTK();else rGHKView();},800);
@@ -2483,11 +2486,13 @@ function rKK(groups){
     <div class="kpi r"><div class="lb">Tổng SP lệch</div><div class="val">${flat.filter(r=>Number(r[5]||0)!==0).length}</div></div></div>`:'';
   const el=document.getElementById('kk-tbl');
   if(!groups.length){el.innerHTML='<div class="empty">📋 Chưa có đợt kiểm kê nào</div>';return;}
-  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Ngày kiểm kê</th><th>Đối tượng</th><th>Người kiểm kê</th><th>Số SP đã đếm</th><th>Số SP lệch</th><th>Tổng chênh lệch</th></tr></thead><tbody>`+
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Ngày kiểm kê</th><th>Đối tượng</th><th>Mốc kỳ</th><th>Người kiểm kê</th><th>Số SP đã đếm</th><th>Số SP lệch</th><th>Tổng chênh lệch</th></tr></thead><tbody>`+
     groups.map(g=>{
       const cl=g.tongChenh===0?'':(g.tongChenh>0?'color:#0ca30c':'color:#d03b3b');
       const doiTuong=g.gianHang?`🏬 ${esc(g.gianHang)}`:'📦 Kho tổng';
-      return`<tr style="cursor:pointer" onclick="openKKDay('${esc(g.ngay)}','${esc(g.gianHang)}')"><td><b>${esc(g.ngay)}</b></td><td>${doiTuong}</td><td>${esc(g.nguoiKK.join(', '))}</td><td>${g.soSP}</td><td>${g.soLech}</td><td style="${cl};font-weight:600">${g.tongChenh>0?'+':''}${g.tongChenh}</td></tr>`;
+      const moc=g.items[0]&&g.items[0][9];
+      const mocBadge=moc==='dau'?'<span class="bg bg-b">📍 Đầu kỳ</span>':moc==='cuoi'?'<span class="bg bg-p">🏁 Cuối kỳ</span>':'';
+      return`<tr style="cursor:pointer" onclick="openKKDay('${esc(g.ngay)}','${esc(g.gianHang)}')"><td><b>${esc(g.ngay)}</b></td><td>${doiTuong}</td><td>${mocBadge}</td><td>${esc(g.nguoiKK.join(', '))}</td><td>${g.soSP}</td><td>${g.soLech}</td><td style="${cl};font-weight:600">${g.tongChenh>0?'+':''}${g.tongChenh}</td></tr>`;
     }).join('')+'</tbody></table>';
 }
 let kkDayCurrent=null;// {ngay,gianHang}
@@ -2526,8 +2531,9 @@ async function delKKDay(){
 // ══ BESTSELLER ══ xác định SP bán chạy dựa trên SỐ LƯỢNG ĐÃ BÁN THỰC TẾ (suy ra từ tồn kiểm kê), TUYỆT ĐỐI
 // không xếp hạng trực tiếp theo số lượng thêm/xếp hàng (xếp nhiều ≠ bán chạy — có thể chỉ đang tồn kho nhiều).
 // Công thức: Đã bán = Tồn đầu kỳ (Đồ gian hàng, gộp mọi gian hàng) + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ.
-// App không có server/cron nên không thể tự "chốt" đúng nửa đêm Thứ 6/cuối tháng — phải dựa vào 2 lần
-// NGƯỜI DÙNG TỰ CHẠY Kiểm kê Gian hàng đúng 2 mốc ngày (đầu kỳ & cuối kỳ). Thiếu mốc nào → báo rõ, không đoán.
+// KHÔNG cố định kỳ theo tuần/tháng — App không có server/cron nên không thể tự "chốt" đúng nửa đêm Thứ 6/cuối
+// tháng. Thay vào đó, khi chạy Kiểm kê Gian hàng, người dùng tự đánh dấu lần đó là "Đầu kỳ"/"Cuối kỳ" (xem
+// kk-moc ở modal Kiểm kê); màn này chỉ liệt kê các mốc đã đánh dấu cho người dùng chọn 1 cặp bất kỳ để tính.
 // LƯU Ý: luôn dựng/đọc Date qua Date.UTC + getUTC*/setUTC* — dựng bằng "new Date(dateStr+'T00:00:00')" (giờ
 // LOCAL) rồi gọi toISOString() (quy đổi UTC) sẽ bị lệch NGÀY ở múi giờ UTC+ (như VN, UTC+7): nửa đêm local
 // bị lùi về chiều/tối hôm trước theo UTC. Toàn bộ hàm tính ngày của Bestseller phải né lỗi này.
@@ -2537,20 +2543,9 @@ function bAddDays(dateStr,n){
   dt.setUTCDate(dt.getUTCDate()+n);
   return dt.toISOString().slice(0,10);
 }
-// Thứ 6 gần nhất (≤ dateStr) — dùng làm giá trị mặc định cho bộ chọn tuần
-function mostRecentFriday(dateStr){
-  const[y,m,d]=dateStr.split('-').map(Number);
-  const dt=new Date(Date.UTC(y,m-1,d));
-  const day=dt.getUTCDay();// 0=CN...6=Thứ 7, 5=Thứ 6
-  const diff=day>=5?day-5:day+2;
-  dt.setUTCDate(dt.getUTCDate()-diff);
-  return dt.toISOString().slice(0,10);
-}
-// Khoảng 1 tháng dương lịch: from = ngày cuối tháng TRƯỚC (đầu kỳ), to = ngày cuối tháng này (cuối kỳ)
-function monthBounds(yyyymm){
-  const[y,m]=yyyymm.split('-').map(Number);
-  const fmt=dt=>dt.toISOString().slice(0,10);
-  return{from:fmt(new Date(Date.UTC(y,m-1,0))),to:fmt(new Date(Date.UTC(y,m,0)))};
+function bDaysBetween(a,b){
+  const[y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number);
+  return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/86400000);
 }
 // Tồn của 1 sản phẩm TẠI 1 NGÀY, gộp mọi gian hàng — CHỈ tính được nếu có ít nhất 1 dòng Kiểm kê Gian hàng
 // đúng ngày đó cho sản phẩm này (tra theo Mã SP trước, theo tên nếu SP chưa có mã); không có → trả về null,
@@ -2585,27 +2580,27 @@ function computeBestsellerPeriod(from,to){
 }
 async function loadBestseller(){
   if(!C.TK.length)await loadTK();
-  toast('Đang tải dữ liệu Bestseller...');
   C.KK=await apiGet('KiemKe');
   C.XH=await apiGet('XepHang');
-  const friEl=document.getElementById('best-week-fri');
-  if(!friEl.value)friEl.value=mostRecentFriday(td());
-  const monEl=document.getElementById('best-month');
-  if(!monEl.value)monEl.value=td().slice(0,7);
-  loadBestWeek();loadBestMonth();
+  fillBestMocOptions();
+  renderBestPeriod();
 }
-function goBestTab(name){
-  document.getElementById('bt-week').classList.toggle('on',name==='week');
-  document.getElementById('bt-month').classList.toggle('on',name==='month');
-  document.getElementById('best-week-pane').style.display=name==='week'?'':'none';
-  document.getElementById('best-month-pane').style.display=name==='month'?'':'none';
+// Đổ 2 dropdown từ các NGÀY đã có ít nhất 1 dòng Kiểm kê Gian hàng đánh dấu Đầu kỳ / Cuối kỳ tương ứng —
+// giữ lại lựa chọn hiện tại nếu vẫn còn hợp lệ sau khi tải lại
+function fillBestMocOptions(){
+  const dauSel=document.getElementById('best-dau'),cuoiSel=document.getElementById('best-cuoi');
+  const curDau=dauSel.value,curCuoi=cuoiSel.value;
+  const dauDates=[...new Set(C.KK.filter(r=>r[8]&&r[9]==='dau').map(r=>r[0]))].sort((a,b)=>b.localeCompare(a));
+  const cuoiDates=[...new Set(C.KK.filter(r=>r[8]&&r[9]==='cuoi').map(r=>r[0]))].sort((a,b)=>b.localeCompare(a));
+  dauSel.innerHTML='<option value="">-- Chọn --</option>'+dauDates.map(d=>`<option${d===curDau?' selected':''}>${d}</option>`).join('');
+  cuoiSel.innerHTML='<option value="">-- Chọn --</option>'+cuoiDates.map(d=>`<option${d===curCuoi?' selected':''}>${d}</option>`).join('');
 }
-function rBestList(elId,computed,warnMsg){
-  const el=document.getElementById(elId);
+function rBestList(computed,warnMsg){
+  const el=document.getElementById('best-tbl');
   if(!computed){el.innerHTML=`<div class="card"><div class="empty">⚠️ ${esc(warnMsg)}</div></div>`;return;}
   const{items,missing,tongSP}=computed;
   let html='';
-  if(missing>0)html+=`<div class="alert" style="display:flex">⚠️ ${missing}/${tongSP} sản phẩm bị loại khỏi xếp hạng do thiếu dữ liệu kiểm kê đầu/cuối kỳ cho riêng SP đó (gian hàng chứa SP đó chưa được kiểm kê đúng ngày).</div>`;
+  if(missing>0)html+=`<div class="alert" style="display:flex">⚠️ ${missing}/${tongSP} sản phẩm bị loại khỏi xếp hạng do thiếu dữ liệu kiểm kê đầu/cuối kỳ cho riêng SP đó (gian hàng chứa SP đó chưa được kiểm kê đúng ngày mốc).</div>`;
   if(!items.length){html+='<div class="card"><div class="empty">📭 Chưa đủ dữ liệu để xếp hạng Bestseller kỳ này</div></div>';el.innerHTML=html;return;}
   html+=`<div class="card"><div class="ch"><h2>🏆 Xếp hạng theo SL đã bán</h2></div>
     <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Tồn đầu kỳ</th><th>Đã xếp</th><th>Tồn cuối kỳ</th><th>Đã bán</th></tr></thead><tbody>`+
@@ -2615,29 +2610,21 @@ function rBestList(elId,computed,warnMsg){
     }).join('')+'</tbody></table></div></div>';
   el.innerHTML=html;
 }
-function loadBestWeek(){
-  const fri=document.getElementById('best-week-fri').value;if(!fri)return;
-  const prevFri=bAddDays(fri,-7);
-  document.getElementById('best-week-info').textContent=`Tuần từ ${prevFri} đến ${fri} — cần Kiểm kê Gian hàng đúng 2 ngày: ${prevFri} (đầu kỳ) và ${fri} (cuối kỳ).`;
-  const dauOk=C.KK.some(r=>r[0]===prevFri&&r[8]),cuoiOk=C.KK.some(r=>r[0]===fri&&r[8]);
-  if(!dauOk||!cuoiOk){
-    const thieu=[!dauOk&&prevFri,!cuoiOk&&fri].filter(Boolean);
-    rBestList('best-week-tbl',null,`Thiếu dữ liệu Kiểm kê Gian hàng ngày ${thieu.join(' và ')} — vào Kiểm kê, chọn 1 Gian hàng, chạy đúng ngày này rồi quay lại xem.`);
+function renderBestPeriod(){
+  const dau=document.getElementById('best-dau').value,cuoi=document.getElementById('best-cuoi').value;
+  const infoEl=document.getElementById('best-info');
+  if(!dau||!cuoi){
+    infoEl.textContent='Chọn cả 2 mốc Đầu kỳ và Cuối kỳ để xem xếp hạng (đánh dấu mốc ngay khi chạy Kiểm kê Gian hàng).';
+    rBestList(null,'Chưa chọn đủ 2 mốc Đầu kỳ / Cuối kỳ.');
     return;
   }
-  rBestList('best-week-tbl',computeBestsellerPeriod(prevFri,fri));
-}
-function loadBestMonth(){
-  const ym=document.getElementById('best-month').value;if(!ym)return;
-  const{from,to}=monthBounds(ym);
-  document.getElementById('best-month-info').textContent=`Tháng ${ym}: từ ${from} (cuối tháng trước, đầu kỳ) đến ${to} (cuối tháng, cuối kỳ) — cần Kiểm kê Gian hàng đúng 2 ngày này.`;
-  const dauOk=C.KK.some(r=>r[0]===from&&r[8]),cuoiOk=C.KK.some(r=>r[0]===to&&r[8]);
-  if(!dauOk||!cuoiOk){
-    const thieu=[!dauOk&&from,!cuoiOk&&to].filter(Boolean);
-    rBestList('best-month-tbl',null,`Thiếu dữ liệu Kiểm kê Gian hàng ngày ${thieu.join(' và ')} — vào Kiểm kê, chọn 1 Gian hàng, chạy đúng ngày này rồi quay lại xem.`);
+  if(dau>=cuoi){
+    infoEl.textContent='';
+    rBestList(null,`Mốc Đầu kỳ (${dau}) phải TRƯỚC mốc Cuối kỳ (${cuoi}) — chọn lại.`);
     return;
   }
-  rBestList('best-month-tbl',computeBestsellerPeriod(from,to));
+  infoEl.textContent=`Kỳ từ ${dau} đến ${cuoi} (${bDaysBetween(dau,cuoi)} ngày).`;
+  rBestList(computeBestsellerPeriod(dau,cuoi));
 }
 
 // ══ BÁO CÁO THEO THÁNG ══ thống kê trong 1 khoảng thời gian, mỗi "Người nhập" đã nhập tổng bao nhiêu tiền

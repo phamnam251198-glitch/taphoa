@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css?v=20260828a">
+<link rel="stylesheet" href="style.css?v=20260828b">
 </head>
 <body>
 
@@ -204,31 +204,18 @@
 
     <!-- BESTSELLER -->
     <div class="sec" id="s-best">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Số lượng "Đã bán" được suy ra từ: <b>Tồn đầu kỳ + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ</b> (gộp tất cả gian hàng) — <b>không</b> tính theo số lượng xếp hàng nhiều hay ít. Cần có 2 lần <a onclick="go('kk')" style="color:var(--blue);cursor:pointer">Kiểm kê Gian hàng</a> đúng ngày đầu và cuối kỳ mới tính được; thiếu ngày nào sẽ báo rõ, không tự đoán số liệu.</p>
-      <div class="tabs">
-        <div class="tab on" id="bt-week" onclick="goBestTab('week')">Theo tuần</div>
-        <div class="tab" id="bt-month" onclick="goBestTab('month')">Theo tháng</div>
-      </div>
-      <div id="best-week-pane">
-        <div class="card">
-          <div class="ch"><h2>Chọn tuần (chốt vào Thứ 6)</h2></div>
-          <div style="padding:14px 18px">
-            <div class="fg" style="max-width:220px"><label>Ngày Thứ 6 chốt tuần</label><input type="date" id="best-week-fri" onchange="loadBestWeek()"></div>
-            <div id="best-week-info" style="font-size:12px;color:var(--text2)"></div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Số lượng "Đã bán" được suy ra từ: <b>Tồn đầu kỳ + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ</b> (gộp tất cả gian hàng) — <b>không</b> tính theo số lượng xếp hàng nhiều hay ít. Kỳ so sánh không cố định theo tuần/tháng — khi <a onclick="go('kk')" style="color:var(--blue);cursor:pointer">Kiểm kê Gian hàng</a>, đánh dấu lần đó là "📍 Đầu kỳ" hoặc "🏁 Cuối kỳ", rồi chọn 1 cặp mốc bất kỳ bên dưới để tính.</p>
+      <div class="card">
+        <div class="ch"><h2>Chọn cặp mốc để tính</h2></div>
+        <div style="padding:14px 18px">
+          <div class="fr">
+            <div class="fg"><label>📍 Mốc Đầu kỳ</label><select id="best-dau" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
+            <div class="fg"><label>🏁 Mốc Cuối kỳ</label><select id="best-cuoi" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
           </div>
+          <div id="best-info" style="font-size:12px;color:var(--text2)"></div>
         </div>
-        <div id="best-week-tbl"></div>
       </div>
-      <div id="best-month-pane" style="display:none">
-        <div class="card">
-          <div class="ch"><h2>Chọn tháng</h2></div>
-          <div style="padding:14px 18px">
-            <div class="fg" style="max-width:220px"><label>Tháng</label><input type="month" id="best-month" onchange="loadBestMonth()"></div>
-            <div id="best-month-info" style="font-size:12px;color:var(--text2)"></div>
-          </div>
-        </div>
-        <div id="best-month-tbl"></div>
-      </div>
+      <div id="best-tbl"></div>
     </div>
 
     <!-- BÁO CÁO THEO THÁNG -->
@@ -546,6 +533,15 @@
       <div class="fg"><label>Ngày kiểm kê</label><input id="kk-ngay" type="date"></div>
       <div class="fg"><label>Người kiểm kê *</label><select id="kk-user"><option value="">-- Chọn --</option></select></div>
     </div>
+    <div class="fg">
+      <label>Đánh dấu mốc kỳ (dùng cho Bestseller) — tùy chọn</label>
+      <select id="kk-moc">
+        <option value="">Không đánh dấu</option>
+        <option value="dau">📍 Đầu kỳ</option>
+        <option value="cuoi">🏁 Cuối kỳ</option>
+      </select>
+      <small style="color:var(--text2);font-size:11px">Đánh dấu lần kiểm kê này là mốc Đầu kỳ hoặc Cuối kỳ để sau vào màn Bestseller chọn ghép cặp tính SL đã bán — không cần đúng thứ 6/cuối tháng, chọn ngày nào tùy ý.</small>
+    </div>
     <div class="fg"><label>Tìm sản phẩm</label><input id="kk-q" placeholder="Gõ tên/mã SP để lọc..." oninput="renderKKRows()"></div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Chỉ những dòng có nhập "Tồn thực tế" mới được lưu &amp; điều chỉnh lại Tồn kho — để trống nghĩa là chưa đếm, bỏ qua sản phẩm đó.</p>
     <div class="scroll-tbl" style="max-height:420px;overflow-y:auto"><table class="item-table">
@@ -669,6 +665,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260828a"></script>
+<script src="app.js?v=20260828b"></script>
 </body>
 </html>
