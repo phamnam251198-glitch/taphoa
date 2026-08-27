@@ -1,0 +1,11 @@
+{
+  "name": "taphoa-grand-test",
+  "private": true,
+  "description": "Kiểm thử tổng hợp (Grand Test) cho app Tạp Hóa — chạy trực tiếp trên app.js/index.html thật qua Chrome headless, KHÔNG đụng Firebase thật (mọi network request thật đều bị chặn, dữ liệu là giả lập trong bộ nhớ).",
+  "scripts": {
+    "test": "node grand-test.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.0.0"
+  }
+}
