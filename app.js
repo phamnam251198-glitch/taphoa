@@ -67,7 +67,7 @@ async function doLogout(){
   }
 }
 
-let C={TK:[],NH:[],NCC:[],USER:[],GH:[],XH:[],LOG:[],GHK:[]};
+let C={TK:[],NH:[],NCC:[],USER:[],GH:[],XH:[],LOG:[],GHK:[],LOAI:[]};
 let SETTINGS={sapHet:10,ganHet:3,hsdSap:30,hsdGan:7};// ngưỡng mặc định dùng chung, SP nào không đặt riêng thì dùng cái này
 
 // ── FIREBASE API ──
@@ -199,13 +199,14 @@ function go(name){
   document.querySelectorAll('#sb nav a').forEach(a=>a.classList.remove('on'));
   document.getElementById('s-'+name).classList.add('on');
   document.getElementById('n-'+name).classList.add('on');
-  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
+  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',bc:'Báo cáo theo tháng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
   document.getElementById('ptitle').textContent=titles[name];
   const btns={
-    tk:`<button class="btn btn-p" onclick="initSPForm();om('m-sp')">+ Thêm sản phẩm</button>`,
+    tk:`<button class="btn btn-p" onclick="initSPForm()">+ Thêm sản phẩm</button>`,
     nh:`<button class="btn btn-s" onclick="openNH()">+ Tạo phiếu nhập</button>`,
     xh:`<button class="btn btn-s" onclick="openXH()">+ Tạo phiếu xếp</button>`,
     ghk:`<button class="btn btn-g" onclick="loadGHK()">↻ Làm mới</button>`,
+    bc:`<button class="btn btn-g" onclick="loadBC()">↻ Làm mới</button>`,
     dash:`<button class="btn btn-g" onclick="loadDash()">↻ Làm mới</button>`,
     log:`<button class="btn btn-g" onclick="loadLog()">↻ Làm mới</button>`,
     setting:''
@@ -215,8 +216,9 @@ function go(name){
   else if(name==='nh')loadNH();
   else if(name==='xh')loadXH();
   else if(name==='ghk')loadGHK();
+  else if(name==='bc')openBC();
   else if(name==='log')loadLog();
-  else if(name==='setting'){loadCaiDat();loadUser();loadNCC();loadGH();}
+  else if(name==='setting'){loadCaiDat();loadUser();loadNCC();loadGH();loadLoai();}
   else loadDash();
 }
 // Tab con trong màn Cài đặt: Ngưỡng cảnh báo / Người dùng / Nhà cung cấp / Gian hàng
@@ -330,6 +332,75 @@ function renderDashDonut(tk){
 // ══ TỒN KHO ══
 let selTK=new Set();
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// ── Ô gõ-tìm tự chế (Sản phẩm/Loại hàng/NCC...) ── thay cho <datalist>: giới hạn ~10 dòng gợi ý rồi cuộn,
+// thay vì để trình duyệt tự quyết hiện bao nhiêu dòng (datalist có thể xổ ra cả danh sách dài không kiểm soát được)
+function attachSearchList(input,getItems){
+  if(!input||input.dataset.acBound)return;
+  input.dataset.acBound='1';
+  input.setAttribute('autocomplete','off');
+  const menu=document.createElement('div');
+  menu.className='ac-menu';
+  document.body.appendChild(menu);
+  input._acMenu=menu;// để dọn dẹp khi dòng/ô này bị xóa hoặc vẽ lại (menu nằm ở body, không tự mất theo input)
+  let items=[],hi=-1;
+  function position(){
+    const r=input.getBoundingClientRect();
+    menu.style.left=Math.round(r.left)+'px';
+    menu.style.top=Math.round(r.bottom+2)+'px';
+    menu.style.width=Math.round(r.width)+'px';
+  }
+  function render(){
+    const q=input.value.trim().toLowerCase();
+    const all=getItems();
+    items=(q?all.filter(v=>v.toLowerCase().includes(q)):all).filter((v,i,a)=>a.indexOf(v)===i);
+    hi=-1;
+    if(!items.length){menu.innerHTML='<div class="ac-empty">Không có kết quả khớp</div>';}
+    else menu.innerHTML=items.map((v,i)=>`<div class="ac-item" data-i="${i}">${esc(v)}</div>`).join('');
+    position();
+    menu.style.display='block';
+  }
+  function highlight(){
+    [...menu.children].forEach((el,i)=>el.classList.toggle('hi',i===hi));
+    const el=menu.children[hi];if(el)el.scrollIntoView({block:'nearest'});
+  }
+  function choose(i){
+    if(!items[i])return;
+    input.value=items[i];
+    menu.style.display='none';
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  input.addEventListener('focus',render);
+  input.addEventListener('input',render);
+  input.addEventListener('blur',()=>setTimeout(()=>{menu.style.display='none';},150));
+  input.addEventListener('keydown',e=>{
+    if(menu.style.display==='none'||!items.length)return;
+    if(e.key==='ArrowDown'){e.preventDefault();hi=Math.min(hi+1,items.length-1);highlight();}
+    else if(e.key==='ArrowUp'){e.preventDefault();hi=Math.max(hi-1,0);highlight();}
+    else if(e.key==='Enter'){if(hi>=0){e.preventDefault();choose(hi);}}
+    else if(e.key==='Escape'){menu.style.display='none';}
+  });
+  menu.addEventListener('mousedown',e=>{// mousedown (không phải click) để chạy trước sự kiện blur của input
+    const it=e.target.closest('.ac-item');
+    if(!it)return;
+    e.preventDefault();
+    choose(Number(it.dataset.i));
+  });
+  window.addEventListener('resize',()=>{if(menu.style.display==='block')position();});
+  window.addEventListener('scroll',()=>{if(menu.style.display==='block')position();},true);
+}
+// Xóa menu gợi ý còn sót lại của mọi ô đã gắn attachSearchList bên trong 1 phần tử — gọi TRƯỚC khi ghi đè
+// innerHTML của phần tử đó (vd vẽ lại bảng), vì ghi đè innerHTML chỉ xóa input chứ không tự xóa menu ở body
+function cleanupSearchLists(container){
+  if(!container)return;
+  container.querySelectorAll('[data-ac-bound]').forEach(el=>{if(el._acMenu)el._acMenu.remove();});
+}
+// Xóa 1 dòng (tr) kèm dọn menu gợi ý của các ô trong dòng đó — dùng thay cho .remove() trần ở các nút ✕ thêm dòng
+function removeRowEl(tr){
+  if(!tr)return;
+  cleanupSearchLists(tr);
+  tr.remove();
+}
 async function loadTK(){
   document.getElementById('tk-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selTK.clear();updateTKSelUI();
@@ -339,12 +410,21 @@ async function loadTK(){
   if(low.length){al.style.display='flex';document.getElementById('la-txt').textContent=low.length+' SP sắp hết: '+low.slice(0,4).map(r=>r[0]).join(', ')+(low.length>4?'...':'');}
   else al.style.display='none';
   document.getElementById('tk-cnt').textContent=data.length+' sản phẩm';
+  if(!C.LOAI.length)await loadLoai();
+  fillLoaiFilterOptions();
   fTK();
+}
+// Nạp danh sách "Loại hàng" đang có (gom từ Tồn kho) vào ô lọc — giữ nguyên lựa chọn hiện tại nếu còn hợp lệ
+function fillLoaiFilterOptions(){
+  const sel=document.getElementById('loai-tk');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tất cả loại hàng</option>'+C.LOAI.map(r=>`<option${r[0]===cur?' selected':''}>${r[0]}</option>`).join('');
 }
 // Tiêu đề cột bấm được để sắp xếp — mỗi cột 1 khóa so sánh riêng
 const TK_COLS=[
-  {key:'ma',label:'Mã SP'},{key:'ten',label:'Tên SP'},{key:'ton',label:'Tồn'},
-  {key:'gia',label:'Giá nhập'},{key:'hsd',label:'Hạn sử dụng'},{key:'status',label:'Trạng thái'}
+  {key:'ma',label:'Mã SP',w:'90px'},{key:'ten',label:'Tên SP',w:'220px'},{key:'ton',label:'Tồn',w:'70px'},
+  {key:'gia',label:'Giá nhập',w:'100px'},{key:'hsd',label:'Hạn sử dụng',w:'120px'},{key:'status',label:'Trạng thái',w:'100px'}
 ];
 let tkSortCol='status',tkSortDir=1;// dir: 1=tăng dần, -1=giảm dần
 function sortTKClick(col){
@@ -355,27 +435,67 @@ function tkCompare(a,b,col){
   switch(col){
     case'ma':return(a[9]||'').localeCompare(b[9]||'');
     case'ten':return(a[0]||'').localeCompare(b[0]||'');
+    case'loai':return(a[13]||'').localeCompare(b[13]||'');
     case'ton':return Number(a[1]||0)-Number(b[1]||0);
     case'gia':return Number(a[3]||0)-Number(b[3]||0);
     case'hsd':return(a[5]||'').localeCompare(b[5]||'');
     default:return statusRank(a)-statusRank(b)||(a[0]||'').localeCompare(b[0]||'');
   }
 }
+// Màu cho từng khối "Loại hàng" — xoay vòng theo thứ tự, riêng "(Chưa phân loại)" luôn màu xám trung tính
+function loaiColorClass(loai,idx){
+  return loai==='(Chưa phân loại)'?'acc-cx':'acc-c'+(idx%8);
+}
+// Vị trí của 1 Loại hàng theo đúng thứ tự đã sắp ở Cài đặt → Loại hàng (kéo lên/xuống bằng nút ↑↓) —
+// dùng để quyết định khối nào hiện trước khi gộp accordion ở Tồn kho & Đồ gian hàng
+function loaiSortOrder(name){
+  const idx=C.LOAI.findIndex(r=>r[0]===name);
+  return idx>=0?idx:9999;
+}
+function sortLoaiNames(names){
+  return names.sort((a,b)=>{
+    if(a==='(Chưa phân loại)')return 1;
+    if(b==='(Chưa phân loại)')return-1;
+    return loaiSortOrder(a)-loaiSortOrder(b);
+  });
+}
 function rTK(data){
   const el=document.getElementById('tk-tbl');
   if(!data.length){el.innerHTML='<div class="empty">📦 Chưa có sản phẩm</div>';return;}
+  // Gộp theo Loại hàng — mỗi loại là 1 khối xổ (accordion) riêng, xổ được nhiều khối cùng lúc
+  const groups=new Map();
+  data.forEach(r=>{
+    const loai=r[13]||'(Chưa phân loại)';
+    if(!groups.has(loai))groups.set(loai,[]);
+    groups.get(loai).push(r);
+  });
+  const loaiNames=sortLoaiNames([...groups.keys()]);
   const ths=TK_COLS.map(c=>{
     const on=tkSortCol===c.key;
-    return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortTKClick('${c.key}')">${c.label} <span class="sort-ic">${on?(tkSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
+    return`<th${c.w?` style="width:${c.w}"`:''} class="th-sort${on?' th-sort-on':''}" onclick="sortTKClick('${c.key}')">${c.label} <span class="sort-ic">${on?(tkSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
-  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="tk-selall" onchange="toggleAllTK(this)"></th><th style="width:40px">STT</th>${ths}<th></th></tr></thead><tbody>`+
-    data.map((r,i)=>{
-      const gi=C.TK.indexOf(r);// vị trí thật trong C.TK, tránh lệch dòng khi đang lọc/sắp xếp
-      const sl=Number(r[1]||0),gn=Number(r[3]||0);
-      const chk=selTK.has(r[0])?'checked':'';
-      return`<tr><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
-      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2},'${r[0]}')">Xóa</button></td></tr>`;
-    }).join('')+'</tbody></table>';
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--text2)">
+    <input type="checkbox" id="tk-selall" onchange="toggleAllTK(this)"><label for="tk-selall">Chọn tất cả đang hiển thị</label>
+  </div>`+
+    loaiNames.map((loai,idx)=>{
+      const items=groups.get(loai);
+      const rows=items.map((r,i)=>{
+        const gi=C.TK.indexOf(r);// vị trí thật trong C.TK, tránh lệch dòng khi đang lọc/sắp xếp
+        const sl=Number(r[1]||0),gn=Number(r[3]||0);
+        const chk=selTK.has(r[0])?'checked':'';
+        return`<tr><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
+        <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2},'${r[0]}')">Xóa</button></td></tr>`;
+      }).join('');
+      const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
+      const moveBtns=loai==='(Chưa phân loại)'?'':`<span style="display:flex;gap:2px" onclick="event.preventDefault();event.stopPropagation()">
+        <button class="btn btn-g btn-sm" ${idx<=0?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',-1,fTK)" title="Đưa loại này lên">↑</button>
+        <button class="btn btn-g btn-sm" ${idx>=loaiNames.length-1?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',1,fTK)" title="Đưa loại này xuống">↓</button>
+      </span>`;
+      return`<details class="acc-group ${loaiColorClass(loai,idx)}" open>
+        <summary>${moveBtns}🏷️ ${esc(loai)}<span class="acc-cnt">${items.length} SP · Tổng tồn: ${fmt(tongSL)}</span></summary>
+        <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th style="width:34px"></th><th style="width:40px">STT</th>${ths}<th style="width:130px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+      </details>`;
+    }).join('');
   updateTKSelUI();
 }
 // Ngưỡng "Sắp hết"/"Gần hết" của 1 sản phẩm: ưu tiên số riêng SP đã đặt, không có thì dùng mặc định ở Cài đặt
@@ -416,7 +536,8 @@ function sortByMode(data,mode){
 function fTK(){
   const q=document.getElementById('q-tk').value.toLowerCase();
   const st=document.getElementById('st-tk').value;
-  const filtered=C.TK.filter(r=>((r[0]||'').toLowerCase().includes(q)||(r[9]||'').toLowerCase().includes(q))&&(!st||stTK(r)===st));
+  const loai=document.getElementById('loai-tk')?.value||'';
+  const filtered=C.TK.filter(r=>((r[0]||'').toLowerCase().includes(q)||(r[9]||'').toLowerCase().includes(q))&&(!st||stTK(r)===st)&&(!loai||r[13]===loai));
   filtered.sort((a,b)=>tkCompare(a,b,tkSortCol)*tkSortDir);
   rTK(filtered);
 }
@@ -461,12 +582,17 @@ async function delSelTK(){
   });
 }
 // Nạp gợi ý NCC (datalist dùng chung) cho các ô "Nhà cung cấp" — vẫn cho gõ tự do, không bắt buộc chọn
-async function fillNCCDatalist(){
+async function initSPForm(){
+  if(!C.LOAI.length)await loadLoai();
+  document.getElementById('m-sp-t').textContent='Thêm sản phẩm';
+  ['sp-ma','sp-ten','sp-sl','sp-dv','sp-gn','sp-gb','sp-hsd','sp-ng','sp-gh','sp-hsdsap','sp-hsdgan','sp-ncc','sp-loai'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sp-row').value='';
   if(!C.NCC.length)await loadNCC();
-  document.getElementById('ncc-datalist').innerHTML=C.NCC.map(r=>`<option value="${esc(r[0])}">`).join('');
+  attachSearchList(document.getElementById('sp-ncc'),()=>C.NCC.map(r=>r[0]));
+  attachSearchList(document.getElementById('sp-loai'),()=>C.LOAI.map(r=>r[0]));
+  om('m-sp');
 }
-function initSPForm(){document.getElementById('m-sp-t').textContent='Thêm sản phẩm';['sp-ma','sp-ten','sp-sl','sp-dv','sp-gn','sp-gb','sp-hsd','sp-ng','sp-gh','sp-hsdsap','sp-hsdgan','sp-ncc'].forEach(id=>document.getElementById(id).value='');document.getElementById('sp-row').value='';fillNCCDatalist();}
-function editSP(row){
+async function editSP(row){
   const r=C.TK[row-2];document.getElementById('m-sp-t').textContent='Sửa sản phẩm';
   document.getElementById('sp-ten').value=r[0]||'';document.getElementById('sp-sl').value=r[1]||'';
   document.getElementById('sp-dv').value=r[2]||'';document.getElementById('sp-gn').value=r[3]||'';
@@ -476,8 +602,13 @@ function editSP(row){
   document.getElementById('sp-gh').value=r[10]||'';
   document.getElementById('sp-hsdsap').value=r[11]||'';
   document.getElementById('sp-hsdgan').value=r[12]||'';
-  document.getElementById('sp-row').value=row;om('m-sp');
-  fillNCCDatalist();
+  document.getElementById('sp-loai').value=r[13]||'';
+  document.getElementById('sp-row').value=row;
+  if(!C.LOAI.length)await loadLoai();
+  if(!C.NCC.length)await loadNCC();
+  attachSearchList(document.getElementById('sp-ncc'),()=>C.NCC.map(r=>r[0]));
+  attachSearchList(document.getElementById('sp-loai'),()=>C.LOAI.map(r=>r[0]));
+  om('m-sp');
 }
 async function delSP(row,name){
   confirmDel(`Xóa sản phẩm "${name}"?`,async()=>{
@@ -493,7 +624,7 @@ async function saveSP(){
   if(ng&&gh&&Number(gh)>Number(ng)){toast('Ngưỡng "Gần hết" phải ≤ ngưỡng "Sắp hết"','err');return;}
   const hsdSap=document.getElementById('sp-hsdsap').value, hsdGan=document.getElementById('sp-hsdgan').value;
   if(hsdSap&&hsdGan&&Number(hsdGan)>Number(hsdSap)){toast('Ngưỡng HSD "Gấp" phải ≤ ngưỡng "Sắp hết hạn"','err');return;}
-  const row=[ten,document.getElementById('sp-sl').value||0,document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,document.getElementById('sp-ma').value.trim(),gh,hsdSap,hsdGan];
+  const row=[ten,document.getElementById('sp-sl').value||0,document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,document.getElementById('sp-ma').value.trim(),gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
   const er=document.getElementById('sp-row').value;
   toast('Đang lưu...');
   await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
@@ -506,23 +637,26 @@ let nhRowCount=0;
 function addNHRow(){
   nhRowCount++;
   const id=nhRowCount;
-  const opts=C.TK.map((r,i)=>`<option value="${i}">${r[0]} (tồn:${r[1]})</option>`).join('');
   const tr=document.createElement('tr');
   tr.id='nh-r-'+id;
-  tr.innerHTML=`<td><select onchange="nhFillGia(${id})" id="nh-sp-${id}"><option value="">-- Chọn --</option>${opts}</select></td>
+  tr.innerHTML=`<td><input id="nh-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." oninput="nhFillGia(${id})" style="min-width:130px"></td>
     <td><input type="number" id="nh-sl-${id}" placeholder="0" oninput="nhCalc(${id},'sl')" style="width:70px"></td>
     <td><input type="number" id="nh-gia-${id}" placeholder="0" oninput="nhCalc(${id},'gia')" style="width:90px"></td>
     <td><input type="number" id="nh-tong-${id}" placeholder="0" oninput="nhCalc(${id},'tong')" style="width:100px"></td>
     <td><input type="date" id="nh-hsd-${id}" style="width:130px"></td>
-    <td class="td-del"><button class="btn btn-d btn-sm" onclick="document.getElementById('nh-r-${id}').remove();calcNH()">✕</button></td>`;
+    <td><input id="nh-loai-${id}" autocomplete="off" style="width:110px"></td>
+    <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(document.getElementById('nh-r-${id}'));calcNH()">✕</button></td>`;
   document.getElementById('nh-rows').appendChild(tr);
+  attachSearchList(document.getElementById('nh-sp-'+id),()=>C.TK.map(t=>t[0]));
+  attachSearchList(document.getElementById('nh-loai-'+id),()=>C.LOAI.map(r=>r[0]));
 }
-// Chọn sản phẩm → gợi ý sẵn Giá nhập = giá nhập cũ trong Tồn kho, rồi tính lại Tổng theo giá đó
+// Gõ/chọn sản phẩm khớp đúng tên có sẵn → gợi ý sẵn Giá nhập = giá nhập cũ, Loại hàng = loại đã lưu, rồi tính lại Tổng theo giá đó
 function nhFillGia(id){
-  const sel=document.getElementById('nh-sp-'+id);
-  const idx=sel.value;
-  if(idx!==''){
+  const val=document.getElementById('nh-sp-'+id).value;
+  const idx=C.TK.findIndex(t=>t[0]===val);
+  if(idx>=0){
     document.getElementById('nh-gia-'+id).value=C.TK[idx][3]||0;
+    document.getElementById('nh-loai-'+id).value=C.TK[idx][13]||'';
     nhCalc(id,'gia');
   } else calcNH();
 }
@@ -556,6 +690,8 @@ function calcNH(){
 async function openNH(){
   if(!C.TK.length)await loadTK();
   if(!C.USER.length)await loadUser();
+  if(!C.LOAI.length)await loadLoai();
+  if(!C.NCC.length)await loadNCC();
   document.getElementById('nh-user').innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(r=>`<option>${r[0]}</option>`).join('');
   // Tự điền sẵn "Người nhập" theo tài khoản đang đăng nhập (nếu tài khoản này có gắn với 1 Người dùng) — đỡ phải chọn tay
   const cur=currentUserName();
@@ -563,9 +699,10 @@ async function openNH(){
   document.getElementById('nh-ngay').value=td();
   document.getElementById('nh-ncc').value='';
   document.getElementById('nh-gc').value='';
+  attachSearchList(document.getElementById('nh-ncc'),()=>C.NCC.map(r=>r[0]));
+  cleanupSearchLists(document.getElementById('nh-rows'));
   document.getElementById('nh-rows').innerHTML='';nhRowCount=0;
   addNHRow();calcNH();om('m-nh');
-  fillNCCDatalist();
 }
 async function saveNH(){
   const user=document.getElementById('nh-user').value;
@@ -576,82 +713,45 @@ async function saveNH(){
   const items=[];
   rows.forEach(tr=>{
     const id=tr.id.replace('nh-r-','');
-    const idx=document.getElementById('nh-sp-'+id)?.value;
+    const spVal=document.getElementById('nh-sp-'+id)?.value||'';
+    const idx=C.TK.findIndex(t=>t[0]===spVal);
     const sl=Number(document.getElementById('nh-sl-'+id)?.value||0);
     const gia=Number(document.getElementById('nh-gia-'+id)?.value||0);// đã tự đồng bộ với Tổng giá nhập qua nhCalc()
     const hsd=document.getElementById('nh-hsd-'+id)?.value||'';
-    if(idx!==''&&idx!==undefined&&sl>0)items.push({idx:Number(idx),sp:C.TK[idx],sl,gia,hsd});
+    const loai=document.getElementById('nh-loai-'+id)?.value||'';
+    if(idx>=0&&sl>0)items.push({idx,sp:C.TK[idx],sl,gia,hsd,loai});
   });
   if(!user){toast('Chọn người nhập','err');return;}
   if(!items.length){toast('Thêm ít nhất 1 sản phẩm','err');return;}
   toast('Đang lưu '+items.length+' sản phẩm...');
   for(const it of items){
     const nccGhi=ncc||it.sp[8]||'';
-    await apiPost({sheet:'NhapHang',action:'append',row:[it.sp[0],it.sl,it.gia,nccGhi,ngay,gc,user,it.hsd]});
+    const loaiGhi=it.loai||it.sp[13]||'';
+    await apiPost({sheet:'NhapHang',action:'append',row:[it.sp[0],it.sl,it.gia,nccGhi,ngay,gc,user,it.hsd,loaiGhi]});
     const newSL=Number(it.sp[1]||0)+it.sl;const upd=[...it.sp];upd[1]=newSL;
     if(it.gia>0)upd[3]=it.gia;// cập nhật giá nhập mới nhất vào Tồn kho
     if(it.hsd)upd[5]=it.hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
     if(ncc)upd[8]=ncc;// cập nhật nhà cung cấp mới nhất vào Tồn kho (chỉ khi có nhập NCC ở phiếu)
+    if(it.loai)upd[13]=it.loai;// cập nhật loại hàng mới nhất vào Tồn kho
     await apiPost({sheet:'TonKho',action:'update',row:it.idx+2,data:upd});
-    C.TK[it.idx][1]=newSL;if(it.gia>0)C.TK[it.idx][3]=it.gia;if(it.hsd)C.TK[it.idx][5]=it.hsd;if(ncc)C.TK[it.idx][8]=ncc;
+    C.TK[it.idx][1]=newSL;if(it.gia>0)C.TK[it.idx][3]=it.gia;if(it.hsd)C.TK[it.idx][5]=it.hsd;if(ncc)C.TK[it.idx][8]=ncc;if(it.loai)C.TK[it.idx][13]=it.loai;
   }
   logAction('Tạo mới','Nhập hàng',`Người nhập: ${user} — ${items.map(it=>`${it.sp[0]} x${it.sl}`).join(', ')}`);
   toast('Đã nhập '+items.length+' sản phẩm thành công!');cm('m-nh');setTimeout(loadNH,800);
 }
 
-// ── SỬA 1 DÒNG NHẬP HÀNG ──
-async function editNH(row){
-  const r=C.NH[row-2];if(!r){toast('Không tìm thấy phiếu nhập','err');return;}
-  if(!C.TK.length)await loadTK();
-  if(!C.USER.length)await loadUser();
-  document.getElementById('nhe-sp').innerHTML=C.TK.map((t,i)=>`<option value="${i}"${t[0]===r[0]?' selected':''}>${t[0]} (tồn:${t[1]})</option>`).join('');
-  document.getElementById('nhe-sl').value=r[1]||'';
-  document.getElementById('nhe-gia').value=r[2]||'';
-  document.getElementById('nhe-tong').value=Number(r[1]||0)*Number(r[2]||0)||'';
-  document.getElementById('nhe-ncc').value=r[3]||'';
-  document.getElementById('nhe-ngay').value=r[4]||'';
-  document.getElementById('nhe-gc').value=r[5]||'';
-  document.getElementById('nhe-user').innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option${u[0]===r[6]?' selected':''}>${u[0]}</option>`).join('');
-  document.getElementById('nhe-hsd').value=r[7]||'';
-  document.getElementById('nhe-row').value=row;
-  om('m-nh-edit');
-  fillNCCDatalist();
-}
-// Liên kết 2 chiều: SL/Giá nhập đổi → tính lại Tổng (SL×Giá); Tổng đổi (kèm SL) → tính ngược Giá nhập (Tổng÷SL)
-function nheCalc(changed){
-  const slEl=document.getElementById('nhe-sl');
-  const giaEl=document.getElementById('nhe-gia');
-  const tongEl=document.getElementById('nhe-tong');
-  const sl=Number(slEl.value||0);
-  if(changed==='tong'){
-    const tong=Number(tongEl.value||0);
-    if(sl>0)giaEl.value=Math.round(tong/sl);
-  } else {
-    const gia=Number(giaEl.value||0);
-    tongEl.value=sl*gia||'';
-  }
-}
-async function saveNHEdit(){
-  const row=Number(document.getElementById('nhe-row').value);
-  const old=C.NH[row-2];if(!old){toast('Không tìm thấy phiếu nhập','err');return;}
-  const spIdx=Number(document.getElementById('nhe-sp').value);
+// Lõi dùng chung để sửa 1 dòng Nhập hàng (dùng cho popup sửa nhanh theo ngày) —
+// tách riêng để tránh viết trùng logic tính lại tồn kho ở 2 nơi (dễ lệch/dễ tái phát lỗi cộng dồn đã fix trước đây)
+async function saveNHEditCore(row,spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai){
+  const old=C.NH[row-2];if(!old)return{ok:false,msg:'Không tìm thấy phiếu nhập'};
   const sp=C.TK[spIdx];
-  const sl=Number(document.getElementById('nhe-sl').value||0);
-  const gia=Number(document.getElementById('nhe-gia').value||0);// đã tự đồng bộ với Tổng giá nhập qua nheCalc()
-  const ncc=document.getElementById('nhe-ncc').value;
-  const ngay=document.getElementById('nhe-ngay').value;
-  const gc=document.getElementById('nhe-gc').value;
-  const user=document.getElementById('nhe-user').value;
-  const hsd=document.getElementById('nhe-hsd').value;
-  if(!sp){toast('Chọn sản phẩm','err');return;}
-  if(!sl||sl<=0){toast('Số lượng phải lớn hơn 0','err');return;}
-  if(!user){toast('Chọn người nhập','err');return;}
-  toast('Đang lưu...');
-  await apiPost({sheet:'NhapHang',action:'update',row,data:[sp[0],sl,gia,ncc,ngay,gc,user,hsd]});
-  // đồng bộ ngay vào cache C.NH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi
-  // setTimeout(loadNH,800) bên dưới kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và
-  // tồn kho bị cộng dồn sai (trừ hụt phần chênh lệch của lần sửa trước)
-  C.NH[row-2]=[sp[0],sl,gia,ncc,ngay,gc,user,hsd];
+  if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
+  if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
+  if(!user)return{ok:false,msg:'Chọn người nhập'};
+  await apiPost({sheet:'NhapHang',action:'update',row,data:[sp[0],sl,gia,ncc,ngay,gc,user,hsd,loai]});
+  // đồng bộ ngay vào cache C.NH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi loadNH()
+  // kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và tồn kho bị cộng dồn sai
+  C.NH[row-2]=[sp[0],sl,gia,ncc,ngay,gc,user,hsd,loai];
   // điều chỉnh lại tồn kho theo chênh lệch số lượng (và đổi sản phẩm nếu có)
   const oldIdx=C.TK.findIndex(t=>t[0]===old[0]);
   const oldSL=Number(old[1]||0);
@@ -661,8 +761,9 @@ async function saveNHEdit(){
     if(gia>0)upd[3]=gia;// cập nhật giá nhập mới nhất vào Tồn kho
     if(hsd)upd[5]=hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
     if(ncc)upd[8]=ncc;// cập nhật nhà cung cấp mới nhất vào Tồn kho
+    if(loai)upd[13]=loai;// cập nhật loại hàng mới nhất vào Tồn kho
     await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
-    C.TK[spIdx][1]=newStock;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;
+    C.TK[spIdx][1]=newStock;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
   } else {
     if(oldIdx>=0){
       const newStockOld=Math.max(0,Number(C.TK[oldIdx][1]||0)-oldSL);
@@ -675,83 +776,125 @@ async function saveNHEdit(){
     if(gia>0)updNew[3]=gia;// cập nhật giá nhập mới nhất vào Tồn kho
     if(hsd)updNew[5]=hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
     if(ncc)updNew[8]=ncc;// cập nhật nhà cung cấp mới nhất vào Tồn kho
+    if(loai)updNew[13]=loai;// cập nhật loại hàng mới nhất vào Tồn kho
     await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:updNew});
-    C.TK[spIdx][1]=newStockNew;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;
+    C.TK[spIdx][1]=newStockNew;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
   }
   logAction('Cập nhật','Nhập hàng',`"${old[0]}" SL ${old[1]}→${sl}, Giá ${old[2]}→${gia} — sửa bởi: ${user}`);
-  toast('Đã cập nhật phiếu nhập!');cm('m-nh-edit');setTimeout(loadNH,800);
+  return{ok:true};
 }
-
 let selNH=new Set();
+// Danh sách Nhập hàng hiển thị GỘP THEO NGÀY (mỗi ngày 1 dòng) — bấm vào xem chi tiết từng dòng
+// nhập của ngày đó trong popup, giống bảng ở form "Tạo phiếu nhập"
+function groupNHByDate(data){
+  const map=new Map();
+  data.forEach(r=>{
+    const ngay=r[4]||'(chưa có ngày)';
+    if(!map.has(ngay))map.set(ngay,[]);
+    map.get(ngay).push(r);
+  });
+  return[...map.entries()].map(([ngay,items])=>({
+    ngay,items,
+    soSP:new Set(items.map(r=>r[0])).size,
+    tongSL:items.reduce((s,r)=>s+Number(r[1]||0),0),
+    tongTien:items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0),
+    nguoiNhap:[...new Set(items.map(r=>r[6]).filter(Boolean))],
+    ncc:[...new Set(items.map(r=>r[3]).filter(Boolean))],
+    loai:[...new Set(items.map(r=>r[8]).filter(Boolean))]
+  }));
+}
 async function loadNH(){
   document.getElementById('nh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selNH.clear();updateSelUI('nh-delsel-btn','nh-selcnt',0);
+  if(!C.USER.length)await loadUser();
+  const userSel=document.getElementById('user-nh');
+  if(userSel){
+    const cur=userSel.value;
+    userSel.innerHTML='<option value="">Tất cả người nhập</option>'+C.USER.map(u=>`<option${u[0]===cur?' selected':''}>${esc(u[0])}</option>`).join('');
+  }
   const data=await apiGet('NhapHang');C.NH=data;
-  rNH(data);
+  rNH(groupNHByDate(data).sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||'')));
+  // Không tự vẽ lại popup nếu đang có dòng mới chưa lưu (bấm "+ Thêm") — tránh mất trắng nội dung đang gõ dở
+  if(nhDayCurrent&&document.getElementById('m-nh-day').classList.contains('on')&&!document.querySelector('#nh-day-tbl tr[data-new="1"]'))renderNHDayDetail();
 }
 const NH_COLS=[
-  {key:'ten',label:'Sản phẩm'},{key:'sl',label:'SL'},{key:'gia',label:'Giá nhập'},{key:'tt',label:'Thành tiền'},
-  {key:'hsd',label:'Hạn SD'},{key:'ncc',label:'NCC'},{key:'ngay',label:'Ngày'},{key:'nguoinhap',label:'Người nhập'},{key:'ghichu',label:'Ghi chú'}
+  {key:'ngay',label:'Ngày nhập'},{key:'sosp',label:'Số sản phẩm'},{key:'tongsl',label:'Tổng SL'},
+  {key:'tongtien',label:'Tổng tiền'},{key:'nguoinhap',label:'Người nhập'},{key:'ncc',label:'NCC'},{key:'loai',label:'Loại hàng'}
 ];
 let nhSortCol=null,nhSortDir=1;
 function sortNHClick(col){if(nhSortCol===col)nhSortDir*=-1;else{nhSortCol=col;nhSortDir=1;}fNH();}
 function nhCompare(a,b,col){
   switch(col){
-    case'ten':return(a[0]||'').localeCompare(b[0]||'');
-    case'sl':return Number(a[1]||0)-Number(b[1]||0);
-    case'gia':return Number(a[2]||0)-Number(b[2]||0);
-    case'tt':return Number(a[1]||0)*Number(a[2]||0)-Number(b[1]||0)*Number(b[2]||0);
-    case'hsd':return(a[7]||'').localeCompare(b[7]||'');
-    case'ncc':return(a[3]||'').localeCompare(b[3]||'');
-    case'ngay':return(a[4]||'').localeCompare(b[4]||'');
-    case'nguoinhap':return(a[6]||'').localeCompare(b[6]||'');
-    default:return(a[5]||'').localeCompare(b[5]||'');
+    case'sosp':return a.soSP-b.soSP;
+    case'tongsl':return a.tongSL-b.tongSL;
+    case'tongtien':return a.tongTien-b.tongTien;
+    case'nguoinhap':return a.nguoiNhap.join(',').localeCompare(b.nguoiNhap.join(','));
+    case'ncc':return a.ncc.join(',').localeCompare(b.ncc.join(','));
+    case'loai':return a.loai.join(',').localeCompare(b.loai.join(','));
+    default:return(a.ngay||'').localeCompare(b.ngay||'');
   }
 }
-function rNH(data){
-  const total=data.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
-  document.getElementById('nh-sum').innerHTML=data.length?`<div class="grid3" style="margin-bottom:16px">
-    <div class="kpi b"><div class="lb">Số dòng nhập</div><div class="val">${data.length}</div></div>
-    <div class="kpi r"><div class="lb">Tổng SL</div><div class="val">${fmt(data.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
+function rNH(groups){
+  const flat=groups.flatMap(g=>g.items);
+  const total=flat.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
+  document.getElementById('nh-sum').innerHTML=flat.length?`<div class="grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số ngày nhập</div><div class="val">${groups.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng SL</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
     <div class="kpi r"><div class="lb">Tổng tiền nhập</div><div class="val">${fmt(total)}đ</div></div></div>`:'';
   const el=document.getElementById('nh-tbl');
-  if(!data.length){el.innerHTML='<div class="empty">⬇️ Chưa có phiếu nhập</div>';return;}
+  if(!groups.length){el.innerHTML='<div class="empty">⬇️ Chưa có phiếu nhập</div>';return;}
   const ths=NH_COLS.map(c=>{
     const on=nhSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortNHClick('${c.key}')">${c.label} <span class="sort-ic">${on?(nhSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
   el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="nh-selall" onchange="toggleAllNH(this)"></th>${ths}<th></th></tr></thead><tbody>`+
-    [...data].map((r)=>{
-      const gi=C.NH.indexOf(r);// vị trí thật trong C.NH, tránh lệch dòng khi đang lọc/tìm kiếm
-      const chk=selNH.has(gi)?'checked':'';
-      return`<tr><td data-label=""><input type="checkbox" class="nh-chk" data-idx="${gi}" ${chk} onchange="toggleNHChk(this)"></td><td data-label="Sản phẩm"><b>${r[0]}</b></td><td data-label="SL">${r[1]}</td><td class="mobile-hide" data-label="Giá nhập">${fmt(r[2])}đ</td>
-      <td data-label="Thành tiền"><span class="bg bg-b">${fmt(Number(r[1]||0)*Number(r[2]||0))}đ</span></td>
-      <td class="mobile-hide" data-label="Hạn SD">${r[7]?`<span class="bg bg-y">${r[7]}</span>`:''}</td>
-      <td class="mobile-hide" data-label="NCC">${r[3]||''}</td><td data-label="Ngày">${r[4]||''}</td><td class="mobile-hide" data-label="Người nhập"><span class="bg bg-p">${r[6]||''}</span></td><td class="mobile-hide" data-label="Ghi chú">${r[5]||''}</td>
-      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delNH(${gi+2},'${r[0]}',${Number(r[1]||0)})">Xóa</button></td></tr>`;
+    groups.map(g=>{
+      const chk=selNH.has(g.ngay)?'checked':'';
+      return`<tr style="cursor:pointer" onclick="openNHDay('${esc(g.ngay)}')">
+      <td data-label="" onclick="event.stopPropagation()"><input type="checkbox" class="nh-chk" data-ngay="${esc(g.ngay)}" ${chk} onchange="toggleNHChk(this)"></td>
+      <td data-label="Ngày nhập"><b>${esc(g.ngay)}</b></td>
+      <td data-label="Số sản phẩm">${g.soSP}</td>
+      <td data-label="Tổng SL">${fmt(g.tongSL)}</td>
+      <td data-label="Tổng tiền"><span class="bg bg-b">${fmt(g.tongTien)}đ</span></td>
+      <td class="mobile-hide" data-label="Người nhập">${g.nguoiNhap.map(n=>`<span class="bg bg-p">${esc(n)}</span>`).join(' ')||''}</td>
+      <td class="mobile-hide" data-label="NCC">${g.ncc.join(', ')}</td>
+      <td class="mobile-hide" data-label="Loại hàng">${g.loai.join(', ')}</td>
+      <td data-label="" onclick="event.stopPropagation()"><button class="btn btn-g btn-sm" onclick="openNHDay('${esc(g.ngay)}')">Xem</button></td></tr>`;
     }).join('')+'</tbody></table>';
   updateSelUI('nh-delsel-btn','nh-selcnt',selNH.size);
-  updateSelAllTri('nh-selall','nh-chk',selNH);
+  updateNHSelAllTri();
+}
+// selNH giờ chứa các NGÀY được chọn (không phải index dòng) — vì 1 dòng ngoài list = cả 1 ngày gộp nhiều bản ghi
+function updateNHSelAllTri(){
+  const all=document.getElementById('nh-selall');
+  if(!all)return;
+  const chks=[...document.querySelectorAll('.nh-chk')];
+  const checkedCnt=chks.filter(c=>selNH.has(c.dataset.ngay)).length;
+  all.checked=chks.length>0&&checkedCnt===chks.length;
+  all.indeterminate=checkedCnt>0&&checkedCnt<chks.length;
 }
 function toggleNHChk(el){
-  const idx=Number(el.dataset.idx);
-  if(el.checked)selNH.add(idx);else selNH.delete(idx);
+  const ngay=el.dataset.ngay;
+  if(el.checked)selNH.add(ngay);else selNH.delete(ngay);
   updateSelUI('nh-delsel-btn','nh-selcnt',selNH.size);
-  updateSelAllTri('nh-selall','nh-chk',selNH);
+  updateNHSelAllTri();
 }
 function toggleAllNH(el){
   document.querySelectorAll('.nh-chk').forEach(c=>{
     c.checked=el.checked;
-    const idx=Number(c.dataset.idx);
-    if(el.checked)selNH.add(idx);else selNH.delete(idx);
+    const ngay=c.dataset.ngay;
+    if(el.checked)selNH.add(ngay);else selNH.delete(ngay);
   });
   updateSelUI('nh-delsel-btn','nh-selcnt',selNH.size);
 }
 async function delSelNH(){
-  if(!selNH.size){toast('Chưa chọn phiếu nào','err');return;}
-  confirmDel(`Xóa ${selNH.size} phiếu nhập đã chọn? Tồn kho sẽ được điều chỉnh (trừ lại) tương ứng.`,async()=>{
-    toast('Đang xóa '+selNH.size+' phiếu...');
-    const idxs=[...selNH].sort((a,b)=>b-a);// xóa từ index lớn → nhỏ để tránh lệch vị trí
+  if(!selNH.size){toast('Chưa chọn ngày nào','err');return;}
+  const days=[...selNH];
+  const items=C.NH.map((r,i)=>[r,i]).filter(([r])=>days.includes(r[4]||'(chưa có ngày)'));
+  if(!items.length){toast('Không tìm thấy phiếu nào','err');return;}
+  confirmDel(`Xóa toàn bộ phiếu nhập của ${days.length} ngày đã chọn (${items.length} dòng)? Tồn kho sẽ được điều chỉnh (trừ lại) tương ứng.`,async()=>{
+    toast('Đang xóa '+items.length+' dòng...');
+    const idxs=items.map(([,i])=>i).sort((a,b)=>b-a);// xóa từ index lớn → nhỏ để tránh lệch vị trí
     const delNames=[];
     for(const idx of idxs){
       const r=C.NH[idx];if(!r)continue;
@@ -765,35 +908,232 @@ async function delSelNH(){
         C.TK[spIdx][1]=newSL;
       }
     }
-    logAction('Xóa','Nhập hàng',`Xóa hàng loạt ${delNames.length} phiếu: ${delNames.join(', ')}`);
+    logAction('Xóa','Nhập hàng',`Xóa hàng loạt ${days.length} ngày (${delNames.length} dòng): ${delNames.join(', ')}`);
     selNH.clear();
-    toast('Đã xóa '+idxs.length+' phiếu nhập!');setTimeout(loadNH,800);
+    toast('Đã xóa '+idxs.length+' dòng nhập!');setTimeout(loadNH,800);
   });
 }
 function fNH(){
   const q=document.getElementById('q-nh').value.toLowerCase();
   const from=document.getElementById('from-nh').value;
   const to=document.getElementById('to-nh').value;
+  const user=document.getElementById('user-nh')?.value||'';
   const pg=Number(document.getElementById('pg-nh').value);
   let d=[...C.NH];
   if(from)d=d.filter(r=>r[4]>=from);
   if(to)d=d.filter(r=>r[4]<=to);
-  if(q)d=d.filter(r=>(r[0]||'').toLowerCase().includes(q)||(r[3]||'').toLowerCase().includes(q));
-  if(pg>0)d=d.slice(-pg);
-  if(nhSortCol)d.sort((a,b)=>nhCompare(a,b,nhSortCol)*nhSortDir);
-  rNH(d);
+  if(user)d=d.filter(r=>r[6]===user);
+  if(q)d=d.filter(r=>(r[0]||'').toLowerCase().includes(q)||(r[3]||'').toLowerCase().includes(q)||(r[8]||'').toLowerCase().includes(q));
+  let groups=groupNHByDate(d);
+  if(nhSortCol)groups.sort((a,b)=>nhCompare(a,b,nhSortCol)*nhSortDir);
+  else groups.sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));// mặc định: ngày mới nhất trước
+  if(pg>0)groups=groups.slice(0,pg);// pg giờ giới hạn theo số NGÀY, không phải số dòng
+  rNH(groups);
+}
+// ── Popup chi tiết các dòng nhập của 1 ngày ──
+let nhDayCurrent=null;
+async function openNHDay(ngay){
+  nhDayCurrent=ngay;
+  if(!C.TK.length)await loadTK();
+  if(!C.USER.length)await loadUser();
+  if(!C.LOAI.length)await loadLoai();
+  if(!C.NCC.length)await loadNCC();
+  document.getElementById('nh-day-q').value='';
+  document.getElementById('nh-day-hsd-from').value='';
+  document.getElementById('nh-day-hsd-to').value='';
+  document.getElementById('nh-day-user-q').innerHTML='<option value="">Tất cả người nhập</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  renderNHDayDetail();
+  om('m-nh-day');
+}
+// Sửa trực tiếp (inline) từng dòng nhập ngay trong popup — tính lại "Thành tiền" khi gõ SL/Giá
+function nhdCalc(id){
+  const sl=Number(document.getElementById('nhd-sl-'+id)?.value||0);
+  const gia=Number(document.getElementById('nhd-gia-'+id)?.value||0);
+  const el=document.getElementById('nhd-tt-'+id);
+  if(el)el.textContent=fmt(sl*gia)+'đ';
+}
+// Đổi sản phẩm → tự điền lại "Loại hàng" theo đúng loại đã lưu của sản phẩm đó; sản phẩm chưa có loại (hoặc gõ chưa khớp tên nào) thì để trống
+function nhdFillLoai(id){
+  const spEl=document.getElementById('nhd-sp-'+id);
+  const loaiEl=document.getElementById('nhd-loai-'+id);
+  if(!spEl||!loaiEl)return;
+  const idx=C.TK.findIndex(t=>t[0]===spEl.value);
+  loaiEl.value=idx>=0?(C.TK[idx][13]||''):'';
+}
+function renderNHDayDetail(){
+  const wrap=document.getElementById('nh-day-tbl');
+  if(!wrap)return;
+  cleanupSearchLists(wrap);// dọn menu gợi ý cũ trước khi ghi đè innerHTML bên dưới
+  const items=C.NH.filter(r=>(r[4]||'(chưa có ngày)')===nhDayCurrent);
+  document.getElementById('nh-day-t').textContent='Phiếu nhập ngày '+(nhDayCurrent||'');
+  const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
+  const tongTien=items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
+  document.getElementById('nh-day-sum').innerHTML=items.length?`<div class="grid3" style="margin-bottom:14px">
+    <div class="kpi b"><div class="lb">Số dòng</div><div class="val">${items.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng SL</div><div class="val">${fmt(tongSL)}</div></div>
+    <div class="kpi r"><div class="lb">Tổng tiền</div><div class="val">${fmt(tongTien)}đ</div></div></div>`:'';
+  // Tìm nhanh Sản phẩm/Hạn SD/Người nhập ngay trong phiếu này — chỉ lọc dòng hiển thị, không đụng tới dữ liệu/tổng số ở trên
+  const q=(document.getElementById('nh-day-q')?.value||'').trim().toLowerCase();
+  const hsdFrom=document.getElementById('nh-day-hsd-from')?.value||'';
+  const hsdTo=document.getElementById('nh-day-hsd-to')?.value||'';
+  const qUser=document.getElementById('nh-day-user-q')?.value||'';
+  const shown=items.filter(r=>
+    (!q||(r[0]||'').toLowerCase().includes(q))&&
+    (!hsdFrom||(r[7]||'')>=hsdFrom)&&
+    (!hsdTo||(r[7]||'')<=hsdTo)&&
+    (!qUser||r[6]===qUser)
+  );
+  const rowsHtml=shown.map(r=>{
+    const gi=C.NH.indexOf(r);const row=gi+2;
+    const userOpts='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option${u[0]===r[6]?' selected':''}>${u[0]}</option>`).join('');
+    return`<tr>
+      <td><input id="nhd-sp-${row}" value="${esc(r[0])}" autocomplete="off" oninput="nhdFillLoai(${row})" style="min-width:130px"></td>
+      <td><input type="number" id="nhd-sl-${row}" value="${r[1]||0}" style="width:65px" oninput="nhdCalc(${row})"></td>
+      <td><input type="number" id="nhd-gia-${row}" value="${r[2]||0}" style="width:85px" oninput="nhdCalc(${row})"></td>
+      <td><b id="nhd-tt-${row}">${fmt(Number(r[1]||0)*Number(r[2]||0))}đ</b></td>
+      <td><input type="date" id="nhd-ngay-${row}" value="${r[4]||''}" style="width:135px"></td>
+      <td><input type="date" id="nhd-hsd-${row}" value="${r[7]||''}" style="width:135px"></td>
+      <td><input id="nhd-ncc-${row}" value="${r[3]||''}" autocomplete="off" style="width:110px"></td>
+      <td><select id="nhd-user-${row}" style="min-width:100px">${userOpts}</select></td>
+      <td><input id="nhd-loai-${row}" value="${esc(r[8]||'')}" autocomplete="off" style="width:100px"></td>
+      <td><input id="nhd-gc-${row}" value="${r[5]||''}" style="width:110px"></td>
+      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delNH(${row},'${r[0]}',${Number(r[1]||0)})">✕</button></td>
+    </tr>`;
+  }).join('');
+  let emptyMsg='';
+  if(!items.length)emptyMsg='<div class="empty">Không còn phiếu nào trong ngày này — bấm "+ Thêm sản phẩm" để thêm mới</div>';
+  else if(!shown.length)emptyMsg='<div class="empty">Không có dòng nào khớp với bộ lọc đang tìm</div>';
+  wrap.innerHTML=`<div class="scroll-tbl"><table class="item-table"><thead><tr>
+    <th>Sản phẩm</th><th>SL</th><th>Giá nhập</th><th>Thành tiền</th><th>Ngày</th><th>Hạn SD</th><th>NCC</th><th>Người nhập</th><th>Loại hàng</th><th>Ghi chú</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`+emptyMsg;
+  wrap.querySelectorAll('[id^="nhd-sp-"]').forEach(el=>attachSearchList(el,()=>C.TK.map(t=>t[0])));
+  wrap.querySelectorAll('[id^="nhd-ncc-"]').forEach(el=>attachSearchList(el,()=>C.NCC.map(r=>r[0])));
+  wrap.querySelectorAll('[id^="nhd-loai-"]').forEach(el=>attachSearchList(el,()=>C.LOAI.map(r=>r[0])));
+}
+// Thêm 1 dòng TRỐNG (chưa lưu) vào popup để nhập thêm sản phẩm mới cho đúng ngày này
+let nhDayNewCount=0;
+function addNHDayRow(){
+  const tbody=document.querySelector('#nh-day-tbl tbody');
+  if(!tbody)return;
+  nhDayNewCount++;
+  const id='new'+nhDayNewCount;
+  const cur=currentUserName();
+  const userOpts='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option${u[0]===cur?' selected':''}>${u[0]}</option>`).join('');
+  const ngayVal=nhDayCurrent&&nhDayCurrent!=='(chưa có ngày)'?nhDayCurrent:'';
+  const tr=document.createElement('tr');
+  tr.dataset.new='1';tr.dataset.tempId=id;
+  tr.innerHTML=`
+    <td><input id="nhd-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." oninput="nhdFillLoai('${id}')" style="min-width:130px"></td>
+    <td><input type="number" id="nhd-sl-${id}" placeholder="0" style="width:65px" oninput="nhdCalc('${id}')"></td>
+    <td><input type="number" id="nhd-gia-${id}" placeholder="0" style="width:85px" oninput="nhdCalc('${id}')"></td>
+    <td><b id="nhd-tt-${id}">0đ</b></td>
+    <td><input type="date" id="nhd-ngay-${id}" value="${ngayVal}" style="width:135px"></td>
+    <td><input type="date" id="nhd-hsd-${id}" style="width:135px"></td>
+    <td><input id="nhd-ncc-${id}" autocomplete="off" style="width:110px"></td>
+    <td><select id="nhd-user-${id}" style="min-width:100px">${userOpts}</select></td>
+    <td><input id="nhd-loai-${id}" autocomplete="off" style="width:100px"></td>
+    <td><input id="nhd-gc-${id}" style="width:110px"></td>
+    <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(this.closest('tr'))">✕</button></td>`;
+  tbody.appendChild(tr);
+  attachSearchList(document.getElementById('nhd-sp-'+id),()=>C.TK.map(t=>t[0]));
+  attachSearchList(document.getElementById('nhd-ncc-'+id),()=>C.NCC.map(r=>r[0]));
+  attachSearchList(document.getElementById('nhd-loai-'+id),()=>C.LOAI.map(r=>r[0]));
+}
+// Tạo mới 1 dòng Nhập hàng (dùng cho dòng vừa "+ Thêm" trong popup theo ngày) — cùng logic cộng tồn kho như saveNH()
+async function saveNHCreateCore(spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai){
+  const sp=C.TK[spIdx];
+  if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
+  if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
+  if(!user)return{ok:false,msg:'Chọn người nhập'};
+  const nccGhi=ncc||sp[8]||'';
+  const loaiGhi=loai||sp[13]||'';
+  await apiPost({sheet:'NhapHang',action:'append',row:[sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi]});
+  const newSL=Number(sp[1]||0)+sl;const upd=[...sp];upd[1]=newSL;
+  if(gia>0)upd[3]=gia;if(hsd)upd[5]=hsd;if(ncc)upd[8]=ncc;if(loai)upd[13]=loai;
+  await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+  C.TK[spIdx][1]=newSL;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
+  C.NH.push([sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi]);
+  return{ok:true};
+}
+// Lưu tất cả các dòng đang sửa trong popup (cả dòng có sẵn lẫn dòng vừa "+ Thêm")
+// Xóa cả phiếu (mọi dòng) của ngày đang xem trong popup — tiện hơn phải đóng popup rồi ra danh sách tick chọn
+async function delNHDay(){
+  const idxs=C.NH.map((r,i)=>i).filter(i=>(C.NH[i][4]||'(chưa có ngày)')===nhDayCurrent).sort((a,b)=>b-a);
+  if(!idxs.length){toast('Không có phiếu nào để xóa','err');return;}
+  confirmDel(`Xóa toàn bộ phiếu nhập ngày ${nhDayCurrent} (${idxs.length} dòng)? Tồn kho sẽ được điều chỉnh (trừ lại) tương ứng.`,async()=>{
+    toast('Đang xóa '+idxs.length+' dòng...');
+    const delNames=[];
+    for(const idx of idxs){
+      const r=C.NH[idx];if(!r)continue;
+      delNames.push(`${r[0]} x${r[1]}`);
+      await apiPost({sheet:'NhapHang',action:'delete',row:idx+2});
+      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(spIdx>=0){
+        const newSL=Math.max(0,Number(C.TK[spIdx][1]||0)-Number(r[1]||0));
+        const upd=[...C.TK[spIdx]];upd[1]=newSL;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=newSL;
+      }
+    }
+    logAction('Xóa','Nhập hàng',`Xóa cả phiếu ngày ${nhDayCurrent} (${delNames.length} dòng): ${delNames.join(', ')}`);
+    toast('Đã xóa phiếu nhập ngày '+nhDayCurrent+'!');
+    cm('m-nh-day');
+    setTimeout(loadNH,800);
+  });
+}
+async function saveNHDayAll(){
+  toast('Đang lưu...');
+  const items=C.NH.filter(r=>(r[4]||'(chưa có ngày)')===nhDayCurrent);
+  for(const r of items){
+    const row=C.NH.indexOf(r)+2;
+    const spEl=document.getElementById('nhd-sp-'+row);
+    if(!spEl)continue;// dòng đã bị xóa khỏi DOM (bấm ✕) trong lúc sửa, bỏ qua
+    const spIdx=C.TK.findIndex(t=>t[0]===spEl.value);
+    const sl=Number(document.getElementById('nhd-sl-'+row).value||0);
+    const gia=Number(document.getElementById('nhd-gia-'+row).value||0);
+    const ngay=document.getElementById('nhd-ngay-'+row).value;
+    const hsd=document.getElementById('nhd-hsd-'+row).value;
+    const ncc=document.getElementById('nhd-ncc-'+row).value;
+    const user=document.getElementById('nhd-user-'+row).value;
+    const loai=document.getElementById('nhd-loai-'+row).value;
+    const gc=document.getElementById('nhd-gc-'+row).value;
+    const res=await saveNHEditCore(row,spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai);
+    if(!res.ok){toast(`Dòng "${r[0]}": ${res.msg}`,'err');return;}
+  }
+  const newTrs=[...document.querySelectorAll('#nh-day-tbl tbody tr[data-new="1"]')];
+  const created=[];
+  for(const tr of newTrs){
+    const id=tr.dataset.tempId;
+    const spVal=document.getElementById('nhd-sp-'+id).value;
+    const sl=Number(document.getElementById('nhd-sl-'+id).value||0);
+    if(!spVal&&!sl)continue;// dòng để trống hoàn toàn (bấm + Thêm nhưng không gõ gì), bỏ qua
+    const spIdx=C.TK.findIndex(t=>t[0]===spVal);
+    const gia=Number(document.getElementById('nhd-gia-'+id).value||0);
+    const ngay=document.getElementById('nhd-ngay-'+id).value;
+    const hsd=document.getElementById('nhd-hsd-'+id).value;
+    const ncc=document.getElementById('nhd-ncc-'+id).value;
+    const user=document.getElementById('nhd-user-'+id).value;
+    const loai=document.getElementById('nhd-loai-'+id).value;
+    const gc=document.getElementById('nhd-gc-'+id).value;
+    const res=await saveNHCreateCore(spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai);
+    if(!res.ok){toast(`Dòng mới: ${res.msg}`,'err');return;}
+    created.push(`${C.TK[spIdx][0]} x${sl}`);
+  }
+  if(created.length)logAction('Tạo mới','Nhập hàng',`Thêm vào ngày ${nhDayCurrent}: ${created.join(', ')}`);
+  toast('Đã lưu tất cả thay đổi!');
+  cm('m-nh-day');
+  setTimeout(loadNH,800);
 }
 
 // ══ XẾP HÀNG NHIỀU DÒNG (chuyển hàng từ kho ra gian hàng, trừ tồn kho) ══
 let xhRowCount=0;
 function addXHRow(){
   xhRowCount++;const id=xhRowCount;
-  const opts=C.TK.map((r,i)=>`<option value="${i}">${r[0]} (tồn:${r[1]})</option>`).join('');
   const tr=document.createElement('tr');tr.id='xh-r-'+id;
-  tr.innerHTML=`<td><select id="xh-sp-${id}"><option value="">-- Chọn --</option>${opts}</select></td>
+  tr.innerHTML=`<td><input id="xh-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." style="min-width:150px"></td>
     <td><input type="number" id="xh-sl-${id}" placeholder="0" oninput="calcXH()" style="width:90px"></td>
-    <td class="td-del"><button class="btn btn-d btn-sm" onclick="document.getElementById('xh-r-${id}').remove();calcXH()">✕</button></td>`;
+    <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(document.getElementById('xh-r-${id}'));calcXH()">✕</button></td>`;
   document.getElementById('xh-rows').appendChild(tr);
+  attachSearchList(document.getElementById('xh-sp-'+id),()=>C.TK.map(t=>t[0]));
 }
 function calcXH(){
   let tsl=0;
@@ -810,6 +1150,7 @@ async function openXH(){
   document.getElementById('xh-gh').innerHTML='<option value="">-- Chọn --</option>'+C.GH.map(r=>`<option>${r[0]}</option>`).join('');
   document.getElementById('xh-ngay').value=td();
   document.getElementById('xh-gc').value='';
+  cleanupSearchLists(document.getElementById('xh-rows'));
   document.getElementById('xh-rows').innerHTML='';xhRowCount=0;
   addXHRow();calcXH();om('m-xh');
 }
@@ -821,9 +1162,10 @@ async function saveXH(){
   const items=[];
   rows.forEach(tr=>{
     const id=tr.id.replace('xh-r-','');
-    const idx=document.getElementById('xh-sp-'+id)?.value;
+    const spVal=document.getElementById('xh-sp-'+id)?.value||'';
+    const idx=C.TK.findIndex(t=>t[0]===spVal);
     const sl=Number(document.getElementById('xh-sl-'+id)?.value||0);
-    if(idx!==''&&idx!==undefined&&sl>0)items.push({idx:Number(idx),sp:C.TK[idx],sl});
+    if(idx>=0&&sl>0)items.push({idx,sp:C.TK[idx],sl});
   });
   if(!gh){toast('Chọn gian hàng','err');return;}
   if(!items.length){toast('Thêm ít nhất 1 sản phẩm','err');return;}
@@ -843,66 +1185,100 @@ async function saveXH(){
 }
 
 let selXH=new Set();
+// Danh sách Xếp hàng hiển thị GỘP THEO NGÀY (mỗi ngày 1 dòng) — bấm vào xem/sửa chi tiết từng dòng
+// xếp của ngày đó trong popup, giống cách đã làm ở Nhập hàng
+function groupXHByDate(data){
+  const map=new Map();
+  data.forEach(r=>{
+    const ngay=r[3]||'(chưa có ngày)';
+    if(!map.has(ngay))map.set(ngay,[]);
+    map.get(ngay).push(r);
+  });
+  return[...map.entries()].map(([ngay,items])=>({
+    ngay,items,
+    soSP:new Set(items.map(r=>r[0])).size,
+    tongSL:items.reduce((s,r)=>s+Number(r[1]||0),0),
+    gianHang:[...new Set(items.map(r=>r[2]).filter(Boolean))]
+  }));
+}
 async function loadXH(){
   document.getElementById('xh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selXH.clear();updateSelUI('xh-delsel-btn','xh-selcnt',0);
   const data=await apiGet('XepHang');C.XH=data;
-  rXH(data);
+  rXH(groupXHByDate(data).sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||'')));
+  // Không tự vẽ lại popup nếu đang có dòng mới chưa lưu (bấm "+ Thêm") — tránh mất trắng nội dung đang gõ dở
+  if(xhDayCurrent&&document.getElementById('m-xh-day').classList.contains('on')&&!document.querySelector('#xh-day-tbl tr[data-new="1"]'))renderXHDayDetail();
 }
 const XH_COLS=[
-  {key:'ten',label:'Sản phẩm'},{key:'sl',label:'SL'},{key:'gh',label:'Gian hàng'},{key:'ngay',label:'Ngày xếp'},{key:'ghichu',label:'Ghi chú'}
+  {key:'ngay',label:'Ngày xếp'},{key:'sosp',label:'Số sản phẩm'},{key:'tongsl',label:'Tổng SL'},{key:'gh',label:'Gian hàng'}
 ];
 let xhSortCol=null,xhSortDir=1;
 function sortXHClick(col){if(xhSortCol===col)xhSortDir*=-1;else{xhSortCol=col;xhSortDir=1;}fXH();}
 function xhCompare(a,b,col){
   switch(col){
-    case'ten':return(a[0]||'').localeCompare(b[0]||'');
-    case'sl':return Number(a[1]||0)-Number(b[1]||0);
-    case'gh':return(a[2]||'').localeCompare(b[2]||'');
-    case'ngay':return(a[3]||'').localeCompare(b[3]||'');
-    default:return(a[4]||'').localeCompare(b[4]||'');
+    case'sosp':return a.soSP-b.soSP;
+    case'tongsl':return a.tongSL-b.tongSL;
+    case'gh':return a.gianHang.join(',').localeCompare(b.gianHang.join(','));
+    default:return(a.ngay||'').localeCompare(b.ngay||'');
   }
 }
-function rXH(data){
-  document.getElementById('xh-sum').innerHTML=data.length?`<div class="grid3" style="margin-bottom:16px">
-    <div class="kpi b"><div class="lb">Số dòng xếp</div><div class="val">${data.length}</div></div>
-    <div class="kpi p"><div class="lb">Tổng SL đã xếp</div><div class="val">${fmt(data.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
-    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(data.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
+function rXH(groups){
+  const flat=groups.flatMap(g=>g.items);
+  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số ngày xếp</div><div class="val">${groups.length}</div></div>
+    <div class="kpi p"><div class="lb">Tổng SL đã xếp</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
+    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
   const el=document.getElementById('xh-tbl');
-  if(!data.length){el.innerHTML='<div class="empty">🏷️ Chưa có phiếu xếp hàng</div>';return;}
+  if(!groups.length){el.innerHTML='<div class="empty">🏷️ Chưa có phiếu xếp hàng</div>';return;}
   const ths=XH_COLS.map(c=>{
     const on=xhSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortXHClick('${c.key}')">${c.label} <span class="sort-ic">${on?(xhSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
   el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="xh-selall" onchange="toggleAllXH(this)"></th>${ths}<th></th></tr></thead><tbody>`+
-    [...data].map(r=>{
-      const gi=C.XH.indexOf(r);
-      const chk=selXH.has(gi)?'checked':'';
-      return`<tr><td data-label=""><input type="checkbox" class="xh-chk" data-idx="${gi}" ${chk} onchange="toggleXHChk(this)"></td><td data-label="Sản phẩm"><b>${r[0]}</b></td><td data-label="SL">${r[1]}</td><td data-label="Gian hàng"><span class="bg bg-p">${r[2]||''}</span></td><td data-label="Ngày xếp">${r[3]||''}</td><td class="mobile-hide" data-label="Ghi chú">${r[4]||''}</td>
-      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editXH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delXH(${gi+2},'${r[0]}',${Number(r[1]||0)})">Xóa</button></td></tr>`;
+    groups.map(g=>{
+      const chk=selXH.has(g.ngay)?'checked':'';
+      return`<tr style="cursor:pointer" onclick="openXHDay('${esc(g.ngay)}')">
+      <td data-label="" onclick="event.stopPropagation()"><input type="checkbox" class="xh-chk" data-ngay="${esc(g.ngay)}" ${chk} onchange="toggleXHChk(this)"></td>
+      <td data-label="Ngày xếp"><b>${esc(g.ngay)}</b></td>
+      <td data-label="Số sản phẩm">${g.soSP}</td>
+      <td data-label="Tổng SL">${fmt(g.tongSL)}</td>
+      <td data-label="Gian hàng">${g.gianHang.map(n=>`<span class="bg bg-p">${esc(n)}</span>`).join(' ')||''}</td>
+      <td data-label="" onclick="event.stopPropagation()"><button class="btn btn-g btn-sm" onclick="openXHDay('${esc(g.ngay)}')">Xem</button></td></tr>`;
     }).join('')+'</tbody></table>';
   updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
-  updateSelAllTri('xh-selall','xh-chk',selXH);
+  updateXHSelAllTri();
+}
+// selXH giờ chứa các NGÀY được chọn (không phải index dòng) — như đã làm ở Nhập hàng
+function updateXHSelAllTri(){
+  const all=document.getElementById('xh-selall');
+  if(!all)return;
+  const chks=[...document.querySelectorAll('.xh-chk')];
+  const checkedCnt=chks.filter(c=>selXH.has(c.dataset.ngay)).length;
+  all.checked=chks.length>0&&checkedCnt===chks.length;
+  all.indeterminate=checkedCnt>0&&checkedCnt<chks.length;
 }
 function toggleXHChk(el){
-  const idx=Number(el.dataset.idx);
-  if(el.checked)selXH.add(idx);else selXH.delete(idx);
+  const ngay=el.dataset.ngay;
+  if(el.checked)selXH.add(ngay);else selXH.delete(ngay);
   updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
-  updateSelAllTri('xh-selall','xh-chk',selXH);
+  updateXHSelAllTri();
 }
 function toggleAllXH(el){
   document.querySelectorAll('.xh-chk').forEach(c=>{
     c.checked=el.checked;
-    const idx=Number(c.dataset.idx);
-    if(el.checked)selXH.add(idx);else selXH.delete(idx);
+    const ngay=c.dataset.ngay;
+    if(el.checked)selXH.add(ngay);else selXH.delete(ngay);
   });
   updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
 }
 async function delSelXH(){
-  if(!selXH.size){toast('Chưa chọn phiếu nào','err');return;}
-  confirmDel(`Xóa ${selXH.size} phiếu xếp đã chọn? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
-    toast('Đang xóa '+selXH.size+' phiếu...');
-    const idxs=[...selXH].sort((a,b)=>b-a);
+  if(!selXH.size){toast('Chưa chọn ngày nào','err');return;}
+  const days=[...selXH];
+  const items=C.XH.map((r,i)=>[r,i]).filter(([r])=>days.includes(r[3]||'(chưa có ngày)'));
+  if(!items.length){toast('Không tìm thấy phiếu nào','err');return;}
+  confirmDel(`Xóa toàn bộ phiếu xếp của ${days.length} ngày đã chọn (${items.length} dòng)? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
+    toast('Đang xóa '+items.length+' dòng...');
+    const idxs=items.map(([,i])=>i).sort((a,b)=>b-a);
     const delNames=[];
     for(const idx of idxs){
       const r=C.XH[idx];if(!r)continue;
@@ -916,9 +1292,9 @@ async function delSelXH(){
         C.TK[spIdx][1]=newSL;
       }
     }
-    logAction('Xóa','Xếp hàng',`Xóa hàng loạt ${delNames.length} phiếu: ${delNames.join(', ')}`);
+    logAction('Xóa','Xếp hàng',`Xóa hàng loạt ${days.length} ngày (${delNames.length} dòng): ${delNames.join(', ')}`);
     selXH.clear();
-    toast('Đã xóa '+idxs.length+' phiếu xếp!');setTimeout(loadXH,800);
+    toast('Đã xóa '+idxs.length+' dòng xếp!');setTimeout(loadXH,800);
   });
 }
 function fXH(){
@@ -930,50 +1306,31 @@ function fXH(){
   if(from)d=d.filter(r=>r[3]>=from);
   if(to)d=d.filter(r=>r[3]<=to);
   if(q)d=d.filter(r=>(r[0]||'').toLowerCase().includes(q)||(r[2]||'').toLowerCase().includes(q));
-  if(pg>0)d=d.slice(-pg);
-  if(xhSortCol)d.sort((a,b)=>xhCompare(a,b,xhSortCol)*xhSortDir);
-  rXH(d);
+  let groups=groupXHByDate(d);
+  if(xhSortCol)groups.sort((a,b)=>xhCompare(a,b,xhSortCol)*xhSortDir);
+  else groups.sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
+  if(pg>0)groups=groups.slice(0,pg);// pg giờ giới hạn theo số NGÀY, không phải số dòng
+  rXH(groups);
 }
-
-// ── SỬA 1 DÒNG XẾP HÀNG ──
-async function editXH(row){
-  const r=C.XH[row-2];if(!r){toast('Không tìm thấy phiếu xếp hàng','err');return;}
-  if(!C.TK.length)await loadTK();
-  if(!C.GH.length)await loadGH();
-  document.getElementById('xhe-sp').innerHTML=C.TK.map((t,i)=>`<option value="${i}"${t[0]===r[0]?' selected':''}>${t[0]} (tồn:${t[1]})</option>`).join('');
-  document.getElementById('xhe-sl').value=r[1]||'';
-  document.getElementById('xhe-gh').innerHTML='<option value="">-- Chọn --</option>'+C.GH.map(g=>`<option${g[0]===r[2]?' selected':''}>${g[0]}</option>`).join('');
-  document.getElementById('xhe-ngay').value=r[3]||'';
-  document.getElementById('xhe-gc').value=r[4]||'';
-  document.getElementById('xhe-row').value=row;
-  om('m-xh-edit');
-}
-async function saveXHEdit(){
-  const row=Number(document.getElementById('xhe-row').value);
-  const old=C.XH[row-2];if(!old){toast('Không tìm thấy phiếu xếp hàng','err');return;}
-  const spIdx=Number(document.getElementById('xhe-sp').value);
+// Lõi dùng chung để sửa 1 dòng Xếp hàng (dùng cho popup sửa nhanh theo ngày)
+async function saveXHEditCore(row,spIdx,sl,gh,ngay,gc){
+  const old=C.XH[row-2];if(!old)return{ok:false,msg:'Không tìm thấy phiếu xếp hàng'};
   const sp=C.TK[spIdx];
-  const sl=Number(document.getElementById('xhe-sl').value||0);
-  const gh=document.getElementById('xhe-gh').value;
-  const ngay=document.getElementById('xhe-ngay').value;
-  const gc=document.getElementById('xhe-gc').value;
-  if(!sp){toast('Chọn sản phẩm','err');return;}
-  if(!sl||sl<=0){toast('Số lượng phải lớn hơn 0','err');return;}
-  if(!gh){toast('Chọn gian hàng','err');return;}
+  if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
+  if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
+  if(!gh)return{ok:false,msg:'Chọn gian hàng'};
   const oldIdx=C.TK.findIndex(t=>t[0]===old[0]);
   const oldSL=Number(old[1]||0);
   // Kiểm tra tồn khả dụng (cộng hoàn lại phần phiếu cũ đã trừ trước khi so sánh)
   if(oldIdx>=0&&oldIdx===spIdx){
     const available=Number(C.TK[spIdx][1]||0)+oldSL;
-    if(sl>available){toast(`${sp[0]}: tồn chỉ còn ${available}!`,'err');return;}
+    if(sl>available)return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${available}!`};
   } else if(sl>Number(sp[1]||0)){
-    toast(`${sp[0]}: tồn chỉ còn ${sp[1]}!`,'err');return;
+    return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${sp[1]}!`};
   }
-  toast('Đang lưu...');
   await apiPost({sheet:'XepHang',action:'update',row,data:[sp[0],sl,gh,ngay,gc]});
-  // đồng bộ ngay vào cache C.XH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi
-  // setTimeout(loadXH,800) bên dưới kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và
-  // tồn kho bị tính sai (cộng/trừ dư phần chênh lệch của lần sửa trước)
+  // đồng bộ ngay vào cache C.XH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi loadXH()
+  // kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và tồn kho bị tính sai
   C.XH[row-2]=[sp[0],sl,gh,ngay,gc];
   if(oldIdx>=0&&oldIdx===spIdx){
     const newStock=Math.max(0,Number(C.TK[spIdx][1]||0)+oldSL-sl);
@@ -994,7 +1351,151 @@ async function saveXHEdit(){
   }
   // (Không cần tự tay cập nhật "Đồ gian hàng" — màn đó tính thẳng từ lịch sử Xếp hàng mỗi lần hiển thị)
   logAction('Cập nhật','Xếp hàng',`"${old[0]}" SL ${old[1]}→${sl}, Gian hàng: ${gh}`);
-  toast('Đã cập nhật phiếu xếp hàng!');cm('m-xh-edit');setTimeout(loadXH,800);
+  return{ok:true};
+}
+// ── Popup chi tiết + sửa nhanh các dòng xếp hàng của 1 ngày ──
+let xhDayCurrent=null;
+async function openXHDay(ngay){
+  xhDayCurrent=ngay;
+  if(!C.TK.length)await loadTK();
+  if(!C.GH.length)await loadGH();
+  document.getElementById('xh-day-q').value='';
+  document.getElementById('xh-day-gh-q').innerHTML='<option value="">Tất cả gian hàng</option>'+C.GH.map(g=>`<option>${esc(g[0])}</option>`).join('');
+  renderXHDayDetail();
+  om('m-xh-day');
+}
+function renderXHDayDetail(){
+  const wrap=document.getElementById('xh-day-tbl');
+  if(!wrap)return;
+  cleanupSearchLists(wrap);// dọn menu gợi ý cũ trước khi ghi đè innerHTML bên dưới
+  const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
+  document.getElementById('xh-day-t').textContent='Phiếu xếp hàng ngày '+(xhDayCurrent||'');
+  const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
+  document.getElementById('xh-day-sum').innerHTML=items.length?`<div class="grid3" style="margin-bottom:14px">
+    <div class="kpi b"><div class="lb">Số dòng</div><div class="val">${items.length}</div></div>
+    <div class="kpi p"><div class="lb">Tổng SL</div><div class="val">${fmt(tongSL)}</div></div>
+    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(items.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
+  // Tìm nhanh sản phẩm/gian hàng ngay trong phiếu này — chỉ lọc dòng hiển thị, không đụng tới dữ liệu/tổng số ở trên
+  const q=(document.getElementById('xh-day-q')?.value||'').trim().toLowerCase();
+  const qGh=document.getElementById('xh-day-gh-q')?.value||'';// chọn đúng tên từ danh mục Gian hàng ở Cài đặt, không phải gõ tự do
+  const shown=items.filter(r=>
+    (!q||(r[0]||'').toLowerCase().includes(q))&&
+    (!qGh||r[2]===qGh)
+  );
+  const rowsHtml=shown.map(r=>{
+    const gi=C.XH.indexOf(r);const row=gi+2;
+    return`<tr>
+      <td><input id="xhd-sp-${row}" value="${esc(r[0])}" autocomplete="off" style="min-width:150px"></td>
+      <td><input type="number" id="xhd-sl-${row}" value="${r[1]||0}" style="width:70px"></td>
+      <td><input id="xhd-gh-${row}" value="${esc(r[2]||'')}" autocomplete="off" style="min-width:100px"></td>
+      <td><input type="date" id="xhd-ngay-${row}" value="${r[3]||''}" style="width:135px"></td>
+      <td><input id="xhd-gc-${row}" value="${r[4]||''}" style="width:130px"></td>
+      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delXH(${row},'${r[0]}',${Number(r[1]||0)})">✕</button></td>
+    </tr>`;
+  }).join('');
+  let emptyMsg='';
+  if(!items.length)emptyMsg='<div class="empty">Không còn phiếu nào trong ngày này — bấm "+ Thêm sản phẩm" để thêm mới</div>';
+  else if(!shown.length)emptyMsg=`<div class="empty">Không có dòng nào khớp với bộ lọc đang tìm</div>`;
+  wrap.innerHTML=`<div class="scroll-tbl"><table class="item-table"><thead><tr>
+    <th>Sản phẩm</th><th>SL</th><th>Gian hàng</th><th>Ngày</th><th>Ghi chú</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`+emptyMsg;
+  wrap.querySelectorAll('[id^="xhd-sp-"]').forEach(el=>attachSearchList(el,()=>C.TK.map(t=>t[0])));
+  wrap.querySelectorAll('[id^="xhd-gh-"]').forEach(el=>attachSearchList(el,()=>C.GH.map(g=>g[0])));
+}
+// Thêm 1 dòng TRỐNG (chưa lưu) vào popup để xếp thêm sản phẩm mới cho đúng ngày này
+let xhDayNewCount=0;
+function addXHDayRow(){
+  const tbody=document.querySelector('#xh-day-tbl tbody');
+  if(!tbody)return;
+  xhDayNewCount++;
+  const id='new'+xhDayNewCount;
+  const ngayVal=xhDayCurrent&&xhDayCurrent!=='(chưa có ngày)'?xhDayCurrent:'';
+  const tr=document.createElement('tr');
+  tr.dataset.new='1';tr.dataset.tempId=id;
+  tr.innerHTML=`
+    <td><input id="xhd-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." style="min-width:150px"></td>
+    <td><input type="number" id="xhd-sl-${id}" placeholder="0" style="width:70px"></td>
+    <td><input id="xhd-gh-${id}" autocomplete="off" placeholder="Gõ tên gian hàng..." style="min-width:100px"></td>
+    <td><input type="date" id="xhd-ngay-${id}" value="${ngayVal}" style="width:135px"></td>
+    <td><input id="xhd-gc-${id}" style="width:130px"></td>
+    <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(this.closest('tr'))">✕</button></td>`;
+  tbody.appendChild(tr);
+  attachSearchList(document.getElementById('xhd-sp-'+id),()=>C.TK.map(t=>t[0]));
+  attachSearchList(document.getElementById('xhd-gh-'+id),()=>C.GH.map(g=>g[0]));
+}
+// Tạo mới 1 dòng Xếp hàng (dùng cho dòng vừa "+ Thêm" trong popup theo ngày) — cùng logic trừ tồn kho như saveXH()
+async function saveXHCreateCore(spIdx,sl,gh,ngay,gc){
+  const sp=C.TK[spIdx];
+  if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
+  if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
+  if(!gh)return{ok:false,msg:'Chọn gian hàng'};
+  if(sl>Number(sp[1]||0))return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${sp[1]}!`};
+  await apiPost({sheet:'XepHang',action:'append',row:[sp[0],sl,gh,ngay,gc]});
+  const newSL=Number(sp[1]||0)-sl;const upd=[...sp];upd[1]=newSL;
+  await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+  C.TK[spIdx][1]=newSL;
+  C.XH.push([sp[0],sl,gh,ngay,gc]);
+  return{ok:true};
+}
+// Lưu tất cả các dòng đang sửa trong popup (cả dòng có sẵn lẫn dòng vừa "+ Thêm")
+// Xóa cả phiếu (mọi dòng) của ngày đang xem trong popup — tiện hơn phải đóng popup rồi ra danh sách tick chọn
+async function delXHDay(){
+  const idxs=C.XH.map((r,i)=>i).filter(i=>(C.XH[i][3]||'(chưa có ngày)')===xhDayCurrent).sort((a,b)=>b-a);
+  if(!idxs.length){toast('Không có phiếu nào để xóa','err');return;}
+  confirmDel(`Xóa toàn bộ phiếu xếp ngày ${xhDayCurrent} (${idxs.length} dòng)? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
+    toast('Đang xóa '+idxs.length+' dòng...');
+    const delNames=[];
+    for(const idx of idxs){
+      const r=C.XH[idx];if(!r)continue;
+      delNames.push(`${r[0]} x${r[1]}`);
+      await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
+      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(spIdx>=0){
+        const newSL=Number(C.TK[spIdx][1]||0)+Number(r[1]||0);
+        const upd=[...C.TK[spIdx]];upd[1]=newSL;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=newSL;
+      }
+    }
+    logAction('Xóa','Xếp hàng',`Xóa cả phiếu ngày ${xhDayCurrent} (${delNames.length} dòng): ${delNames.join(', ')}`);
+    toast('Đã xóa phiếu xếp ngày '+xhDayCurrent+'!');
+    cm('m-xh-day');
+    setTimeout(loadXH,800);
+  });
+}
+async function saveXHDayAll(){
+  toast('Đang lưu...');
+  const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
+  for(const r of items){
+    const row=C.XH.indexOf(r)+2;
+    const spEl=document.getElementById('xhd-sp-'+row);
+    if(!spEl)continue;// dòng đã bị xóa khỏi DOM (bấm ✕) trong lúc sửa, bỏ qua
+    const spIdx=C.TK.findIndex(t=>t[0]===spEl.value);
+    const sl=Number(document.getElementById('xhd-sl-'+row).value||0);
+    const gh=document.getElementById('xhd-gh-'+row).value;
+    const ngay=document.getElementById('xhd-ngay-'+row).value;
+    const gc=document.getElementById('xhd-gc-'+row).value;
+    const res=await saveXHEditCore(row,spIdx,sl,gh,ngay,gc);
+    if(!res.ok){toast(`Dòng "${r[0]}": ${res.msg}`,'err');return;}
+  }
+  const newTrs=[...document.querySelectorAll('#xh-day-tbl tbody tr[data-new="1"]')];
+  const created=[];
+  for(const tr of newTrs){
+    const id=tr.dataset.tempId;
+    const spVal=document.getElementById('xhd-sp-'+id).value;
+    const sl=Number(document.getElementById('xhd-sl-'+id).value||0);
+    if(!spVal&&!sl)continue;// dòng để trống hoàn toàn (bấm + Thêm nhưng không gõ gì), bỏ qua
+    const spIdx=C.TK.findIndex(t=>t[0]===spVal);
+    const gh=document.getElementById('xhd-gh-'+id).value;
+    const ngay=document.getElementById('xhd-ngay-'+id).value;
+    const gc=document.getElementById('xhd-gc-'+id).value;
+    const res=await saveXHCreateCore(spIdx,sl,gh,ngay,gc);
+    if(!res.ok){toast(`Dòng mới: ${res.msg}`,'err');return;}
+    created.push(`${C.TK[spIdx][0]} x${sl}`);
+  }
+  if(created.length)logAction('Tạo mới','Xếp hàng',`Thêm vào ngày ${xhDayCurrent}: ${created.join(', ')}`);
+  toast('Đã lưu tất cả thay đổi!');
+  cm('m-xh-day');
+  setTimeout(loadXH,800);
 }
 
 // ── XÓA XẾP HÀNG → hoàn lại tồn kho ──
@@ -1033,6 +1534,7 @@ function ghkQty(tenSP,gianHang){
 let ghkActiveTab=null;
 async function loadGHK(){
   if(!C.GH.length)await loadGH();
+  if(!C.TK.length)await loadTK();// cần để tra Loại hàng của từng sản phẩm khi gộp hiển thị
   // luôn lấy XepHang mới nhất — đây là nguồn dữ liệu chính để tính số lượng, phải tươi
   C.XH=await apiGet('XepHang');
   C.GHK=await apiGet('GianHangKho');
@@ -1063,13 +1565,35 @@ function rGHKView(){
   if(q)names=names.filter(n=>n.toLowerCase().includes(q));
   const items=names.map(n=>[n,ghkQty(n,ghkActiveTab)]).sort((a,b)=>a[0].localeCompare(b[0]));
   const total=items.reduce((s,r)=>s+r[1],0);
-  const body=!items.length
-    ?`<div class="empty">🗄️ "${esc(ghkActiveTab)}" chưa có hàng nào (tự có khi Xếp hàng ra gian hàng này)</div>`
-    :`<table class="m-tbl"><thead><tr><th>Sản phẩm</th><th>Số lượng</th><th></th></tr></thead><tbody>`+
-      items.map(([ten,sl])=>
-        `<tr><td data-label="Sản phẩm"><b>${ten}</b></td><td data-label="Số lượng"><b>${fmt(sl)}</b></td><td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Sửa</button></td></tr>`
-      ).join('')+'</tbody></table>';
-  paneEl.innerHTML=`<div class="card"><div class="ch"><h2>${esc(ghkActiveTab)}</h2><span style="font-size:11px;color:var(--text2)">Tổng SL: ${fmt(total)}</span></div>${body}</div>`;
+  if(!items.length){
+    paneEl.innerHTML=`<div class="empty">🗄️ "${esc(ghkActiveTab)}" chưa có hàng nào (tự có khi Xếp hàng ra gian hàng này)</div>`;
+    return;
+  }
+  // Gộp theo Loại hàng ngay trong gian hàng đang xem — mỗi loại 1 khối xổ (accordion) riêng
+  const groups=new Map();
+  items.forEach(([ten,sl])=>{
+    const tk=C.TK.find(t=>t[0]===ten);
+    const loai=(tk&&tk[13])||'(Chưa phân loại)';
+    if(!groups.has(loai))groups.set(loai,[]);
+    groups.get(loai).push([ten,sl]);
+  });
+  const loaiNames=sortLoaiNames([...groups.keys()]);
+  const body=loaiNames.map((loai,idx)=>{
+    const its=groups.get(loai);
+    const rows=its.map(([ten,sl])=>
+      `<tr><td data-label="Sản phẩm"><b>${ten}</b></td><td data-label="Số lượng"><b>${fmt(sl)}</b></td><td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Sửa</button></td></tr>`
+    ).join('');
+    const tongSL=its.reduce((s,[,sl])=>s+Number(sl||0),0);
+    const moveBtns=loai==='(Chưa phân loại)'?'':`<span style="display:flex;gap:2px" onclick="event.preventDefault();event.stopPropagation()">
+      <button class="btn btn-g btn-sm" ${idx<=0?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',-1,rGHKView)" title="Đưa loại này lên">↑</button>
+      <button class="btn btn-g btn-sm" ${idx>=loaiNames.length-1?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',1,rGHKView)" title="Đưa loại này xuống">↓</button>
+    </span>`;
+    return`<details class="acc-group ${loaiColorClass(loai,idx)}" open>
+      <summary>${moveBtns}🏷️ ${esc(loai)}<span class="acc-cnt">${its.length} SP · Tổng SL: ${fmt(tongSL)}</span></summary>
+      <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th>Sản phẩm</th><th style="width:120px">Số lượng</th><th style="width:90px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </details>`;
+  }).join('');
+  paneEl.innerHTML=`<div class="card"><div class="ch"><h2>${esc(ghkActiveTab)}</h2><span style="font-size:11px;color:var(--text2)">Tổng SL: ${fmt(total)}</span></div></div>${body}`;
 }
 function editGHK(tenSP,gianHang){
   document.getElementById('ghk-sp').innerHTML=`<option>${tenSP}</option>`;
@@ -1229,6 +1753,91 @@ async function saveGH(){
   const er=document.getElementById('gh-row').value;
   await apiPost(er?{sheet:'GianHang',action:'update',row:Number(er),data:row}:{sheet:'GianHang',action:'append',row});
   toast(er?'Đã cập nhật gian hàng':'Đã thêm gian hàng');cm('m-gh');setTimeout(loadGH,800);
+}
+
+// ══ LOẠI HÀNG ══
+let selLoai=new Set();
+async function loadLoai(){
+  document.getElementById('loai-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selLoai.clear();updateSelUI('loai-delsel-btn','loai-selcnt',0);
+  const data=await apiGet('LoaiHang');C.LOAI=data;fLoai();
+}
+// Thứ tự Loại hàng hiển thị đúng theo thứ tự đã lưu trong C.LOAI (kéo/đưa lên xuống bằng nút ↑↓ bên dưới) —
+// thứ tự này được TK/Đồ gian hàng dùng để quyết định khối nào hiện trước khi gộp accordion
+function rLoai(data){
+  const el=document.getElementById('loai-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">🏷️ Chưa có loại hàng</div>';return;}
+  const filtering=!!document.getElementById('q-loai').value.trim();
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="loai-selall" onchange="toggleAllLoai(this)"></th><th style="width:80px">Thứ tự</th><th>Tên loại hàng</th><th></th></tr></thead><tbody>`+
+    data.map(r=>{
+      const gi=C.LOAI.indexOf(r);
+      const chk=selLoai.has(gi)?'checked':'';
+      const upDis=filtering||gi<=0?'disabled':'';
+      const downDis=filtering||gi>=C.LOAI.length-1?'disabled':'';
+      return`<tr><td data-label=""><input type="checkbox" class="loai-chk" data-idx="${gi}" ${chk} onchange="toggleLoaiChk(this)"></td>
+      <td data-label="Thứ tự"><button class="btn btn-g btn-sm" ${upDis} onclick="moveLoaiSettings(${gi},-1)" title="Đưa lên">↑</button> <button class="btn btn-g btn-sm" ${downDis} onclick="moveLoaiSettings(${gi},1)" title="Đưa xuống">↓</button></td>
+      <td data-label="Tên loại hàng"><b>${r[0]}</b></td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editLoai(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('LoaiHang',${gi+2},'loại hàng')">Xóa</button></td></tr>`;
+    }).join('')+'</tbody></table>'+(filtering?'<p style="font-size:11px;color:var(--text2);padding:10px 18px 0">Xóa ô tìm kiếm để sắp xếp lại thứ tự</p>':'');
+  updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
+  updateSelAllTri('loai-selall','loai-chk',selLoai);
+}
+// Đổi chỗ 1 loại hàng với loại liền kề (lên/xuống) — ghi thẳng xuống sheet để giữ đúng thứ tự sau khi tải lại
+// Lõi đổi chỗ dùng chung — không tự vẽ lại màn hình nào cả, để chỗ nào gọi thì chỗ đó tự làm mới đúng view của mình
+async function moveLoai(idx,dir){
+  const j=idx+dir;
+  if(j<0||j>=C.LOAI.length)return false;
+  const a=C.LOAI[idx],b=C.LOAI[j];
+  await apiPost({sheet:'LoaiHang',action:'update',row:idx+2,data:b});
+  await apiPost({sheet:'LoaiHang',action:'update',row:j+2,data:a});
+  [C.LOAI[idx],C.LOAI[j]]=[C.LOAI[j],C.LOAI[idx]];
+  return true;
+}
+// Đổi thứ tự từ màn Cài đặt → Loại hàng (theo vị trí dòng)
+async function moveLoaiSettings(idx,dir){if(await moveLoai(idx,dir))fLoai();}
+// Đổi thứ tự ngay từ khối accordion ở Tồn kho / Đồ gian hàng (theo tên loại, vì các màn đó không có sẵn vị trí dòng)
+async function moveLoaiByName(name,dir,refreshFn){
+  const idx=C.LOAI.findIndex(r=>r[0]===name);
+  if(idx<0)return;
+  if(await moveLoai(idx,dir))refreshFn();
+}
+function toggleLoaiChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selLoai.add(idx);else selLoai.delete(idx);
+  updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
+  updateSelAllTri('loai-selall','loai-chk',selLoai);
+}
+function toggleAllLoai(el){
+  document.querySelectorAll('.loai-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selLoai.add(idx);else selLoai.delete(idx);
+  });
+  updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
+}
+async function delSelLoai(){
+  if(!selLoai.size){toast('Chưa chọn loại hàng nào','err');return;}
+  confirmDel(`Xóa ${selLoai.size} loại hàng đã chọn?`,async()=>{
+    toast('Đang xóa '+selLoai.size+' loại hàng...');
+    const idxs=[...selLoai].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'LoaiHang',action:'delete',row:idx+2});
+    selLoai.clear();
+    toast('Đã xóa '+idxs.length+' loại hàng!');setTimeout(loadLoai,800);
+  });
+}
+function fLoai(){
+  const q=document.getElementById('q-loai').value.toLowerCase();
+  const d=C.LOAI.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  rLoai(d);
+}
+function initLoai(){document.getElementById('m-loai-t').textContent='Thêm loại hàng';document.getElementById('loai-ten').value='';document.getElementById('loai-row').value='';om('m-loai');}
+function editLoai(row){const r=C.LOAI[row-2];document.getElementById('m-loai-t').textContent='Sửa loại hàng';document.getElementById('loai-ten').value=r[0]||'';document.getElementById('loai-row').value=row;om('m-loai');}
+async function saveLoai(){
+  const ten=document.getElementById('loai-ten').value.trim();if(!ten){toast('Nhập tên loại hàng','err');return;}
+  const row=[ten];
+  const er=document.getElementById('loai-row').value;
+  await apiPost(er?{sheet:'LoaiHang',action:'update',row:Number(er),data:row}:{sheet:'LoaiHang',action:'append',row});
+  toast(er?'Đã cập nhật loại hàng':'Đã thêm loại hàng');cm('m-loai');setTimeout(loadLoai,800);
 }
 
 // ══ NGƯỜI DÙNG ══
@@ -1418,6 +2027,7 @@ async function delRow(sheet,row,label){
       if(sheet==='NhaCungCap')loadNCC();
       else if(sheet==='GianHang')loadGH();
       else if(sheet==='User')loadUser();
+      else if(sheet==='LoaiHang')loadLoai();
     },800);
   });
 }
@@ -1467,6 +2077,74 @@ async function saveCaiDat(){
   await apiPost(data.length?{sheet:'CaiDat',action:'update',row:2,data:row}:{sheet:'CaiDat',action:'append',row});
   SETTINGS.ganHet=gan;SETTINGS.sapHet=sap;SETTINGS.hsdGan=hsdGan;SETTINGS.hsdSap=hsdSap;
   toast('Đã lưu cài đặt!');
+}
+
+// ══ BÁO CÁO THEO THÁNG ══ thống kê trong 1 khoảng thời gian, mỗi "Người nhập" đã nhập tổng bao nhiêu tiền
+// (dùng để đối chiếu/thanh toán lại cho người đã tạm ứng tiền mua hàng)
+function bcMonthRange(ym){
+  const[y,m]=ym.split('-').map(Number);
+  const from=`${ym}-01`;
+  const lastDay=new Date(y,m,0).getDate();// ngày cuối cùng của tháng
+  const to=`${ym}-${String(lastDay).padStart(2,'0')}`;
+  return{from,to};
+}
+function bcSetMonth(){
+  const ym=document.getElementById('bc-thang').value;
+  if(!ym)return;
+  const{from,to}=bcMonthRange(ym);
+  document.getElementById('bc-tu').value=from;
+  document.getElementById('bc-den').value=to;
+  loadBC();
+}
+function bcShiftMonth(delta){
+  let ym=document.getElementById('bc-thang').value;
+  if(!ym){const d=new Date();ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  let[y,m]=ym.split('-').map(Number);
+  m+=delta;
+  if(m<1){m=12;y--;}else if(m>12){m=1;y++;}
+  document.getElementById('bc-thang').value=`${y}-${String(m).padStart(2,'0')}`;
+  bcSetMonth();
+}
+async function openBC(){
+  const d=new Date();
+  const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('bc-thang').value=ym;
+  const{from,to}=bcMonthRange(ym);
+  document.getElementById('bc-tu').value=from;
+  document.getElementById('bc-den').value=to;
+  if(!C.USER.length)await loadUser();
+  document.getElementById('bc-user').innerHTML='<option value="">Tất cả người nhập</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  await loadBC();
+}
+async function loadBC(){
+  document.getElementById('bc-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  const data=await apiGet('NhapHang');C.NH=data;
+  const from=document.getElementById('bc-tu').value;
+  const to=document.getElementById('bc-den').value;
+  const user=document.getElementById('bc-user')?.value||'';
+  const filtered=data.filter(r=>(!from||(r[4]||'')>=from)&&(!to||(r[4]||'')<=to)&&(!user||r[6]===user));
+  const groups=new Map();
+  filtered.forEach(r=>{
+    const user=r[6]||'(Không rõ người nhập)';
+    if(!groups.has(user))groups.set(user,[]);
+    groups.get(user).push(r);
+  });
+  const rows=[...groups.entries()].map(([user,items])=>({
+    user,
+    soSP:new Set(items.map(r=>r[0])).size,
+    tongSL:items.reduce((s,r)=>s+Number(r[1]||0),0),
+    tongTien:items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0)
+  })).sort((a,b)=>b.tongTien-a.tongTien);
+  const grandTotal=rows.reduce((s,r)=>s+r.tongTien,0);
+  document.getElementById('bc-sum').innerHTML=`<div class="grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số sản phẩm nhập</div><div class="val">${new Set(filtered.map(r=>r[0])).size}</div></div>
+    <div class="kpi p"><div class="lb">Số người nhập</div><div class="val">${rows.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng tiền đã thanh toán</div><div class="val">${fmt(grandTotal)}đ</div></div></div>`;
+  const el=document.getElementById('bc-tbl');
+  if(!rows.length){el.innerHTML='<div class="empty">📊 Không có dữ liệu nhập hàng trong khoảng thời gian này</div>';return;}
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Người nhập</th><th>Số sản phẩm nhập</th><th>Tổng SL</th><th>Tổng tiền đã thanh toán</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td data-label="Người nhập"><span class="bg bg-p">${esc(r.user)}</span></td><td data-label="Số sản phẩm nhập">${r.soSP}</td><td data-label="Tổng SL">${fmt(r.tongSL)}</td><td data-label="Tổng tiền đã thanh toán"><b>${fmt(r.tongTien)}đ</b></td></tr>`).join('')+
+    '</tbody></table>';
 }
 
 // ══ NHẬT KÝ HOẠT ĐỘNG ══ xem lại ai đã tạo mới/cập nhật/xóa gì ở Tồn kho, Nhập hàng, Xếp hàng
