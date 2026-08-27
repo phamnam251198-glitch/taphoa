@@ -232,7 +232,22 @@ function goSetTab(name){
 }
 
 // ══ DASHBOARD ══
-let dashLow=[];
+let dashLow=[],dashHet=[],dashExp=[];
+// Bấm vào ô thống kê Hết hàng/Hàng sắp hết/Sắp hết hạn → popup danh sách SP tương ứng (chỉ Tên + Số lượng)
+function openDashList(kind){
+  const cfg={
+    het:{title:'Hết hàng',data:dashHet},
+    sap:{title:'Hàng sắp hết',data:dashLow},
+    hsd:{title:'Sắp hết hạn sử dụng',data:dashExp}
+  }[kind];
+  if(!cfg)return;
+  document.getElementById('dash-list-t').textContent=`${cfg.title} (${cfg.data.length} sản phẩm)`;
+  const el=document.getElementById('dash-list-tbl');
+  el.innerHTML=cfg.data.length?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Tên sản phẩm</th><th>Số lượng</th></tr></thead><tbody>`+
+    cfg.data.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${fmt(Number(r[1]||0))}</td></tr>`).join('')+'</tbody></table></div>'
+    :'<div class="empty">✅ Không có sản phẩm nào</div>';
+  om('m-dash-list');
+}
 function renderDLow(){
   const mode=document.getElementById('srt-dash')?.value||'status';
   const data=sortByMode(dashLow,mode);
@@ -244,7 +259,8 @@ async function loadDash(){
   const tk=await apiGet('TonKho');
   C.TK=tk;
   document.getElementById('d-sp').textContent=tk.length;
-  document.getElementById('d-het').textContent=tk.filter(r=>stTK(r)==='het').length;
+  dashHet=tk.filter(r=>stTK(r)==='het');
+  document.getElementById('d-het').textContent=dashHet.length;
   dashLow=tk.filter(r=>Number(r[1]||0)<=getSapHet(r));
   document.getElementById('d-sh').textContent=dashLow.length;
   document.getElementById('lbadge').style.display=dashLow.length?'inline':'none';
@@ -253,6 +269,7 @@ async function loadDash(){
   const ts=td();
   const daysLeftOf=r=>Math.round((new Date(r[5])-new Date(ts))/86400000);
   const exp=tk.filter(r=>r[5]&&Number(r[1]||0)>0&&daysLeftOf(r)<=getHsdSap(r)).sort((a,b)=>(a[5]||'').localeCompare(b[5]||''));
+  dashExp=exp;
   document.getElementById('d-hsd').textContent=exp.length;
   document.getElementById('d-exp').innerHTML=exp.length===0?'<div class="empty">✅ Không có hàng sắp hết hạn</div>':
     '<div class="scroll-tbl"><table><thead><tr><th>Sản phẩm</th><th>HSD</th><th>Trạng thái</th></tr></thead><tbody>'+

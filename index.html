@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css?v=20260827b">
+<link rel="stylesheet" href="style.css?v=20260827c">
 </head>
 <body>
 
@@ -50,9 +50,9 @@
     <div class="sec on" id="s-dash">
       <div class="grid4">
         <div class="kpi b"><div class="lb">Tổng sản phẩm</div><div class="val" id="d-sp">—</div></div>
-        <div class="kpi r"><div class="lb">Hết hàng</div><div class="val" id="d-het">—</div></div>
-        <div class="kpi y"><div class="lb">Hàng sắp hết</div><div class="val" id="d-sh">—</div></div>
-        <div class="kpi r"><div class="lb">Sắp hết hạn</div><div class="val" id="d-hsd">—</div></div>
+        <div class="kpi r" style="cursor:pointer" onclick="openDashList('het')" title="Bấm để xem danh sách"><div class="lb">Hết hàng</div><div class="val" id="d-het">—</div></div>
+        <div class="kpi y" style="cursor:pointer" onclick="openDashList('sap')" title="Bấm để xem danh sách"><div class="lb">Hàng sắp hết</div><div class="val" id="d-sh">—</div></div>
+        <div class="kpi r" style="cursor:pointer" onclick="openDashList('hsd')" title="Bấm để xem danh sách"><div class="lb">Sắp hết hạn</div><div class="val" id="d-hsd">—</div></div>
       </div>
       <div id="d-chart-tip" class="chart-tip"></div>
       <div class="grid3">
@@ -533,6 +533,17 @@
   </div>
 </div>
 
+<!-- MODAL DANH SÁCH SP THEO TRẠNG THÁI (bấm từ ô thống kê ở Tổng quan: Hết hàng/Hàng sắp hết/Sắp hết hạn) -->
+<div class="mo" id="m-dash-list">
+  <div class="mb mb-sm">
+    <h3 id="dash-list-t">Danh sách sản phẩm</h3>
+    <div id="dash-list-tbl"></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-dash-list')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ĐỒ GIAN HÀNG -->
 <div class="mo" id="m-ghk">
   <div class="mb mb-sm">
@@ -621,6 +632,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260827b"></script>
+<script src="app.js?v=20260827c"></script>
 </body>
 </html>
