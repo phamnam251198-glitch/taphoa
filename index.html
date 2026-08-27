@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css?v=20260827d">
+<link rel="stylesheet" href="style.css?v=20260827e">
 </head>
 <body>
 
@@ -536,11 +536,9 @@
 <!-- MODAL DANH SÁCH SP THEO TRẠNG THÁI (bấm từ ô thống kê ở Tổng quan: Hết hàng/Hàng sắp hết/Sắp hết hạn) -->
 <div class="mo" id="m-dash-list">
   <div class="mb mb-sm">
-    <h3 id="dash-list-t">Danh sách sản phẩm</h3>
+    <button class="modal-x" onclick="cm('m-dash-list')" aria-label="Đóng">✕</button>
+    <h3 id="dash-list-t" style="padding-right:28px">Danh sách sản phẩm</h3>
     <div id="dash-list-tbl"></div>
-    <div class="mf">
-      <button class="btn btn-g" onclick="cm('m-dash-list')">Đóng</button>
-    </div>
   </div>
 </div>
 
@@ -632,6 +630,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260827d"></script>
+<script src="app.js?v=20260827e"></script>
 </body>
 </html>

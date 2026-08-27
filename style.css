@@ -87,7 +87,9 @@ tr:hover td{background:#f8fafc}
 .btn-sm{padding:4px 9px;font-size:12px}
 .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;align-items:center;justify-content:center}
 .mo.on{display:flex}
-.mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto}
+.mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto;position:relative}
+.modal-x{position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:var(--bg);border-radius:50%;font-size:14px;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
+.modal-x:hover{background:var(--border);color:var(--text)}
 .mb h3{font-size:15px;font-weight:600;margin-bottom:18px}
 .mb-sm{width:420px}
 .mb-lg{width:1080px}
