@@ -243,8 +243,10 @@ function openDashList(kind){
   if(!cfg)return;
   document.getElementById('dash-list-t').textContent=`${cfg.title} (${cfg.data.length} sản phẩm)`;
   const el=document.getElementById('dash-list-tbl');
-  el.innerHTML=cfg.data.length?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Tên sản phẩm</th><th>Số lượng</th></tr></thead><tbody>`+
-    cfg.data.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${fmt(Number(r[1]||0))}</td></tr>`).join('')+'</tbody></table></div>'
+  // Cố tình KHÔNG dùng bảng .m-tbl (bảng đó ở mobile tự chuyển mỗi CỘT thành 1 dòng riêng cho card nhiều
+  // trường) — ở đây chỉ có 2 trường Tên/SL nên luôn muốn nằm chung 1 hàng, kể cả trên điện thoại
+  el.innerHTML=cfg.data.length?'<div class="simple-list">'+
+    cfg.data.map(r=>`<div class="simple-row"><span class="n">${esc(r[0])}</span><span class="v">${fmt(Number(r[1]||0))}</span></div>`).join('')+'</div>'
     :'<div class="empty">✅ Không có sản phẩm nào</div>';
   om('m-dash-list');
 }

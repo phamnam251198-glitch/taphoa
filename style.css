@@ -121,6 +121,13 @@ tr:hover td{background:#f8fafc}
 .spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .6s linear infinite;margin:0 auto 8px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .empty{text-align:center;padding:36px;color:var(--text2);font-size:13px}
+/* Danh sách đơn giản 2 cột (Tên - Số lượng) luôn nằm chung 1 hàng, kể cả trên điện thoại —
+   dùng cho popup Hết hàng/Hàng sắp hết/Sắp hết hạn ở Tổng quan (khác .m-tbl vốn dựng cho bảng nhiều cột) */
+.simple-list{max-height:60vh;overflow-y:auto}
+.simple-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--border);font-size:13px}
+.simple-row:last-child{border-bottom:none}
+.simple-row .n{font-weight:600}
+.simple-row .v{color:var(--text2);white-space:nowrap}
 .tabs{display:flex;gap:4px;margin-bottom:16px}
 .tab{padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);border:1px solid transparent}
 .tab.on{background:var(--blue);color:#fff}.tab:hover:not(.on){background:var(--bg)}
