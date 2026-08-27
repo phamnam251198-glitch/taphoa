@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css?v=20260827">
+<link rel="stylesheet" href="style.css?v=20260827b">
 </head>
 <body>
 
@@ -111,10 +111,12 @@
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
         <input type="text" id="q-nh" placeholder="Tìm sản phẩm, NCC, loại hàng..." oninput="fNH()">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
-        <input type="date" id="from-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
-        <input type="date" id="to-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
         <button class="btn btn-g" onclick="document.getElementById('from-nh').value='';document.getElementById('to-nh').value='';document.getElementById('user-nh').value='';fNH()">✕</button>
         <select id="user-nh" onchange="fNH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
           <option value="">Tất cả người nhập</option>
@@ -140,10 +142,12 @@
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
         <input type="text" id="q-xh" placeholder="Tìm sản phẩm, gian hàng..." oninput="fXH()">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
-        <input type="date" id="from-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
-        <input type="date" id="to-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
         <button class="btn btn-g" onclick="document.getElementById('from-xh').value='';document.getElementById('to-xh').value='';fXH()">✕</button>
         <select id="pg-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
           <option value="30">30 ngày</option>
@@ -174,10 +178,12 @@
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
         <input type="text" id="q-kk" placeholder="Tìm người kiểm kê..." oninput="fKK()">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
-        <input type="date" id="from-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
-        <input type="date" id="to-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
         <button class="btn btn-g" onclick="document.getElementById('from-kk').value='';document.getElementById('to-kk').value='';document.getElementById('q-kk').value='';fKK()">✕</button>
         <button class="btn btn-g" onclick="loadKK()">↻ Làm mới</button>
       </div>
@@ -216,10 +222,12 @@
       <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
       <div class="sb">
         <input type="text" id="q-log" placeholder="Tìm người dùng, chi tiết..." oninput="fLog()">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
-        <input type="date" id="from-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
-        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
-        <input type="date" id="to-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
         <select id="act-log" onchange="fLog()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
           <option value="">Tất cả hành động</option>
           <option value="Tạo mới">Tạo mới</option>
@@ -427,10 +435,12 @@
     <div id="nh-day-sum"></div>
     <div class="sb">
       <input type="text" id="nh-day-q" placeholder="🔍 Tìm sản phẩm trong phiếu này..." oninput="renderNHDayDetail()">
-      <label style="font-size:12px;color:var(--text2);white-space:nowrap">Hạn SD từ</label>
-      <input type="date" id="nh-day-hsd-from" onchange="renderNHDayDetail()">
-      <label style="font-size:12px;color:var(--text2);white-space:nowrap">đến</label>
-      <input type="date" id="nh-day-hsd-to" onchange="renderNHDayDetail()">
+      <div class="date-range">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Hạn SD từ</label>
+        <input type="date" id="nh-day-hsd-from" onchange="renderNHDayDetail()">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">đến</label>
+        <input type="date" id="nh-day-hsd-to" onchange="renderNHDayDetail()">
+      </div>
       <button class="btn btn-g" onclick="document.getElementById('nh-day-hsd-from').value='';document.getElementById('nh-day-hsd-to').value='';renderNHDayDetail()">✕</button>
       <select id="nh-day-user-q" onchange="renderNHDayDetail()"><option value="">Tất cả người nhập</option></select>
     </div>
@@ -611,6 +621,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260827"></script>
+<script src="app.js?v=20260827b"></script>
 </body>
 </html>

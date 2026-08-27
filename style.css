@@ -102,6 +102,12 @@ tr:hover td{background:#f8fafc}
 .sb input{flex:1;min-width:160px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none}
 .sb input:focus{border-color:var(--blue)}
 .sb select{padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none}
+/* Nhóm cặp "Từ - Đến" (khoảng ngày) lại thành 1 khối — để .sb>* (ép full-width trên mobile) coi cả cặp
+   là 1 item duy nhất, thay vì mỗi label/input tách rời chiếm hẳn 1 dòng riêng; bên trong khối vẫn luôn
+   nằm ngang cùng 1 dòng dù ở mobile hay desktop */
+.date-range{display:flex;align-items:center;gap:6px}
+.date-range label{flex-shrink:0}
+.date-range input[type=date]{flex:1;min-width:0}
 /* Ô gõ-tìm tự chế (Sản phẩm/Loại hàng/NCC) — thay cho <datalist> vì datalist để trình duyệt tự quyết
    hiện bao nhiêu dòng (có thể xổ ra cả danh sách dài); cái này giới hạn ~10 dòng rồi cuộn */
 .ac-menu{position:fixed;z-index:300;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow-y:auto;display:none}
@@ -201,8 +207,20 @@ tr:hover td{background:#f8fafc}
   #acts .btn{padding:6px 10px;font-size:12px}
   #content{padding:12px;padding-top:calc(48px + 12px)}
 
-  /* Các lưới KPI/2-3-4 cột → xếp dọc 1 cột cho dễ đọc */
-  .grid4,.grid3,.grid2{grid-template-columns:1fr}
+  /* Khoảng ngày Từ-Đến trên 1 dòng: ẩn bớt nhãn chữ "Từ"/"Đến" (giữ nguyên ở desktop) để dành chỗ cho chính
+     2 ô ngày — vì input date tối thiểu cần ~130-140px mới đủ hiện "mm/dd/yyyy" + icon lịch mà không bị tràn,
+     nhất là sau khi ép font-size lên 16px (để tắt auto-zoom) làm ô ngày cần rộng hơn trước */
+  .date-range label{display:none}
+  .date-range{gap:8px}
+
+  /* Lưới card TO (biểu đồ/bảng/dropdown bên trong — .grid3 dùng ở Tổng quan, .grid2 hiện chưa dùng chỗ nào)
+     → vẫn xếp dọc 1 cột, ép 2 cột sẽ làm bẹp dúm nội dung bên trong không đọc được */
+  .grid3,.grid2{grid-template-columns:1fr}
+  /* Lưới Ô THỐNG KÊ nhỏ (số + nhãn, VD "Tổng sản phẩm"/"Hết hàng" ở Tổng quan, hoặc "Tổng SL"/"Tổng tiền"
+     ở các màn Nhập/Xếp/Kiểm kê/Báo cáo) → xếp 2 cột cho gọn thay vì mỗi ô 1 dòng dài lê thê phải cuộn nhiều */
+  .grid4,.stat-grid3{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{padding:11px 14px}
+  .kpi .val{font-size:19px}
 
   /* Thanh công cụ tìm kiếm/lọc: mỗi ô full-width, xếp dọc cho dễ chạm */
   .sb{gap:8px}

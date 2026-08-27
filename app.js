@@ -990,7 +990,7 @@ function renderNHTop(flat){
 function rNH(groups){
   const flat=groups.flatMap(g=>g.items);
   const total=flat.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
-  document.getElementById('nh-sum').innerHTML=flat.length?`<div class="grid3" style="margin-bottom:16px">
+  document.getElementById('nh-sum').innerHTML=flat.length?`<div class="grid3 stat-grid3" style="margin-bottom:16px">
     <div class="kpi b"><div class="lb">Số ngày nhập</div><div class="val">${groups.length}</div></div>
     <div class="kpi r"><div class="lb">Tổng SL</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
     <div class="kpi r"><div class="lb">Tổng tiền nhập</div><div class="val">${fmt(total)}đ</div></div></div>`:'';
@@ -1122,7 +1122,7 @@ function renderNHDayDetail(){
   document.getElementById('nh-day-t').textContent='Phiếu nhập ngày '+(nhDayCurrent||'');
   const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
   const tongTien=items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
-  document.getElementById('nh-day-sum').innerHTML=items.length?`<div class="grid3" style="margin-bottom:14px">
+  document.getElementById('nh-day-sum').innerHTML=items.length?`<div class="grid3 stat-grid3" style="margin-bottom:14px">
     <div class="kpi b"><div class="lb">Số dòng</div><div class="val">${items.length}</div></div>
     <div class="kpi r"><div class="lb">Tổng SL</div><div class="val">${fmt(tongSL)}</div></div>
     <div class="kpi r"><div class="lb">Tổng tiền</div><div class="val">${fmt(tongTien)}đ</div></div></div>`:'';
@@ -1378,7 +1378,7 @@ function xhCompare(a,b,col){
 }
 function rXH(groups){
   const flat=groups.flatMap(g=>g.items);
-  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid3" style="margin-bottom:16px">
+  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid3 stat-grid3" style="margin-bottom:16px">
     <div class="kpi b"><div class="lb">Số ngày xếp</div><div class="val">${groups.length}</div></div>
     <div class="kpi p"><div class="lb">Tổng SL đã xếp</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
     <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
@@ -1525,7 +1525,7 @@ function renderXHDayDetail(){
   const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
   document.getElementById('xh-day-t').textContent='Phiếu xếp hàng ngày '+(xhDayCurrent||'');
   const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
-  document.getElementById('xh-day-sum').innerHTML=items.length?`<div class="grid3" style="margin-bottom:14px">
+  document.getElementById('xh-day-sum').innerHTML=items.length?`<div class="grid3 stat-grid3" style="margin-bottom:14px">
     <div class="kpi b"><div class="lb">Số dòng</div><div class="val">${items.length}</div></div>
     <div class="kpi p"><div class="lb">Tổng SL</div><div class="val">${fmt(tongSL)}</div></div>
     <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(items.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
@@ -2428,7 +2428,7 @@ function fKK(){
 }
 function rKK(groups){
   const flat=groups.flatMap(g=>g.items);
-  document.getElementById('kk-sum').innerHTML=flat.length?`<div class="grid3" style="margin-bottom:16px">
+  document.getElementById('kk-sum').innerHTML=flat.length?`<div class="grid3 stat-grid3" style="margin-bottom:16px">
     <div class="kpi b"><div class="lb">Số đợt kiểm kê</div><div class="val">${groups.length}</div></div>
     <div class="kpi r"><div class="lb">Tổng SP đã đếm</div><div class="val">${flat.length}</div></div>
     <div class="kpi r"><div class="lb">Tổng SP lệch</div><div class="val">${flat.filter(r=>Number(r[5]||0)!==0).length}</div></div></div>`:'';
@@ -2531,7 +2531,7 @@ async function loadBC(){
     tongTien:items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0)
   })).sort((a,b)=>b.tongTien-a.tongTien);
   const grandTotal=rows.reduce((s,r)=>s+r.tongTien,0);
-  document.getElementById('bc-sum').innerHTML=`<div class="grid3" style="margin-bottom:16px">
+  document.getElementById('bc-sum').innerHTML=`<div class="grid3 stat-grid3" style="margin-bottom:16px">
     <div class="kpi b"><div class="lb">Số sản phẩm nhập</div><div class="val">${new Set(filtered.map(r=>r[0])).size}</div></div>
     <div class="kpi p"><div class="lb">Số người nhập</div><div class="val">${rows.length}</div></div>
     <div class="kpi r"><div class="lb">Tổng tiền đã thanh toán</div><div class="val">${fmt(grandTotal)}đ</div></div></div>`;
