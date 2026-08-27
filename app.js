@@ -281,7 +281,35 @@ async function loadDash(){
       return`<tr><td>${r[0]}</td><td>${r[5]}</td><td>${badge}</td></tr>`;
     }).join('')+'</tbody></table></div>';
   renderDashChart(tk);
+  C.XH=await apiGet('XepHang');
+  renderDashBest();
   document.getElementById('sync').innerHTML='Trạng thái: <b>Đã đồng bộ ✓</b>';
+}
+// ── Bestseller (ước tính) — vì app chưa có bước ghi nhận BÁN HÀNG thực tế, không thể biết chính xác SP nào
+// bán chạy. Tạm suy đoán qua tín hiệu gián tiếp: SP nào được XẾP HÀNG (bù ra gian hàng) nhiều nhất trong
+// 30 ngày gần đây → khả năng cao là SP bán chạy nên phải bù hàng liên tục. Gộp theo Mã SP (qua xhTKIndex)
+// để đổi tên SP không làm tách lẻ dữ liệu ra 2 dòng khác nhau, giống cách làm ở "Top sản phẩm nhập hàng".
+let dashBestN=5;
+function changeDashBestN(v){dashBestN=Number(v);renderDashBest();}
+function renderDashBest(){
+  const el=document.getElementById('d-best');if(!el)return;
+  const cutoff=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+  const recent=(C.XH||[]).filter(r=>(r[3]||'')>=cutoff);
+  const map=new Map();
+  recent.forEach(r=>{
+    const idx=xhTKIndex(r);
+    const key=idx>=0?'i'+idx:'n'+r[0];
+    const ten=idx>=0?C.TK[idx][0]:r[0];
+    if(!map.has(key))map.set(key,{ten,sl:0,lan:0});
+    const g=map.get(key);
+    g.sl+=Number(r[1]||0);g.lan++;
+  });
+  const top=[...map.values()].sort((a,b)=>b.sl-a.sl).slice(0,dashBestN);
+  if(!top.length){el.innerHTML='<div class="empty">📭 Chưa có dữ liệu xếp hàng trong 30 ngày qua</div>';return;}
+  el.innerHTML='<p style="font-size:11px;color:var(--text2);padding:0 2px 10px">* Ước tính qua tổng SL đã Xếp hàng ra gian hàng (chưa có bước ghi nhận bán hàng thực tế) — SP càng phải bù hàng nhiều càng có khả năng bán chạy.</p>'+
+    '<div class="simple-list">'+
+    top.map((g,i)=>`<div class="simple-row"><span class="n">${i+1}. ${esc(g.ten)}</span><span class="v">${fmt(g.sl)} · ${g.lan} lần xếp</span></div>`).join('')+
+    '</div>';
 }
 
 // ── Biểu đồ tròn "Tồn kho theo trạng thái" (gộp SP theo Hết hàng/Gần hết/Sắp hết/Còn hàng) ──

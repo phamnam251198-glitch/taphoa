@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css?v=20260827e">
+<link rel="stylesheet" href="style.css?v=20260827f">
 </head>
 <body>
 
@@ -74,6 +74,15 @@
           <div id="d-low"><div class="ld"><div class="spin"></div></div></div>
         </div>
         <div class="card"><div class="ch"><h2>Hàng sắp hết hạn sử dụng</h2></div><div id="d-exp"><div class="ld"><div class="spin"></div></div></div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><h2>🔥 Bestseller (Xếp hàng nhiều nhất — 30 ngày qua)</h2>
+          <select id="dash-best-n" onchange="changeDashBestN(this.value)" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;outline:none">
+            <option value="5">Top 5</option>
+            <option value="10">Top 10</option>
+          </select>
+        </div>
+        <div id="d-best"><div class="ld"><div class="spin"></div></div></div>
       </div>
     </div>
 
@@ -630,6 +639,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260827e"></script>
+<script src="app.js?v=20260827f"></script>
 </body>
 </html>
