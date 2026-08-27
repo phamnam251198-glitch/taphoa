@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css?v=20260827f">
+<link rel="stylesheet" href="style.css?v=20260828a">
 </head>
 <body>
 
@@ -33,6 +33,7 @@
     <a onclick="go('xh')" id="n-xh">🏷️ Xếp hàng</a>
     <a onclick="go('ghk')" id="n-ghk">🗄️ Đồ gian hàng</a>
     <a onclick="go('kk')" id="n-kk">📋 Kiểm kê</a>
+    <a onclick="go('best')" id="n-best">🏆 Bestseller</a>
     <a onclick="go('bc')" id="n-bc">📊 Báo cáo</a>
     <a onclick="go('log')" id="n-log">📜 Nhật ký</a>
     <a onclick="go('setting')" id="n-setting">⚙️ Cài đặt</a>
@@ -199,6 +200,35 @@
       </details>
       <div id="kk-sum"></div>
       <div class="card"><div class="ch"><h2>Lịch sử kiểm kê</h2></div><div id="kk-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+    </div>
+
+    <!-- BESTSELLER -->
+    <div class="sec" id="s-best">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Số lượng "Đã bán" được suy ra từ: <b>Tồn đầu kỳ + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ</b> (gộp tất cả gian hàng) — <b>không</b> tính theo số lượng xếp hàng nhiều hay ít. Cần có 2 lần <a onclick="go('kk')" style="color:var(--blue);cursor:pointer">Kiểm kê Gian hàng</a> đúng ngày đầu và cuối kỳ mới tính được; thiếu ngày nào sẽ báo rõ, không tự đoán số liệu.</p>
+      <div class="tabs">
+        <div class="tab on" id="bt-week" onclick="goBestTab('week')">Theo tuần</div>
+        <div class="tab" id="bt-month" onclick="goBestTab('month')">Theo tháng</div>
+      </div>
+      <div id="best-week-pane">
+        <div class="card">
+          <div class="ch"><h2>Chọn tuần (chốt vào Thứ 6)</h2></div>
+          <div style="padding:14px 18px">
+            <div class="fg" style="max-width:220px"><label>Ngày Thứ 6 chốt tuần</label><input type="date" id="best-week-fri" onchange="loadBestWeek()"></div>
+            <div id="best-week-info" style="font-size:12px;color:var(--text2)"></div>
+          </div>
+        </div>
+        <div id="best-week-tbl"></div>
+      </div>
+      <div id="best-month-pane" style="display:none">
+        <div class="card">
+          <div class="ch"><h2>Chọn tháng</h2></div>
+          <div style="padding:14px 18px">
+            <div class="fg" style="max-width:220px"><label>Tháng</label><input type="month" id="best-month" onchange="loadBestMonth()"></div>
+            <div id="best-month-info" style="font-size:12px;color:var(--text2)"></div>
+          </div>
+        </div>
+        <div id="best-month-tbl"></div>
+      </div>
     </div>
 
     <!-- BÁO CÁO THEO THÁNG -->
@@ -639,6 +669,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260827f"></script>
+<script src="app.js?v=20260828a"></script>
 </body>
 </html>

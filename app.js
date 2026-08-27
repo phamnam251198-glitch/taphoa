@@ -199,7 +199,7 @@ function go(name){
   document.querySelectorAll('#sb nav a').forEach(a=>a.classList.remove('on'));
   document.getElementById('s-'+name).classList.add('on');
   document.getElementById('n-'+name).classList.add('on');
-  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',kk:'Kiểm kê',bc:'Báo cáo theo tháng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
+  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',kk:'Kiểm kê',best:'Bestseller',bc:'Báo cáo theo tháng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
   document.getElementById('ptitle').textContent=titles[name];
   const btns={
     tk:`<button class="btn btn-p" onclick="initSPForm()">+ Thêm sản phẩm</button>`,
@@ -207,6 +207,7 @@ function go(name){
     xh:`<button class="btn btn-s" onclick="openXH()">+ Tạo phiếu xếp</button>`,
     ghk:`<button class="btn btn-g" onclick="loadGHK()">↻ Làm mới</button>`,
     kk:`<button class="btn btn-s" onclick="openKKNew()">+ Kiểm kê mới</button>`,
+    best:`<button class="btn btn-g" onclick="loadBestseller()">↻ Làm mới</button>`,
     bc:`<button class="btn btn-g" onclick="loadBC()">↻ Làm mới</button>`,
     dash:`<button class="btn btn-g" onclick="loadDash()">↻ Làm mới</button>`,
     log:`<button class="btn btn-g" onclick="loadLog()">↻ Làm mới</button>`,
@@ -218,6 +219,7 @@ function go(name){
   else if(name==='xh')loadXH();
   else if(name==='ghk')loadGHK();
   else if(name==='kk')loadKK();
+  else if(name==='best')loadBestseller();
   else if(name==='bc')openBC();
   else if(name==='log')loadLog();
   else if(name==='setting'){loadCaiDat();loadUser();loadNCC();loadGH();loadLoai();}
@@ -2519,6 +2521,123 @@ async function delKKDay(){
     cm('m-kk-day');
     setTimeout(loadKK,800);
   });
+}
+
+// ══ BESTSELLER ══ xác định SP bán chạy dựa trên SỐ LƯỢNG ĐÃ BÁN THỰC TẾ (suy ra từ tồn kiểm kê), TUYỆT ĐỐI
+// không xếp hạng trực tiếp theo số lượng thêm/xếp hàng (xếp nhiều ≠ bán chạy — có thể chỉ đang tồn kho nhiều).
+// Công thức: Đã bán = Tồn đầu kỳ (Đồ gian hàng, gộp mọi gian hàng) + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ.
+// App không có server/cron nên không thể tự "chốt" đúng nửa đêm Thứ 6/cuối tháng — phải dựa vào 2 lần
+// NGƯỜI DÙNG TỰ CHẠY Kiểm kê Gian hàng đúng 2 mốc ngày (đầu kỳ & cuối kỳ). Thiếu mốc nào → báo rõ, không đoán.
+// LƯU Ý: luôn dựng/đọc Date qua Date.UTC + getUTC*/setUTC* — dựng bằng "new Date(dateStr+'T00:00:00')" (giờ
+// LOCAL) rồi gọi toISOString() (quy đổi UTC) sẽ bị lệch NGÀY ở múi giờ UTC+ (như VN, UTC+7): nửa đêm local
+// bị lùi về chiều/tối hôm trước theo UTC. Toàn bộ hàm tính ngày của Bestseller phải né lỗi này.
+function bAddDays(dateStr,n){
+  const[y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d));
+  dt.setUTCDate(dt.getUTCDate()+n);
+  return dt.toISOString().slice(0,10);
+}
+// Thứ 6 gần nhất (≤ dateStr) — dùng làm giá trị mặc định cho bộ chọn tuần
+function mostRecentFriday(dateStr){
+  const[y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d));
+  const day=dt.getUTCDay();// 0=CN...6=Thứ 7, 5=Thứ 6
+  const diff=day>=5?day-5:day+2;
+  dt.setUTCDate(dt.getUTCDate()-diff);
+  return dt.toISOString().slice(0,10);
+}
+// Khoảng 1 tháng dương lịch: from = ngày cuối tháng TRƯỚC (đầu kỳ), to = ngày cuối tháng này (cuối kỳ)
+function monthBounds(yyyymm){
+  const[y,m]=yyyymm.split('-').map(Number);
+  const fmt=dt=>dt.toISOString().slice(0,10);
+  return{from:fmt(new Date(Date.UTC(y,m-1,0))),to:fmt(new Date(Date.UTC(y,m,0)))};
+}
+// Tồn của 1 sản phẩm TẠI 1 NGÀY, gộp mọi gian hàng — CHỈ tính được nếu có ít nhất 1 dòng Kiểm kê Gian hàng
+// đúng ngày đó cho sản phẩm này (tra theo Mã SP trước, theo tên nếu SP chưa có mã); không có → trả về null,
+// KHÔNG suy diễn/ước tính thay thế (đúng yêu cầu: thiếu dữ liệu phải báo rõ, không đoán bừa)
+function kkStockOnDate(maSP,tenSP,date){
+  const rows=C.KK.filter(r=>r[0]===date&&r[8]&&(maSP?r[1]===maSP:r[2]===tenSP));
+  if(!rows.length)return null;
+  return rows.reduce((s,r)=>s+Number(r[4]||0),0);
+}
+// Tổng SL đã Xếp hàng ra CÁC gian hàng của 1 sản phẩm, tính từ SAU ngày đầu kỳ đến HẾT ngày cuối kỳ
+function xhAddedInRange(maSP,tenSP,fromExclusive,toInclusive){
+  const start=bAddDays(fromExclusive,1);
+  return C.XH.filter(r=>{
+    if(!((r[3]||'')>=start&&(r[3]||'')<=toInclusive))return false;
+    return maSP?r[5]===maSP:r[0]===tenSP;
+  }).reduce((s,r)=>s+Number(r[1]||0),0);
+}
+// Tính bảng xếp hạng Bestseller cho khoảng [from,to] — bỏ qua (không đoán) những SP thiếu tồn kiểm kê ở 1
+// trong 2 đầu mốc; trả về danh sách đã sắp xếp giảm dần theo SL đã bán thực tế + số SP bị loại vì thiếu dữ liệu
+function computeBestsellerPeriod(from,to){
+  const items=[];let missing=0;
+  C.TK.forEach(sp=>{
+    const ten=sp[0],ma=sp[9]||'';
+    const dauKy=kkStockOnDate(ma,ten,from);
+    const cuoiKy=kkStockOnDate(ma,ten,to);
+    if(dauKy===null||cuoiKy===null){missing++;return;}
+    const them=xhAddedInRange(ma,ten,from,to);
+    items.push({ten,ma,dauKy,them,cuoiKy,daBan:dauKy+them-cuoiKy});
+  });
+  items.sort((a,b)=>b.daBan-a.daBan);
+  return{items,missing,tongSP:C.TK.length};
+}
+async function loadBestseller(){
+  if(!C.TK.length)await loadTK();
+  toast('Đang tải dữ liệu Bestseller...');
+  C.KK=await apiGet('KiemKe');
+  C.XH=await apiGet('XepHang');
+  const friEl=document.getElementById('best-week-fri');
+  if(!friEl.value)friEl.value=mostRecentFriday(td());
+  const monEl=document.getElementById('best-month');
+  if(!monEl.value)monEl.value=td().slice(0,7);
+  loadBestWeek();loadBestMonth();
+}
+function goBestTab(name){
+  document.getElementById('bt-week').classList.toggle('on',name==='week');
+  document.getElementById('bt-month').classList.toggle('on',name==='month');
+  document.getElementById('best-week-pane').style.display=name==='week'?'':'none';
+  document.getElementById('best-month-pane').style.display=name==='month'?'':'none';
+}
+function rBestList(elId,computed,warnMsg){
+  const el=document.getElementById(elId);
+  if(!computed){el.innerHTML=`<div class="card"><div class="empty">⚠️ ${esc(warnMsg)}</div></div>`;return;}
+  const{items,missing,tongSP}=computed;
+  let html='';
+  if(missing>0)html+=`<div class="alert" style="display:flex">⚠️ ${missing}/${tongSP} sản phẩm bị loại khỏi xếp hạng do thiếu dữ liệu kiểm kê đầu/cuối kỳ cho riêng SP đó (gian hàng chứa SP đó chưa được kiểm kê đúng ngày).</div>`;
+  if(!items.length){html+='<div class="card"><div class="empty">📭 Chưa đủ dữ liệu để xếp hạng Bestseller kỳ này</div></div>';el.innerHTML=html;return;}
+  html+=`<div class="card"><div class="ch"><h2>🏆 Xếp hạng theo SL đã bán</h2></div>
+    <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Tồn đầu kỳ</th><th>Đã xếp</th><th>Tồn cuối kỳ</th><th>Đã bán</th></tr></thead><tbody>`+
+    items.map((it,i)=>{
+      const cl=it.daBan<0?'color:#d03b3b':'';
+      return`<tr><td>${i+1}</td><td><b>${esc(it.ten)}</b></td><td>${fmt(it.dauKy)}</td><td>${fmt(it.them)}</td><td>${fmt(it.cuoiKy)}</td><td style="font-weight:700;${cl}">${fmt(it.daBan)}</td></tr>`;
+    }).join('')+'</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+function loadBestWeek(){
+  const fri=document.getElementById('best-week-fri').value;if(!fri)return;
+  const prevFri=bAddDays(fri,-7);
+  document.getElementById('best-week-info').textContent=`Tuần từ ${prevFri} đến ${fri} — cần Kiểm kê Gian hàng đúng 2 ngày: ${prevFri} (đầu kỳ) và ${fri} (cuối kỳ).`;
+  const dauOk=C.KK.some(r=>r[0]===prevFri&&r[8]),cuoiOk=C.KK.some(r=>r[0]===fri&&r[8]);
+  if(!dauOk||!cuoiOk){
+    const thieu=[!dauOk&&prevFri,!cuoiOk&&fri].filter(Boolean);
+    rBestList('best-week-tbl',null,`Thiếu dữ liệu Kiểm kê Gian hàng ngày ${thieu.join(' và ')} — vào Kiểm kê, chọn 1 Gian hàng, chạy đúng ngày này rồi quay lại xem.`);
+    return;
+  }
+  rBestList('best-week-tbl',computeBestsellerPeriod(prevFri,fri));
+}
+function loadBestMonth(){
+  const ym=document.getElementById('best-month').value;if(!ym)return;
+  const{from,to}=monthBounds(ym);
+  document.getElementById('best-month-info').textContent=`Tháng ${ym}: từ ${from} (cuối tháng trước, đầu kỳ) đến ${to} (cuối tháng, cuối kỳ) — cần Kiểm kê Gian hàng đúng 2 ngày này.`;
+  const dauOk=C.KK.some(r=>r[0]===from&&r[8]),cuoiOk=C.KK.some(r=>r[0]===to&&r[8]);
+  if(!dauOk||!cuoiOk){
+    const thieu=[!dauOk&&from,!cuoiOk&&to].filter(Boolean);
+    rBestList('best-month-tbl',null,`Thiếu dữ liệu Kiểm kê Gian hàng ngày ${thieu.join(' và ')} — vào Kiểm kê, chọn 1 Gian hàng, chạy đúng ngày này rồi quay lại xem.`);
+    return;
+  }
+  rBestList('best-month-tbl',computeBestsellerPeriod(from,to));
 }
 
 // ══ BÁO CÁO THEO THÁNG ══ thống kê trong 1 khoảng thời gian, mỗi "Người nhập" đã nhập tổng bao nhiêu tiền
