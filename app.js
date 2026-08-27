@@ -2507,12 +2507,27 @@ function renderKKDayDetail(){
   const items=C.KK.filter(r=>(r[0]||'(chưa có ngày)')===kkDayCurrent.ngay&&(r[8]||'')===kkDayCurrent.gianHang);
   const soLech=items.filter(r=>Number(r[5]||0)!==0).length;
   document.getElementById('kk-day-sum').innerHTML=`<p style="font-size:12px;color:var(--text2);margin-bottom:12px">${items.length} SP đã đếm · ${soLech} SP lệch</p>`;
-  document.getElementById('kk-day-tbl').innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Sản phẩm</th><th>Mã SP</th><th>Sổ sách</th><th>Thực tế</th><th>Chênh lệch</th><th>Ghi chú</th><th>Người kiểm kê</th></tr></thead><tbody>`+
+  document.getElementById('kk-day-tbl').innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Sản phẩm</th><th>Mã SP</th><th>Sổ sách</th><th>Thực tế</th><th>Chênh lệch</th><th>Ghi chú</th><th>Người kiểm kê</th><th></th></tr></thead><tbody>`+
     items.map(r=>{
       const chenh=Number(r[5]||0);
       const cl=chenh===0?'':(chenh>0?'color:#0ca30c':'color:#d03b3b');
-      return`<tr><td><b>${esc(r[2])}</b></td><td>${r[1]?`<span class="bg bg-b">${esc(r[1])}</span>`:''}</td><td>${r[3]}</td><td>${r[4]}</td><td style="${cl};font-weight:600">${chenh>0?'+':''}${chenh}</td><td>${esc(r[6]||'')}</td><td>${esc(r[7]||'')}</td></tr>`;
+      const row=C.KK.indexOf(r)+2;// vị trí thật trong C.KK, tránh lệch dòng khi lọc theo ngày/gian hàng
+      return`<tr><td><b>${esc(r[2])}</b></td><td>${r[1]?`<span class="bg bg-b">${esc(r[1])}</span>`:''}</td><td>${r[3]}</td><td>${r[4]}</td><td style="${cl};font-weight:600">${chenh>0?'+':''}${chenh}</td><td>${esc(r[6]||'')}</td><td>${esc(r[7]||'')}</td><td class="td-del"><button class="btn btn-d btn-sm" onclick="delKKRow(${row})" title="Xóa dòng này (chỉ xóa lịch sử, không hoàn tác tồn kho)">✕</button></td></tr>`;
     }).join('')+'</tbody></table></div>';
+}
+// Hủy/xóa 1 DÒNG kiểm kê riêng lẻ (VD gõ nhầm 1 sản phẩm) — không cần xóa cả phiếu cả ngày như delKKDay().
+// Giống delKKDay(): CHỈ xóa bản ghi lịch sử, không tự hoàn tác Tồn kho/Đồ gian hàng (lý do xem ghi chú ở đó).
+async function delKKRow(row){
+  const r=C.KK[row-2];if(!r)return;
+  confirmDel(`Xóa dòng kiểm kê "${r[2]}" (ngày ${r[0]})? LƯU Ý: không tự hoàn tác lại số liệu Tồn kho/Đồ gian hàng đã điều chỉnh lúc lưu.`,async()=>{
+    toast('Đang xóa...');
+    await apiPost({sheet:'KiemKe',action:'delete',row:Number(row)});
+    C.KK.splice(row-2,1);
+    logAction('Xóa','Kiểm kê',`Xóa 1 dòng kiểm kê: "${r[2]}" ngày ${r[0]}`);
+    toast('Đã xóa dòng!');
+    renderKKDayDetail();
+    fKK();// cập nhật lại danh sách/tổng số đằng sau popup luôn, không cần đóng popup mới thấy đúng
+  });
 }
 async function delKKDay(){
   if(!kkDayCurrent)return;
