@@ -2517,27 +2517,76 @@ function renderKKDayDetail(){
 }
 // Hủy/xóa 1 DÒNG kiểm kê riêng lẻ (VD gõ nhầm 1 sản phẩm) — không cần xóa cả phiếu cả ngày như delKKDay().
 // Giống delKKDay(): CHỈ xóa bản ghi lịch sử, không tự hoàn tác Tồn kho/Đồ gian hàng (lý do xem ghi chú ở đó).
+// Kiểm tra: từ sau ngày kiểm kê r, có phát sinh giao dịch nào khác (Nhập/Xếp/Kiểm kê khác) ảnh hưởng tới
+// CHÍNH sản phẩm đó không (cùng đối tượng Kho tổng/Gian hàng). Không có → AN TOÀN để tự hoàn tác đúng số liệu
+// trước khi kiểm kê khi xóa dòng này. Có rồi thì không dám đoán — vì hoàn tác mù sẽ xóa mất giao dịch hợp lệ
+// phát sinh sau đó (VD: kiểm kê xong lại có phiếu Nhập mới, hoàn tác về số cũ sẽ làm mất luôn phần mới nhập).
+function kkHasLaterActivity(r,excludeRowIdx){
+  const ngay=r[0],ma=r[1],ten=r[2],gianHang=r[8];
+  const matchP=(rMa,rTen)=>ma?rMa===ma:rTen===ten;
+  if(!gianHang){
+    return C.NH.some(x=>(x[4]||'')>=ngay&&matchP(x[9],x[0]))
+      ||C.XH.some(x=>(x[3]||'')>=ngay&&matchP(x[5],x[0]))
+      ||C.KK.some((x,i)=>i!==excludeRowIdx&&!x[8]&&(x[0]||'')>=ngay&&matchP(x[1],x[2]));
+  }
+  return C.XH.some(x=>x[2]===gianHang&&(x[3]||'')>=ngay&&matchP(x[5],x[0]))
+    ||C.KK.some((x,i)=>i!==excludeRowIdx&&x[8]===gianHang&&(x[0]||'')>=ngay&&matchP(x[1],x[2]));
+}
+// Hoàn tác lại số liệu về đúng như TRƯỚC lần kiểm kê r (chỉ gọi khi kkHasLaterActivity() báo an toàn)
+async function kkRevertOne(r){
+  const ma=r[1],ten=r[2],soSach=Number(r[3]||0),gianHang=r[8];
+  if(!gianHang){
+    const idx=ma?C.TK.findIndex(t=>t[9]===ma):C.TK.findIndex(t=>t[0]===ten);
+    if(idx>=0){
+      const upd=[...C.TK[idx]];upd[1]=soSach;
+      await apiPost({sheet:'TonKho',action:'update',row:idx+2,data:upd});
+      C.TK[idx][1]=soSach;
+    }
+  }else{
+    const offset=soSach-ghkBase(ten,gianHang);
+    const gi=C.GHK.findIndex(x=>x[0]===ten&&x[1]===gianHang);
+    const grow=[ten,gianHang,offset];
+    await apiPost(gi>=0?{sheet:'GianHangKho',action:'update',row:gi+2,data:grow}:{sheet:'GianHangKho',action:'append',row:grow});
+    if(gi>=0)C.GHK[gi]=grow;else C.GHK.push(grow);
+  }
+}
 async function delKKRow(row){
   const r=C.KK[row-2];if(!r)return;
-  confirmDel(`Xóa dòng kiểm kê "${r[2]}" (ngày ${r[0]})? LƯU Ý: không tự hoàn tác lại số liệu Tồn kho/Đồ gian hàng đã điều chỉnh lúc lưu.`,async()=>{
+  const ngay=r[0],ten=r[2];
+  toast('Đang kiểm tra dữ liệu liên quan...');
+  C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+  const hasLater=kkHasLaterActivity(r,row-2);
+  const msg=hasLater
+    ?`Xóa dòng kiểm kê "${ten}" (ngày ${ngay})? Đã có giao dịch khác sau ngày này cho SP này nên KHÔNG THỂ tự hoàn tác an toàn — chỉ xóa lịch sử, giữ nguyên số liệu hiện tại.`
+    :`Xóa dòng kiểm kê "${ten}" (ngày ${ngay})? Không có giao dịch nào khác sau đó cho SP này → sẽ TỰ HOÀN TÁC lại đúng số liệu như trước khi kiểm kê.`;
+  confirmDel(msg,async()=>{
     toast('Đang xóa...');
     await apiPost({sheet:'KiemKe',action:'delete',row:Number(row)});
     C.KK.splice(row-2,1);
-    logAction('Xóa','Kiểm kê',`Xóa 1 dòng kiểm kê: "${r[2]}" ngày ${r[0]}`);
-    toast('Đã xóa dòng!');
+    if(!hasLater)await kkRevertOne(r);
+    logAction('Xóa','Kiểm kê',`Xóa 1 dòng kiểm kê: "${ten}" ngày ${ngay}${hasLater?'':' (đã tự hoàn tác lại số liệu)'}`);
+    toast(hasLater?'Đã xóa dòng!':'Đã xóa dòng & hoàn tác số liệu!');
     renderKKDayDetail();
     fKK();// cập nhật lại danh sách/tổng số đằng sau popup luôn, không cần đóng popup mới thấy đúng
+    if(!hasLater){if(!r[8])loadTK();else rGHKView();}
   });
 }
 async function delKKDay(){
   if(!kkDayCurrent)return;
   const idxs=C.KK.map((r,i)=>i).filter(i=>(C.KK[i][0]||'(chưa có ngày)')===kkDayCurrent.ngay&&(C.KK[i][8]||'')===kkDayCurrent.gianHang).sort((a,b)=>b-a);
   if(!idxs.length){toast('Không có gì để xóa','err');return;}
-  confirmDel(`Xóa toàn bộ lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng)? LƯU Ý: thao tác này KHÔNG hoàn tác lại số liệu (Tồn kho/Đồ gian hàng) — vì có thể đã bị thay đổi bởi Nhập/Xếp hàng khác sau thời điểm kiểm kê, tự hoàn tác dễ gây sai số hơn. Chỉ nên xóa nếu ghi nhầm phiếu.`,async()=>{
+  confirmDel(`Xóa toàn bộ lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng)? Với mỗi SP: nếu KHÔNG có giao dịch nào khác xảy ra sau ngày này thì tự hoàn tác lại đúng số liệu trước khi kiểm kê; SP nào đã có giao dịch sau đó thì chỉ xóa lịch sử, giữ nguyên số hiện tại (không đoán mò).`,async()=>{
     toast('Đang xóa...');
-    for(const idx of idxs)await apiPost({sheet:'KiemKe',action:'delete',row:idx+2});
-    logAction('Xóa','Kiểm kê',`Xóa lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng)`);
-    toast('Đã xóa!');
+    C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+    let soHoanTac=0;
+    for(const idx of idxs){
+      const r=C.KK[idx];if(!r)continue;
+      const hasLater=kkHasLaterActivity(r,idx);
+      await apiPost({sheet:'KiemKe',action:'delete',row:idx+2});
+      if(!hasLater){await kkRevertOne(r);soHoanTac++;}
+    }
+    logAction('Xóa','Kiểm kê',`Xóa lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng, tự hoàn tác ${soHoanTac} dòng)`);
+    toast(`Đã xóa! (Tự hoàn tác số liệu cho ${soHoanTac}/${idxs.length} dòng)`);
     cm('m-kk-day');
     setTimeout(loadKK,800);
   });
