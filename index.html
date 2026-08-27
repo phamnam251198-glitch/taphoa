@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260827">
 </head>
 <body>
 
@@ -32,6 +32,7 @@
     <a onclick="go('nh')" id="n-nh">⬇️ Nhập hàng</a>
     <a onclick="go('xh')" id="n-xh">🏷️ Xếp hàng</a>
     <a onclick="go('ghk')" id="n-ghk">🗄️ Đồ gian hàng</a>
+    <a onclick="go('kk')" id="n-kk">📋 Kiểm kê</a>
     <a onclick="go('bc')" id="n-bc">📊 Báo cáo</a>
     <a onclick="go('log')" id="n-log">📜 Nhật ký</a>
     <a onclick="go('setting')" id="n-setting">⚙️ Cài đặt</a>
@@ -94,6 +95,7 @@
           <option value="">Tất cả loại hàng</option>
         </select>
         <button class="btn btn-g" onclick="loadTK()">↻ Làm mới</button>
+        <button class="btn btn-g" id="tk-toggle-all-btn" onclick="toggleTKAll()">▲ Thu gọn tất cả</button>
         <button class="btn btn-d" id="tk-delsel-btn" onclick="delSelTK()" style="display:none">🗑 Xóa đã chọn (<span id="tk-selcnt">0</span>)</button>
       </div>
       </details>
@@ -128,6 +130,7 @@
       </div>
       </details>
       <div id="nh-sum"></div>
+      <div id="nh-top"></div>
       <div class="card"><div class="ch"><h2>Lịch sử nhập hàng</h2></div><div id="nh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
@@ -163,6 +166,24 @@
         <input type="text" id="q-ghk" placeholder="Tìm sản phẩm trong gian hàng này..." oninput="rGHKView()">
       </div>
       <div id="ghk-pane"><div class="ld"><div class="spin"></div></div></div>
+    </div>
+
+    <!-- KIỂM KÊ -->
+    <div class="sec" id="s-kk">
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+      <div class="sb">
+        <input type="text" id="q-kk" placeholder="Tìm người kiểm kê..." oninput="fKK()">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+        <input type="date" id="from-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+        <input type="date" id="to-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <button class="btn btn-g" onclick="document.getElementById('from-kk').value='';document.getElementById('to-kk').value='';document.getElementById('q-kk').value='';fKK()">✕</button>
+        <button class="btn btn-g" onclick="loadKK()">↻ Làm mới</button>
+      </div>
+      </details>
+      <div id="kk-sum"></div>
+      <div class="card"><div class="ch"><h2>Lịch sử kiểm kê</h2></div><div id="kk-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
 
     <!-- BÁO CÁO THEO THÁNG -->
@@ -254,6 +275,15 @@
             </div>
           </div>
         </div>
+        <div class="card">
+          <div class="ch"><h2>Mã SP (liên kết dữ liệu)</h2></div>
+          <div style="padding:18px">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Nhập hàng/Xếp hàng giờ liên kết với sản phẩm qua <b>Mã SP</b> (thay vì tên) để đổi tên sản phẩm không làm sai lệch phiếu cũ. Chạy nút dưới đây <b>1 lần</b> để: tự sinh Mã SP cho các sản phẩm đang thiếu, và gán mã vào lịch sử phiếu Nhập/Xếp hàng cũ (khớp theo tên hiện tại). Nên chạy <b>trước khi đổi tên</b> bất kỳ sản phẩm nào.</p>
+            <div class="mf" style="border-top:none;padding-top:8px">
+              <button class="btn btn-g" onclick="askRunMaSPMigration()">🔗 Quét & gán Mã SP</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="set-tab" id="set-user">
@@ -332,7 +362,7 @@
     <h3 id="m-sp-t">Thêm sản phẩm</h3>
     <input type="hidden" id="sp-row">
     <div class="fr">
-      <div class="fg"><label>Mã SP</label><input id="sp-ma" placeholder="VD: SP001"></div>
+      <div class="fg"><label>Mã SP *</label><input id="sp-ma" placeholder="Để trống sẽ tự sinh mã"></div>
       <div class="fg"><label>Tên sản phẩm *</label><input id="sp-ten" placeholder="VD: Bimbim Oishi"></div>
     </div>
     <div class="fr">
@@ -458,6 +488,41 @@
   </div>
 </div>
 
+<!-- MODAL KIỂM KÊ MỚI -->
+<div class="mo" id="m-kk">
+  <div class="mb mb-lg">
+    <h3>Kiểm kê</h3>
+    <div class="fr3">
+      <div class="fg"><label>Đối tượng kiểm kê *</label><select id="kk-target" onchange="kkTargetChanged()"><option value="">📦 Kho tổng (Tồn kho)</option></select></div>
+      <div class="fg"><label>Ngày kiểm kê</label><input id="kk-ngay" type="date"></div>
+      <div class="fg"><label>Người kiểm kê *</label><select id="kk-user"><option value="">-- Chọn --</option></select></div>
+    </div>
+    <div class="fg"><label>Tìm sản phẩm</label><input id="kk-q" placeholder="Gõ tên/mã SP để lọc..." oninput="renderKKRows()"></div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Chỉ những dòng có nhập "Tồn thực tế" mới được lưu &amp; điều chỉnh lại Tồn kho — để trống nghĩa là chưa đếm, bỏ qua sản phẩm đó.</p>
+    <div class="scroll-tbl" style="max-height:420px;overflow-y:auto"><table class="item-table">
+      <thead><tr><th>Sản phẩm</th><th style="width:90px">Tồn sổ sách</th><th style="width:110px">Tồn thực tế</th><th style="width:90px">Chênh lệch</th><th>Ghi chú</th></tr></thead>
+      <tbody id="kk-rows"></tbody>
+    </table></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-kk')">Hủy</button>
+      <button class="btn btn-p" onclick="saveKKNew()">💾 Lưu kết quả kiểm kê</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CHI TIẾT KIỂM KÊ THEO NGÀY -->
+<div class="mo" id="m-kk-day">
+  <div class="mb mb-lg">
+    <h3 id="kk-day-t">Phiếu kiểm kê ngày ...</h3>
+    <div id="kk-day-sum"></div>
+    <div id="kk-day-tbl"></div>
+    <div class="mf">
+      <button class="btn btn-d" style="margin-right:auto" onclick="delKKDay()">🗑 Xóa phiếu này</button>
+      <button class="btn btn-g" onclick="cm('m-kk-day')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ĐỒ GIAN HÀNG -->
 <div class="mo" id="m-ghk">
   <div class="mb mb-sm">
@@ -546,6 +611,6 @@
 <div id="toast"></div>
 
 <div id="toast"></div>
-<script src="app.js"></script>
+<script src="app.js?v=20260827"></script>
 </body>
 </html>

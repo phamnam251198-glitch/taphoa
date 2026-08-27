@@ -67,7 +67,7 @@ async function doLogout(){
   }
 }
 
-let C={TK:[],NH:[],NCC:[],USER:[],GH:[],XH:[],LOG:[],GHK:[],LOAI:[]};
+let C={TK:[],NH:[],NCC:[],USER:[],GH:[],XH:[],LOG:[],GHK:[],LOAI:[],KK:[]};
 let SETTINGS={sapHet:10,ganHet:3,hsdSap:30,hsdGan:7};// ngưỡng mặc định dùng chung, SP nào không đặt riêng thì dùng cái này
 
 // ── FIREBASE API ──
@@ -199,13 +199,14 @@ function go(name){
   document.querySelectorAll('#sb nav a').forEach(a=>a.classList.remove('on'));
   document.getElementById('s-'+name).classList.add('on');
   document.getElementById('n-'+name).classList.add('on');
-  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',bc:'Báo cáo theo tháng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
+  const titles={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',xh:'Xếp hàng',ghk:'Đồ gian hàng',kk:'Kiểm kê',bc:'Báo cáo theo tháng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
   document.getElementById('ptitle').textContent=titles[name];
   const btns={
     tk:`<button class="btn btn-p" onclick="initSPForm()">+ Thêm sản phẩm</button>`,
     nh:`<button class="btn btn-s" onclick="openNH()">+ Tạo phiếu nhập</button>`,
     xh:`<button class="btn btn-s" onclick="openXH()">+ Tạo phiếu xếp</button>`,
     ghk:`<button class="btn btn-g" onclick="loadGHK()">↻ Làm mới</button>`,
+    kk:`<button class="btn btn-s" onclick="openKKNew()">+ Kiểm kê mới</button>`,
     bc:`<button class="btn btn-g" onclick="loadBC()">↻ Làm mới</button>`,
     dash:`<button class="btn btn-g" onclick="loadDash()">↻ Làm mới</button>`,
     log:`<button class="btn btn-g" onclick="loadLog()">↻ Làm mới</button>`,
@@ -216,6 +217,7 @@ function go(name){
   else if(name==='nh')loadNH();
   else if(name==='xh')loadXH();
   else if(name==='ghk')loadGHK();
+  else if(name==='kk')loadKK();
   else if(name==='bc')openBC();
   else if(name==='log')loadLog();
   else if(name==='setting'){loadCaiDat();loadUser();loadNCC();loadGH();loadLoai();}
@@ -332,7 +334,31 @@ function renderDashDonut(tk){
 
 // ══ TỒN KHO ══
 let selTK=new Set();
+// Trạng thái thu gọn/mở của các khối Loại hàng — mặc định mở hết; bấm nút để đảo trạng thái cho TẤT CẢ khối
+let tkAllOpen=true;
+function toggleTKAll(){
+  tkAllOpen=!tkAllOpen;
+  document.querySelectorAll('#tk-tbl .acc-group').forEach(d=>{d.open=tkAllOpen;});
+  updateTKToggleBtn();
+}
+function updateTKToggleBtn(){
+  const btn=document.getElementById('tk-toggle-all-btn');
+  if(btn)btn.textContent=tkAllOpen?'▲ Thu gọn tất cả':'▼ Mở tất cả';
+}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// ── Phân trang dùng chung cho các màn danh sách (Tồn kho, NCC, Gian hàng, Loại hàng, Người dùng) ──
+// mkOnclick(page) trả về chuỗi JS cho thuộc tính onclick — cho phép mỗi màn tự định nghĩa hàm goto của mình
+// (có màn chỉ cần 1 tham số trang, có màn như Tồn kho cần thêm tên Loại hàng vì phân trang riêng theo từng khối)
+const LIST_PAGE_SIZE=20;
+function pagerHTML(page,total,mkOnclick){
+  const totalPages=Math.max(1,Math.ceil(total/LIST_PAGE_SIZE));
+  if(totalPages<=1)return'';
+  return`<div class="pager" style="display:flex;align-items:center;justify-content:center;gap:12px;padding:12px;flex-wrap:wrap">
+    <button class="btn btn-g btn-sm"${page<=1?' disabled':''} onclick="${mkOnclick(page-1)}">‹ Trước</button>
+    <span style="font-size:12px;color:var(--text2)">Trang ${page}/${totalPages} (${total} dòng)</span>
+    <button class="btn btn-g btn-sm"${page>=totalPages?' disabled':''} onclick="${mkOnclick(page+1)}">Sau ›</button>
+  </div>`;
+}
 // ── Ô gõ-tìm tự chế (Sản phẩm/Loại hàng/NCC...) ── thay cho <datalist>: giới hạn ~10 dòng gợi ý rồi cuộn,
 // thay vì để trình duyệt tự quyết hiện bao nhiêu dòng (datalist có thể xổ ra cả danh sách dài không kiểm soát được)
 function attachSearchList(input,getItems){
@@ -405,6 +431,7 @@ function removeRowEl(tr){
 async function loadTK(){
   document.getElementById('tk-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selTK.clear();updateTKSelUI();
+  tkPageByLoai={};// tải mới hẳn thì reset về trang 1 cho mọi khối Loại hàng
   const data=await apiGet('TonKho');C.TK=data;
   const low=data.filter(r=>Number(r[1]||0)<=getSapHet(r));
   const al=document.getElementById('la');
@@ -447,6 +474,79 @@ function tkCompare(a,b,col){
 function loaiColorClass(loai,idx){
   return loai==='(Chưa phân loại)'?'acc-cx':'acc-c'+(idx%8);
 }
+// ── Liên kết Nhập/Xếp hàng ↔ Tồn kho theo MÃ SP (khóa ổn định) thay vì theo TÊN ──
+// Trước đây mọi nơi tra "phiếu này của sản phẩm nào" đều so tên (r[0]) với C.TK — nếu sau này đổi tên sản
+// phẩm, các phiếu cũ sẽ tra sai/không ra. Giờ mỗi dòng NhapHang/XepHang có thêm cột Mã SP lưu kèm; tra theo
+// mã trước, chỉ so tên như phương án dự phòng cho các bản ghi cũ chưa kịp gán mã (xem runMaSPMigration()).
+function genNextMaSP(){
+  let maxNum=0;
+  C.TK.forEach(r=>{
+    const m=/^SP(\d+)$/.exec(r[9]||'');
+    if(m)maxNum=Math.max(maxNum,parseInt(m[1],10));
+  });
+  return'SP'+String(maxNum+1).padStart(4,'0');
+}
+// r = 1 dòng NhapHang [ten,sl,gia,ncc,ngay,gc,user,hsd,loai,maSP] — maSP ở index 9
+function nhTKIndex(r){
+  if(!r)return-1;
+  const ma=r[9];
+  if(ma){const i=C.TK.findIndex(t=>t[9]===ma);if(i>=0)return i;}
+  return C.TK.findIndex(t=>t[0]===r[0]);// dự phòng: bản ghi cũ chưa có Mã SP
+}
+// r = 1 dòng XepHang [ten,sl,gh,ngay,gc,maSP] — maSP ở index 5
+function xhTKIndex(r){
+  if(!r)return-1;
+  const ma=r[5];
+  if(ma){const i=C.TK.findIndex(t=>t[9]===ma);if(i>=0)return i;}
+  return C.TK.findIndex(t=>t[0]===r[0]);// dự phòng: bản ghi cũ chưa có Mã SP
+}
+// Chạy 1 LẦN (theo yêu cầu người dùng) để: (1) tự sinh Mã SP cho mọi sản phẩm Tồn kho đang thiếu mã,
+// (2) quét toàn bộ lịch sử Nhập hàng/Xếp hàng, gán Mã SP vào các phiếu cũ chưa có (khớp theo TÊN đang lưu ở
+// phiếu đó với Tồn kho hiện tại — vì vậy nên chạy TRƯỚC khi đổi tên bất kỳ SP nào, kẻo khớp sai/không ra).
+// Sau khi chạy xong, mọi tra cứu liên kết phiếu↔sản phẩm sẽ ổn định qua đổi tên về sau.
+async function runMaSPMigration(){
+  toast('Đang quét & gán Mã SP...');
+  const tk=await apiGet('TonKho');C.TK=tk;
+  let tkCount=0;
+  for(let i=0;i<C.TK.length;i++){
+    if(!C.TK[i][9]){
+      const row=[...C.TK[i]];row[9]=genNextMaSP();
+      await apiPost({sheet:'TonKho',action:'update',row:i+2,data:row});
+      C.TK[i]=row;tkCount++;
+    }
+  }
+  const nh=await apiGet('NhapHang');C.NH=nh;
+  let nhCount=0;
+  for(let i=0;i<C.NH.length;i++){
+    const r=C.NH[i];
+    if(!r[9]){
+      const idx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(idx>=0&&C.TK[idx][9]){
+        const row=[...r];row[9]=C.TK[idx][9];
+        await apiPost({sheet:'NhapHang',action:'update',row:i+2,data:row});
+        C.NH[i]=row;nhCount++;
+      }
+    }
+  }
+  const xh=await apiGet('XepHang');C.XH=xh;
+  let xhCount=0;
+  for(let i=0;i<C.XH.length;i++){
+    const r=C.XH[i];
+    if(!r[5]){
+      const idx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(idx>=0&&C.TK[idx][9]){
+        const row=[...r];row[5]=C.TK[idx][9];
+        await apiPost({sheet:'XepHang',action:'update',row:i+2,data:row});
+        C.XH[i]=row;xhCount++;
+      }
+    }
+  }
+  logAction('Cập nhật','Hệ thống',`Quét gán Mã SP: ${tkCount} sản phẩm được sinh mã mới, ${nhCount} phiếu nhập & ${xhCount} phiếu xếp được gán mã.`);
+  toast(`Xong! Đã sinh mã cho ${tkCount} SP, gán mã cho ${nhCount} phiếu nhập & ${xhCount} phiếu xếp.`);
+}
+function askRunMaSPMigration(){
+  confirmDel('Quét & gán Mã SP cho toàn bộ sản phẩm + lịch sử Nhập/Xếp hàng đang thiếu mã?\n\nChỉ cần chạy 1 lần. Nên chạy trước khi đổi tên bất kỳ sản phẩm nào để việc khớp theo tên (cho phiếu cũ) được chính xác.',runMaSPMigration);
+}
 // Vị trí của 1 Loại hàng theo đúng thứ tự đã sắp ở Cài đặt → Loại hàng (kéo lên/xuống bằng nút ↑↓) —
 // dùng để quyết định khối nào hiện trước khi gộp accordion ở Tồn kho & Đồ gian hàng
 function loaiSortOrder(name){
@@ -460,7 +560,12 @@ function sortLoaiNames(names){
     return loaiSortOrder(a)-loaiSortOrder(b);
   });
 }
+// Phân trang RIÊNG cho từng khối Loại hàng (vì mỗi khối là 1 bảng độc lập) — key = tên Loại hàng
+let tkPageByLoai={};
+function gotoTKPage(loai,p){tkPageByLoai[loai]=p;rTK(tkLastData);}
+let tkLastData=[];
 function rTK(data){
+  tkLastData=data;
   const el=document.getElementById('tk-tbl');
   if(!data.length){el.innerHTML='<div class="empty">📦 Chưa có sản phẩm</div>';return;}
   // Gộp theo Loại hàng — mỗi loại là 1 khối xổ (accordion) riêng, xổ được nhiều khối cùng lúc
@@ -480,24 +585,32 @@ function rTK(data){
   </div>`+
     loaiNames.map((loai,idx)=>{
       const items=groups.get(loai);
-      const rows=items.map((r,i)=>{
+      const totalPages=Math.max(1,Math.ceil(items.length/LIST_PAGE_SIZE));
+      let page=tkPageByLoai[loai]||1;
+      if(page>totalPages)page=totalPages;if(page<1)page=1;
+      tkPageByLoai[loai]=page;
+      const pageItems=items.slice((page-1)*LIST_PAGE_SIZE,page*LIST_PAGE_SIZE);
+      const rows=pageItems.map((r,i)=>{
         const gi=C.TK.indexOf(r);// vị trí thật trong C.TK, tránh lệch dòng khi đang lọc/sắp xếp
         const sl=Number(r[1]||0),gn=Number(r[3]||0);
         const chk=selTK.has(r[0])?'checked':'';
-        return`<tr><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
-        <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2},'${r[0]}')">Xóa</button></td></tr>`;
+        return`<tr><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${(page-1)*LIST_PAGE_SIZE+i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
+        <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2})">Xóa</button></td></tr>`;
       }).join('');
       const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
       const moveBtns=loai==='(Chưa phân loại)'?'':`<span style="display:flex;gap:2px" onclick="event.preventDefault();event.stopPropagation()">
         <button class="btn btn-g btn-sm" ${idx<=0?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',-1,fTK)" title="Đưa loại này lên">↑</button>
         <button class="btn btn-g btn-sm" ${idx>=loaiNames.length-1?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',1,fTK)" title="Đưa loại này xuống">↓</button>
       </span>`;
-      return`<details class="acc-group ${loaiColorClass(loai,idx)}" open>
+      const pager=pagerHTML(page,items.length,p=>`gotoTKPage('${esc(loai)}',${p})`);
+      return`<details class="acc-group ${loaiColorClass(loai,idx)}"${tkAllOpen?' open':''}>
         <summary>${moveBtns}🏷️ ${esc(loai)}<span class="acc-cnt">${items.length} SP · Tổng tồn: ${fmt(tongSL)}</span></summary>
         <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th style="width:34px"></th><th style="width:40px">STT</th>${ths}<th style="width:130px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${pager}
       </details>`;
     }).join('');
   updateTKSelUI();
+  updateTKToggleBtn();
 }
 // Ngưỡng "Sắp hết"/"Gần hết" của 1 sản phẩm: ưu tiên số riêng SP đã đặt, không có thì dùng mặc định ở Cài đặt
 function getSapHet(r){return Number(r[7])>0?Number(r[7]):SETTINGS.sapHet;}
@@ -611,7 +724,11 @@ async function editSP(row){
   attachSearchList(document.getElementById('sp-loai'),()=>C.LOAI.map(r=>r[0]));
   om('m-sp');
 }
-async function delSP(row,name){
+async function delSP(row){
+  // Lấy tên trực tiếp từ C.TK theo vị trí dòng thay vì nhận qua tham số chuỗi trong onclick —
+  // tránh lỗi/kẹt nút khi tên sản phẩm chứa dấu nháy đơn (') làm hỏng chuỗi JS nhúng trong HTML
+  const r=C.TK[row-2];
+  const name=r?r[0]:'';
   confirmDel(`Xóa sản phẩm "${name}"?`,async()=>{
     toast('Đang xóa...');
     await apiPost({sheet:'TonKho',action:'delete',row:Number(row)});
@@ -625,8 +742,12 @@ async function saveSP(){
   if(ng&&gh&&Number(gh)>Number(ng)){toast('Ngưỡng "Gần hết" phải ≤ ngưỡng "Sắp hết"','err');return;}
   const hsdSap=document.getElementById('sp-hsdsap').value, hsdGan=document.getElementById('sp-hsdgan').value;
   if(hsdSap&&hsdGan&&Number(hsdGan)>Number(hsdSap)){toast('Ngưỡng HSD "Gấp" phải ≤ ngưỡng "Sắp hết hạn"','err');return;}
-  const row=[ten,document.getElementById('sp-sl').value||0,document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,document.getElementById('sp-ma').value.trim(),gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
   const er=document.getElementById('sp-row').value;
+  let ma=document.getElementById('sp-ma').value.trim();
+  if(!ma&&!er)ma=genNextMaSP();// SP mới mà chưa gõ mã → tự sinh, để luôn có khóa liên kết ổn định (không phụ thuộc tên nữa)
+  if(!ma){toast('Thiếu Mã SP — không được để trống (sẽ làm hỏng liên kết với phiếu Nhập/Xếp hàng)','err');return;}
+  if(C.TK.some((t,i)=>t[9]===ma&&String(i+2)!==er)){toast(`Mã SP "${ma}" đã được dùng cho sản phẩm khác`,'err');return;}
+  const row=[ten,document.getElementById('sp-sl').value||0,document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
   toast('Đang lưu...');
   await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
   logAction(er?'Cập nhật':'Tạo mới','Tồn kho',`Sản phẩm "${ten}", SL: ${row[1]}`);
@@ -728,7 +849,7 @@ async function saveNH(){
   for(const it of items){
     const nccGhi=ncc||it.sp[8]||'';
     const loaiGhi=it.loai||it.sp[13]||'';
-    await apiPost({sheet:'NhapHang',action:'append',row:[it.sp[0],it.sl,it.gia,nccGhi,ngay,gc,user,it.hsd,loaiGhi]});
+    await apiPost({sheet:'NhapHang',action:'append',row:[it.sp[0],it.sl,it.gia,nccGhi,ngay,gc,user,it.hsd,loaiGhi,it.sp[9]||'']});
     const newSL=Number(it.sp[1]||0)+it.sl;const upd=[...it.sp];upd[1]=newSL;
     if(it.gia>0)upd[3]=it.gia;// cập nhật giá nhập mới nhất vào Tồn kho
     if(it.hsd)upd[5]=it.hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
@@ -749,12 +870,13 @@ async function saveNHEditCore(row,spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai){
   if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
   if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
   if(!user)return{ok:false,msg:'Chọn người nhập'};
-  await apiPost({sheet:'NhapHang',action:'update',row,data:[sp[0],sl,gia,ncc,ngay,gc,user,hsd,loai]});
+  await apiPost({sheet:'NhapHang',action:'update',row,data:[sp[0],sl,gia,ncc,ngay,gc,user,hsd,loai,sp[9]||'']});
   // đồng bộ ngay vào cache C.NH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi loadNH()
   // kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và tồn kho bị cộng dồn sai
-  C.NH[row-2]=[sp[0],sl,gia,ncc,ngay,gc,user,hsd,loai];
-  // điều chỉnh lại tồn kho theo chênh lệch số lượng (và đổi sản phẩm nếu có)
-  const oldIdx=C.TK.findIndex(t=>t[0]===old[0]);
+  C.NH[row-2]=[sp[0],sl,gia,ncc,ngay,gc,user,hsd,loai,sp[9]||''];
+  // điều chỉnh lại tồn kho theo chênh lệch số lượng (và đổi sản phẩm nếu có) — tra theo Mã SP trước (ổn định
+  // khi đổi tên), chỉ dự phòng theo tên cho các phiếu cũ chưa có Mã SP
+  const oldIdx=nhTKIndex(old);
   const oldSL=Number(old[1]||0);
   if(oldIdx>=0&&oldIdx===spIdx){
     const newStock=Math.max(0,Number(C.TK[spIdx][1]||0)-oldSL+sl);
@@ -835,6 +957,36 @@ function nhCompare(a,b,col){
     default:return(a.ngay||'').localeCompare(b.ngay||'');
   }
 }
+// Top sản phẩm nhập nhiều nhất trong khoảng đang lọc — gộp theo Mã SP (qua nhTKIndex) chứ không theo tên,
+// để đổi tên sản phẩm không làm tách lẻ dữ liệu ra 2 dòng khác nhau trong bảng xếp hạng này.
+let nhTopN=5,nhLastFlat=[];
+function changeNHTopN(v){nhTopN=Number(v);renderNHTop(nhLastFlat);}
+function renderNHTop(flat){
+  nhLastFlat=flat;
+  const el=document.getElementById('nh-top');if(!el)return;
+  if(!flat.length){el.innerHTML='';return;}
+  const map=new Map();
+  flat.forEach(r=>{
+    const idx=nhTKIndex(r);
+    const key=idx>=0?'i'+idx:'n'+r[0];
+    const ten=idx>=0?C.TK[idx][0]:r[0];
+    if(!map.has(key))map.set(key,{ten,sl:0,tien:0,lan:0});
+    const g=map.get(key);
+    g.sl+=Number(r[1]||0);g.tien+=Number(r[1]||0)*Number(r[2]||0);g.lan++;
+  });
+  const top=[...map.values()].sort((a,b)=>b.sl-a.sl).slice(0,nhTopN);
+  el.innerHTML=`<div class="card" style="margin-bottom:16px">
+    <div class="ch"><h2>🏆 Top sản phẩm nhập nhiều nhất</h2>
+      <select id="nh-topn" onchange="changeNHTopN(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="5"${nhTopN===5?' selected':''}>Top 5</option>
+        <option value="10"${nhTopN===10?' selected':''}>Top 10</option>
+      </select>
+    </div>
+    <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Số lần nhập</th><th>Tổng SL</th><th>Tổng tiền</th></tr></thead><tbody>
+    ${top.map((g,i)=>`<tr><td>${i+1}</td><td><b>${esc(g.ten)}</b></td><td>${g.lan}</td><td>${fmt(g.sl)}</td><td>${fmt(g.tien)}đ</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
 function rNH(groups){
   const flat=groups.flatMap(g=>g.items);
   const total=flat.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
@@ -842,6 +994,7 @@ function rNH(groups){
     <div class="kpi b"><div class="lb">Số ngày nhập</div><div class="val">${groups.length}</div></div>
     <div class="kpi r"><div class="lb">Tổng SL</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
     <div class="kpi r"><div class="lb">Tổng tiền nhập</div><div class="val">${fmt(total)}đ</div></div></div>`:'';
+  renderNHTop(flat);
   const el=document.getElementById('nh-tbl');
   if(!groups.length){el.innerHTML='<div class="empty">⬇️ Chưa có phiếu nhập</div>';return;}
   const ths=NH_COLS.map(c=>{
@@ -901,7 +1054,7 @@ async function delSelNH(){
       const r=C.NH[idx];if(!r)continue;
       delNames.push(`${r[0]} x${r[1]}`);
       await apiPost({sheet:'NhapHang',action:'delete',row:idx+2});
-      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      const spIdx=nhTKIndex(r);
       if(spIdx>=0){
         const newSL=Math.max(0,Number(C.TK[spIdx][1]||0)-Number(r[1]||0));
         const upd=[...C.TK[spIdx]];upd[1]=newSL;
@@ -998,7 +1151,7 @@ function renderNHDayDetail(){
       <td><select id="nhd-user-${row}" style="min-width:100px">${userOpts}</select></td>
       <td><input id="nhd-loai-${row}" value="${esc(r[8]||'')}" autocomplete="off" style="width:100px"></td>
       <td><input id="nhd-gc-${row}" value="${r[5]||''}" style="width:110px"></td>
-      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delNH(${row},'${r[0]}',${Number(r[1]||0)})">✕</button></td>
+      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delNH(${row})">✕</button></td>
     </tr>`;
   }).join('');
   let emptyMsg='';
@@ -1047,12 +1200,12 @@ async function saveNHCreateCore(spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai){
   if(!user)return{ok:false,msg:'Chọn người nhập'};
   const nccGhi=ncc||sp[8]||'';
   const loaiGhi=loai||sp[13]||'';
-  await apiPost({sheet:'NhapHang',action:'append',row:[sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi]});
+  await apiPost({sheet:'NhapHang',action:'append',row:[sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi,sp[9]||'']});
   const newSL=Number(sp[1]||0)+sl;const upd=[...sp];upd[1]=newSL;
   if(gia>0)upd[3]=gia;if(hsd)upd[5]=hsd;if(ncc)upd[8]=ncc;if(loai)upd[13]=loai;
   await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
   C.TK[spIdx][1]=newSL;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
-  C.NH.push([sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi]);
+  C.NH.push([sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi,sp[9]||'']);
   return{ok:true};
 }
 // Lưu tất cả các dòng đang sửa trong popup (cả dòng có sẵn lẫn dòng vừa "+ Thêm")
@@ -1067,7 +1220,7 @@ async function delNHDay(){
       const r=C.NH[idx];if(!r)continue;
       delNames.push(`${r[0]} x${r[1]}`);
       await apiPost({sheet:'NhapHang',action:'delete',row:idx+2});
-      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      const spIdx=nhTKIndex(r);
       if(spIdx>=0){
         const newSL=Math.max(0,Number(C.TK[spIdx][1]||0)-Number(r[1]||0));
         const upd=[...C.TK[spIdx]];upd[1]=newSL;
@@ -1176,7 +1329,7 @@ async function saveXH(){
   }
   toast('Đang lưu '+items.length+' sản phẩm...');
   for(const it of items){
-    await apiPost({sheet:'XepHang',action:'append',row:[it.sp[0],it.sl,gh,ngay,gc]});
+    await apiPost({sheet:'XepHang',action:'append',row:[it.sp[0],it.sl,gh,ngay,gc,it.sp[9]||'']});
     const newSL=Number(it.sp[1]||0)-it.sl;const upd=[...it.sp];upd[1]=newSL;
     await apiPost({sheet:'TonKho',action:'update',row:it.idx+2,data:upd});
     C.TK[it.idx][1]=newSL;
@@ -1285,7 +1438,7 @@ async function delSelXH(){
       const r=C.XH[idx];if(!r)continue;
       delNames.push(`${r[0]} x${r[1]}`);
       await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
-      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      const spIdx=xhTKIndex(r);
       if(spIdx>=0){
         const newSL=Number(C.TK[spIdx][1]||0)+Number(r[1]||0);
         const upd=[...C.TK[spIdx]];upd[1]=newSL;
@@ -1320,7 +1473,7 @@ async function saveXHEditCore(row,spIdx,sl,gh,ngay,gc){
   if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
   if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
   if(!gh)return{ok:false,msg:'Chọn gian hàng'};
-  const oldIdx=C.TK.findIndex(t=>t[0]===old[0]);
+  const oldIdx=xhTKIndex(old);
   const oldSL=Number(old[1]||0);
   // Kiểm tra tồn khả dụng (cộng hoàn lại phần phiếu cũ đã trừ trước khi so sánh)
   if(oldIdx>=0&&oldIdx===spIdx){
@@ -1329,10 +1482,10 @@ async function saveXHEditCore(row,spIdx,sl,gh,ngay,gc){
   } else if(sl>Number(sp[1]||0)){
     return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${sp[1]}!`};
   }
-  await apiPost({sheet:'XepHang',action:'update',row,data:[sp[0],sl,gh,ngay,gc]});
+  await apiPost({sheet:'XepHang',action:'update',row,data:[sp[0],sl,gh,ngay,gc,sp[9]||'']});
   // đồng bộ ngay vào cache C.XH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi loadXH()
   // kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và tồn kho bị tính sai
-  C.XH[row-2]=[sp[0],sl,gh,ngay,gc];
+  C.XH[row-2]=[sp[0],sl,gh,ngay,gc,sp[9]||''];
   if(oldIdx>=0&&oldIdx===spIdx){
     const newStock=Math.max(0,Number(C.TK[spIdx][1]||0)+oldSL-sl);
     const upd=[...C.TK[spIdx]];upd[1]=newStock;
@@ -1391,7 +1544,7 @@ function renderXHDayDetail(){
       <td><input id="xhd-gh-${row}" value="${esc(r[2]||'')}" autocomplete="off" style="min-width:100px"></td>
       <td><input type="date" id="xhd-ngay-${row}" value="${r[3]||''}" style="width:135px"></td>
       <td><input id="xhd-gc-${row}" value="${r[4]||''}" style="width:130px"></td>
-      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delXH(${row},'${r[0]}',${Number(r[1]||0)})">✕</button></td>
+      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delXH(${row})">✕</button></td>
     </tr>`;
   }).join('');
   let emptyMsg='';
@@ -1430,11 +1583,11 @@ async function saveXHCreateCore(spIdx,sl,gh,ngay,gc){
   if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
   if(!gh)return{ok:false,msg:'Chọn gian hàng'};
   if(sl>Number(sp[1]||0))return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${sp[1]}!`};
-  await apiPost({sheet:'XepHang',action:'append',row:[sp[0],sl,gh,ngay,gc]});
+  await apiPost({sheet:'XepHang',action:'append',row:[sp[0],sl,gh,ngay,gc,sp[9]||'']});
   const newSL=Number(sp[1]||0)-sl;const upd=[...sp];upd[1]=newSL;
   await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
   C.TK[spIdx][1]=newSL;
-  C.XH.push([sp[0],sl,gh,ngay,gc]);
+  C.XH.push([sp[0],sl,gh,ngay,gc,sp[9]||'']);
   return{ok:true};
 }
 // Lưu tất cả các dòng đang sửa trong popup (cả dòng có sẵn lẫn dòng vừa "+ Thêm")
@@ -1449,7 +1602,7 @@ async function delXHDay(){
       const r=C.XH[idx];if(!r)continue;
       delNames.push(`${r[0]} x${r[1]}`);
       await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
-      const spIdx=C.TK.findIndex(t=>t[0]===r[0]);
+      const spIdx=xhTKIndex(r);
       if(spIdx>=0){
         const newSL=Number(C.TK[spIdx][1]||0)+Number(r[1]||0);
         const upd=[...C.TK[spIdx]];upd[1]=newSL;
@@ -1500,11 +1653,13 @@ async function saveXHDayAll(){
 }
 
 // ── XÓA XẾP HÀNG → hoàn lại tồn kho ──
-async function delXH(row,tenSP,sl){
+async function delXH(row){
+  const r=C.XH[row-2];if(!r)return;
+  const tenSP=r[0],sl=Number(r[1]||0);
   confirmDel(`Xóa phiếu xếp "${tenSP}" (${sl})? Tồn kho sẽ được hoàn lại ${sl}.`,async()=>{
     toast('Đang xóa...');
     await apiPost({sheet:'XepHang',action:'delete',row:Number(row)});
-    const spIdx=C.TK.findIndex(r=>r[0]===tenSP);
+    const spIdx=xhTKIndex(r);
     if(spIdx>=0){
       const newSL=Number(C.TK[spIdx][1]||0)+sl;
       const upd=[...C.TK[spIdx]];upd[1]=newSL;
@@ -1626,6 +1781,7 @@ let selNCC=new Set();
 async function loadNCC(){
   document.getElementById('ncc-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selNCC.clear();updateSelUI('ncc-delsel-btn','ncc-selcnt',0);
+  nccPage=1;
   const data=await apiGet('NhaCungCap');C.NCC=data;rNCC(data);
 }
 const NCC_COLS=[
@@ -1637,20 +1793,26 @@ function nccCompare(a,b,col){
   const idx={ten:0,sdt:1,mh:2,dc:3,gc:4}[col];
   return(a[idx]||'').localeCompare(b[idx]||'');
 }
+let nccPage=1,nccLastData=[];
+function gotoNCCPage(p){nccPage=p;rNCC(nccLastData);}
 function rNCC(data){
+  nccLastData=data;
   const el=document.getElementById('ncc-tbl');
   if(!data.length){el.innerHTML='<div class="empty">🚚 Chưa có NCC</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(nccPage>totalPages)nccPage=totalPages;if(nccPage<1)nccPage=1;
+  const pageData=data.slice((nccPage-1)*LIST_PAGE_SIZE,nccPage*LIST_PAGE_SIZE);
   const ths=NCC_COLS.map(c=>{
     const on=nccSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortNCCClick('${c.key}')">${c.label} <span class="sort-ic">${on?(nccSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
   el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="ncc-selall" onchange="toggleAllNCC(this)"></th>${ths}<th></th></tr></thead><tbody>`+
-    data.map(r=>{
+    pageData.map(r=>{
       const gi=C.NCC.indexOf(r);// vị trí thật, tránh lệch dòng khi đang lọc/sắp xếp
       const chk=selNCC.has(gi)?'checked':'';
       return`<tr><td data-label=""><input type="checkbox" class="ncc-chk" data-idx="${gi}" ${chk} onchange="toggleNCCChk(this)"></td><td data-label="Tên NCC"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Mặt hàng">${r[2]||''}</td><td data-label="Địa chỉ">${r[3]||''}</td><td class="mobile-hide" data-label="Ghi chú">${r[4]||''}</td>
       <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNCC(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('NhaCungCap',${gi+2},'NCC')">Xóa</button></td></tr>`;
-    }).join('')+'</tbody></table>';
+    }).join('')+'</tbody></table>'+pagerHTML(nccPage,data.length,p=>`gotoNCCPage(${p})`);
   updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
   updateSelAllTri('ncc-selall','ncc-chk',selNCC);
 }
@@ -1682,6 +1844,7 @@ function fNCC(){
   const q=document.getElementById('q-ncc').value.toLowerCase();
   const d=C.NCC.filter(r=>(r[0]||'').toLowerCase().includes(q));
   if(nccSortCol)d.sort((a,b)=>nccCompare(a,b,nccSortCol)*nccSortDir);
+  nccPage=1;
   rNCC(d);
 }
 function initNCC(){document.getElementById('m-ncc-t').textContent='Thêm NCC';['ncc-ten','ncc-sdt','ncc-mh','ncc-dc','ncc-gc'].forEach(id=>document.getElementById(id).value='');document.getElementById('ncc-row').value='';om('m-ncc');}
@@ -1699,20 +1862,27 @@ let selGH=new Set();
 async function loadGH(){
   document.getElementById('gh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selGH.clear();updateSelUI('gh-delsel-btn','gh-selcnt',0);
+  ghPage=1;
   const data=await apiGet('GianHang');C.GH=data;fGH();
 }
 let ghSortDir=1;
 function sortGHClick(){ghSortDir*=-1;fGH();}
+let ghPage=1,ghLastData=[];
+function gotoGHPage(p){ghPage=p;rGH(ghLastData);}
 function rGH(data){
+  ghLastData=data;
   const el=document.getElementById('gh-tbl');
   if(!data.length){el.innerHTML='<div class="empty">🏬 Chưa có gian hàng</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(ghPage>totalPages)ghPage=totalPages;if(ghPage<1)ghPage=1;
+  const pageData=data.slice((ghPage-1)*LIST_PAGE_SIZE,ghPage*LIST_PAGE_SIZE);
   el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="gh-selall" onchange="toggleAllGH(this)"></th><th class="th-sort th-sort-on" onclick="sortGHClick()">Tên gian hàng <span class="sort-ic">${ghSortDir===1?'▲':'▼'}</span></th><th></th></tr></thead><tbody>`+
-    data.map(r=>{
+    pageData.map(r=>{
       const gi=C.GH.indexOf(r);
       const chk=selGH.has(gi)?'checked':'';
       return`<tr><td data-label=""><input type="checkbox" class="gh-chk" data-idx="${gi}" ${chk} onchange="toggleGHChk(this)"></td><td data-label="Tên gian hàng"><b>${r[0]}</b></td>
       <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('GianHang',${gi+2},'gian hàng')">Xóa</button></td></tr>`;
-    }).join('')+'</tbody></table>';
+    }).join('')+'</tbody></table>'+pagerHTML(ghPage,data.length,p=>`gotoGHPage(${p})`);
   updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
   updateSelAllTri('gh-selall','gh-chk',selGH);
 }
@@ -1744,6 +1914,7 @@ function fGH(){
   const q=document.getElementById('q-gh').value.toLowerCase();
   const d=C.GH.filter(r=>(r[0]||'').toLowerCase().includes(q));
   d.sort((a,b)=>(a[0]||'').localeCompare(b[0]||'')*ghSortDir);
+  ghPage=1;
   rGH(d);
 }
 function initGH(){document.getElementById('m-gh-t').textContent='Thêm gian hàng';document.getElementById('gh-ten').value='';document.getElementById('gh-row').value='';om('m-gh');}
@@ -1761,16 +1932,23 @@ let selLoai=new Set();
 async function loadLoai(){
   document.getElementById('loai-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selLoai.clear();updateSelUI('loai-delsel-btn','loai-selcnt',0);
+  loaiPage=1;
   const data=await apiGet('LoaiHang');C.LOAI=data;fLoai();
 }
 // Thứ tự Loại hàng hiển thị đúng theo thứ tự đã lưu trong C.LOAI (kéo/đưa lên xuống bằng nút ↑↓ bên dưới) —
 // thứ tự này được TK/Đồ gian hàng dùng để quyết định khối nào hiện trước khi gộp accordion
+let loaiPage=1,loaiLastData=[];
+function gotoLoaiPage(p){loaiPage=p;rLoai(loaiLastData);}
 function rLoai(data){
+  loaiLastData=data;
   const el=document.getElementById('loai-tbl');
   if(!data.length){el.innerHTML='<div class="empty">🏷️ Chưa có loại hàng</div>';return;}
   const filtering=!!document.getElementById('q-loai').value.trim();
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(loaiPage>totalPages)loaiPage=totalPages;if(loaiPage<1)loaiPage=1;
+  const pageData=data.slice((loaiPage-1)*LIST_PAGE_SIZE,loaiPage*LIST_PAGE_SIZE);
   el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="loai-selall" onchange="toggleAllLoai(this)"></th><th style="width:80px">Thứ tự</th><th>Tên loại hàng</th><th></th></tr></thead><tbody>`+
-    data.map(r=>{
+    pageData.map(r=>{
       const gi=C.LOAI.indexOf(r);
       const chk=selLoai.has(gi)?'checked':'';
       const upDis=filtering||gi<=0?'disabled':'';
@@ -1779,7 +1957,7 @@ function rLoai(data){
       <td data-label="Thứ tự"><button class="btn btn-g btn-sm" ${upDis} onclick="moveLoaiSettings(${gi},-1)" title="Đưa lên">↑</button> <button class="btn btn-g btn-sm" ${downDis} onclick="moveLoaiSettings(${gi},1)" title="Đưa xuống">↓</button></td>
       <td data-label="Tên loại hàng"><b>${r[0]}</b></td>
       <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editLoai(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('LoaiHang',${gi+2},'loại hàng')">Xóa</button></td></tr>`;
-    }).join('')+'</tbody></table>'+(filtering?'<p style="font-size:11px;color:var(--text2);padding:10px 18px 0">Xóa ô tìm kiếm để sắp xếp lại thứ tự</p>':'');
+    }).join('')+'</tbody></table>'+pagerHTML(loaiPage,data.length,p=>`gotoLoaiPage(${p})`)+(filtering?'<p style="font-size:11px;color:var(--text2);padding:10px 18px 0">Xóa ô tìm kiếm để sắp xếp lại thứ tự</p>':'');
   updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
   updateSelAllTri('loai-selall','loai-chk',selLoai);
 }
@@ -1826,8 +2004,10 @@ async function delSelLoai(){
     toast('Đã xóa '+idxs.length+' loại hàng!');setTimeout(loadLoai,800);
   });
 }
+let loaiLastQ='';
 function fLoai(){
   const q=document.getElementById('q-loai').value.toLowerCase();
+  if(q!==loaiLastQ){loaiPage=1;loaiLastQ=q;}// chỉ về trang 1 khi Ô TÌM KIẾM thực sự đổi — không phải mỗi lần bấm ↑↓ đưa lên/xuống (fLoai() cũng được gọi lại sau đó để vẽ lại đúng thứ tự)
   const d=C.LOAI.filter(r=>(r[0]||'').toLowerCase().includes(q));
   rLoai(d);
 }
@@ -1854,6 +2034,7 @@ function userCompare(a,b,col){
 function renderUserSorted(){
   const d=[...C.USER];
   if(userSortCol)d.sort((a,b)=>userCompare(a,b,userSortCol)*userSortDir);
+  userPage=1;
   rUser(d);
 }
 let selUser=new Set();
@@ -1862,15 +2043,21 @@ async function loadUser(){
   selUser.clear();updateSelUI('user-delsel-btn','user-selcnt',0);
   const data=await apiGet('User');C.USER=data;renderUserSorted();
 }
+let userPage=1,userLastData=[];
+function gotoUserPage(p){userPage=p;rUser(userLastData);}
 function rUser(data){
+  userLastData=data;
   const el=document.getElementById('user-tbl');
   if(!data.length){el.innerHTML='<div class="empty">👤 Chưa có người dùng nào</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(userPage>totalPages)userPage=totalPages;if(userPage<1)userPage=1;
+  const pageData=data.slice((userPage-1)*LIST_PAGE_SIZE,userPage*LIST_PAGE_SIZE);
   const ths=USER_COLS.map(c=>{
     const on=userSortCol===c.key;
     return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortUserClick('${c.key}')">${c.label} <span class="sort-ic">${on?(userSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
   }).join('');
   el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="user-selall" onchange="toggleAllUser(this)"></th>${ths}<th></th></tr></thead><tbody>`+
-    data.map(r=>{
+    pageData.map(r=>{
       const gi=C.USER.indexOf(r);
       const chk=selUser.has(gi)?'checked':'';
       const passCell=r[5]
@@ -1878,7 +2065,7 @@ function rUser(data){
         :'<span style="color:var(--text2);font-size:11px">—</span>';
       return`<tr><td data-label=""><input type="checkbox" class="user-chk" data-idx="${gi}" ${chk} onchange="toggleUserChk(this)"></td><td data-label="Họ tên"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Vai trò">${r[2]?`<span class="bg bg-p">${r[2]}</span>`:''}</td><td data-label="Email đăng nhập">${r[4]?`<span class="bg bg-b">${r[4]}</span>`:'<span style="color:var(--text2);font-size:11px">Chưa có</span>'}</td><td data-label="Mật khẩu">${passCell}</td><td class="mobile-hide" data-label="Ghi chú">${r[3]||''}</td>
       <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editUser(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('User',${gi+2},'người dùng')">Xóa</button></td></tr>`;
-    }).join('')+'</tbody></table>';
+    }).join('')+'</tbody></table>'+pagerHTML(userPage,data.length,p=>`gotoUserPage(${p})`);
   updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
   updateSelAllTri('user-selall','user-chk',selUser);
 }
@@ -2001,12 +2188,14 @@ async function saveUser(){
 }
 
 // ══ XÓA NHẬP HÀNG → trừ lại tồn kho ══
-async function delNH(row,tenSP,sl){
+async function delNH(row){
+  const r=C.NH[row-2];if(!r)return;
+  const tenSP=r[0],sl=Number(r[1]||0);
   confirmDel(`Xóa phiếu nhập "${tenSP}" (${sl} ${''})? Tồn kho sẽ bị trừ lại ${sl}.`,async()=>{
     toast('Đang xóa...');
     await apiPost({sheet:'NhapHang',action:'delete',row:Number(row)});
-    // Trừ lại tồn kho
-    const spIdx=C.TK.findIndex(r=>r[0]===tenSP);
+    // Trừ lại tồn kho — tra theo Mã SP trước, dự phòng theo tên cho phiếu cũ
+    const spIdx=nhTKIndex(r);
     if(spIdx>=0){
       const newSL=Math.max(0,Number(C.TK[spIdx][1]||0)-sl);
       const upd=[...C.TK[spIdx]];upd[1]=newSL;
@@ -2078,6 +2267,211 @@ async function saveCaiDat(){
   await apiPost(data.length?{sheet:'CaiDat',action:'update',row:2,data:row}:{sheet:'CaiDat',action:'append',row});
   SETTINGS.ganHet=gan;SETTINGS.sapHet=sap;SETTINGS.hsdGan=hsdGan;SETTINGS.hsdSap=hsdSap;
   toast('Đã lưu cài đặt!');
+}
+
+// ══ KIỂM KÊ ══ đối chiếu sổ sách với số đếm thực tế, phát hiện hao hụt/thất thoát — áp dụng được cho
+// CẢ Kho tổng (Tồn kho) LẪN từng Gian hàng riêng (chọn ở ô "Đối tượng kiểm kê").
+// Lưu lịch sử đối chiếu (KiemKe) VÀ điều chỉnh thẳng số liệu theo số thực tế đếm được lúc lưu:
+//  - Kho tổng: ghi đè thẳng SL trong Tồn kho (giống trước).
+//  - Gian hàng: ghi vào GianHangKho phần CHÊNH LỆCH (offset) so với số tính từ lịch sử Xếp hàng — dùng
+//    đúng cơ chế offset sẵn có của Đồ gian hàng (xem ghkBase/ghkOffset/saveGHK ở trên) để không phá vỡ
+//    cách tính "cộng dồn từ Xếp hàng" khi có phiếu xếp mới sau này.
+// Lưu ý: khác Nhập/Xếp hàng (chỉnh theo CHÊNH LỆCH số lượng), Kiểm kê ghi đè theo số đếm thực tế tại thời
+// điểm đó — nên xóa lại 1 phiếu kiểm kê CŨ sẽ không tự hoàn tác lại (dễ sai nếu đã có giao dịch sau đó).
+let kkEntries={};// {key: {tt,gc,label,maSP,soSach}} — key ổn định theo SP/đối tượng, giữ state khi lọc/tìm trong modal
+let kkCurrentList=[];// danh sách [{key,label,maSP,soSach}] đang render — tra theo VỊ TRÍ (pos) trong onclick,
+// không nhúng thẳng tên SP vào chuỗi onclick (tên có thể chứa dấu nháy đơn, xem bug đã sửa ở delSP/delNH/delXH)
+async function openKKNew(){
+  kkEntries={};
+  document.getElementById('kk-ngay').value=td();
+  const userSel=document.getElementById('kk-user');
+  userSel.innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  if(!C.GH.length)await loadGH();
+  if(!C.TK.length)await loadTK();
+  C.XH=await apiGet('XepHang');// tươi, để tính đúng số hiện có ở từng gian hàng (ghkBase/ghkQty)
+  C.GHK=await apiGet('GianHangKho');
+  const targetSel=document.getElementById('kk-target');
+  targetSel.innerHTML='<option value="">📦 Kho tổng (Tồn kho)</option>'+C.GH.map(g=>`<option value="${esc(g[0])}">🏬 ${esc(g[0])}</option>`).join('');
+  document.getElementById('kk-q').value='';
+  kkTargetChanged();
+  om('m-kk');
+}
+// Đổi Đối tượng kiểm kê (Kho tổng ↔ 1 Gian hàng) → danh sách SP khác hẳn nhau, không giữ dở dữ liệu đang gõ
+function kkTargetChanged(){
+  kkEntries={};
+  renderKKRows();
+}
+function kkDiffText(d){
+  if(d===0)return'<span style="color:var(--text2)">0</span>';
+  return`<span style="color:${d>0?'#0ca30c':'#d03b3b'}">${d>0?'+':''}${d}</span>`;
+}
+// Xây danh sách SP cần kiểm kê theo đối tượng đang chọn: '' = Kho tổng (mọi SP Tồn kho),
+// còn lại = 1 Gian hàng (mọi SP từng có phiếu Xếp hàng vào đó, hợp với SP có sửa tay riêng — giống namesOf() ở rGHKView)
+function kkBuildList(target){
+  if(!target)return C.TK.map((r,idx)=>({key:'tk'+idx,label:r[0],maSP:r[9]||'',soSach:Number(r[1]||0)}));
+  const names=new Set(C.XH.filter(r=>r[2]===target).map(r=>r[0]));
+  C.GHK.filter(r=>r[1]===target).forEach(r=>names.add(r[0]));
+  return[...names].sort((a,b)=>a.localeCompare(b)).map(name=>{
+    const tk=C.TK.find(t=>t[0]===name);
+    return{key:'gh:'+target+':'+name,label:name,maSP:tk?tk[9]||'':'',soSach:ghkQty(name,target)};
+  });
+}
+function kkCalcRow(pos){
+  const it=kkCurrentList[pos];if(!it)return;
+  const v=document.getElementById('kk-tt-'+pos).value;
+  kkEntries[it.key]=kkEntries[it.key]||{};
+  Object.assign(kkEntries[it.key],{tt:v,label:it.label,maSP:it.maSP,soSach:it.soSach});
+  document.getElementById('kk-cl-'+pos).innerHTML=v!==''?kkDiffText(Number(v)-it.soSach):'';
+}
+function kkSetNote(pos,val){
+  const it=kkCurrentList[pos];if(!it)return;
+  kkEntries[it.key]=kkEntries[it.key]||{};
+  Object.assign(kkEntries[it.key],{gc:val,label:it.label,maSP:it.maSP,soSach:it.soSach});
+}
+function renderKKRows(){
+  const target=document.getElementById('kk-target').value;
+  const q=(document.getElementById('kk-q').value||'').trim().toLowerCase();
+  const full=kkBuildList(target);
+  const list=full.filter(it=>!q||it.label.toLowerCase().includes(q)||it.maSP.toLowerCase().includes(q));
+  kkCurrentList=list;
+  const el=document.getElementById('kk-rows');
+  if(!list.length){el.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">Không có sản phẩm nào${target?' ở gian hàng này':' khớp'}</td></tr>`;return;}
+  el.innerHTML=list.map((it,pos)=>{
+    const ent=kkEntries[it.key]||{};
+    const ttVal=ent.tt!==undefined?ent.tt:'';
+    return`<tr>
+      <td><b>${esc(it.label)}</b>${it.maSP?` <span class="bg bg-b" style="font-size:10px">${esc(it.maSP)}</span>`:''}</td>
+      <td style="text-align:center"><b>${it.soSach}</b></td>
+      <td><input type="number" id="kk-tt-${pos}" value="${esc(ttVal)}" oninput="kkCalcRow(${pos})" style="width:90px"></td>
+      <td id="kk-cl-${pos}" style="text-align:center;font-weight:600">${ttVal!==''?kkDiffText(Number(ttVal)-it.soSach):''}</td>
+      <td><input id="kk-gc-${pos}" value="${esc(ent.gc||'')}" oninput="kkSetNote(${pos},this.value)" placeholder="Lý do lệch (nếu có)" style="width:140px"></td>
+    </tr>`;
+  }).join('');
+}
+async function saveKKNew(){
+  const ngay=document.getElementById('kk-ngay').value;
+  const nguoi=document.getElementById('kk-user').value;
+  const target=document.getElementById('kk-target').value;// '' = Kho tổng, khác thì là tên Gian hàng
+  if(!ngay){toast('Chọn ngày kiểm kê','err');return;}
+  if(!nguoi){toast('Chọn người kiểm kê','err');return;}
+  const entries=Object.entries(kkEntries).filter(([,e])=>e.tt!==undefined&&e.tt!=='');
+  if(!entries.length){toast('Chưa nhập Tồn thực tế cho sản phẩm nào','err');return;}
+  toast('Đang lưu kiểm kê...');
+  let soLech=0;
+  for(const[,e] of entries){
+    const soSach=Number(e.soSach||0);
+    const thucTe=Number(e.tt||0);
+    const chenh=thucTe-soSach;
+    const row=[ngay,e.maSP||'',e.label,soSach,thucTe,chenh,e.gc||'',nguoi,target];
+    await apiPost({sheet:'KiemKe',action:'append',row});
+    C.KK.push(row);
+    if(chenh===0)continue;
+    soLech++;
+    if(!target){
+      // Kho tổng: ghi đè thẳng SL trong Tồn kho — tra theo Mã SP trước (ổn định), dự phòng theo tên
+      const idx=e.maSP?C.TK.findIndex(t=>t[9]===e.maSP):-1;
+      const spIdx=idx>=0?idx:C.TK.findIndex(t=>t[0]===e.label);
+      if(spIdx>=0){
+        const upd=[...C.TK[spIdx]];upd[1]=thucTe;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=thucTe;
+      }
+    } else {
+      // Gian hàng: lưu phần CHÊNH LỆCH (offset) so với số tính từ lịch sử Xếp hàng — giống hệt saveGHK()
+      const offset=thucTe-ghkBase(e.label,target);
+      const gi=C.GHK.findIndex(r=>r[0]===e.label&&r[1]===target);
+      const grow=[e.label,target,offset];
+      await apiPost(gi>=0?{sheet:'GianHangKho',action:'update',row:gi+2,data:grow}:{sheet:'GianHangKho',action:'append',row:grow});
+      if(gi>=0)C.GHK[gi]=grow;else C.GHK.push(grow);
+    }
+  }
+  const doiTuongTxt=target?`Gian hàng "${target}"`:'Kho tổng';
+  logAction('Tạo mới','Kiểm kê',`Kiểm kê ${doiTuongTxt} ngày ${ngay} bởi ${nguoi}: ${entries.length} SP đã đếm, ${soLech} SP lệch.`);
+  toast(`Đã lưu kiểm kê: ${entries.length} SP đã đếm, ${soLech} SP lệch!`);
+  cm('m-kk');kkEntries={};
+  setTimeout(()=>{loadKK();if(!target)loadTK();else rGHKView();},800);
+}
+async function loadKK(){
+  document.getElementById('kk-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  if(!C.USER.length)await loadUser();// cần sẵn danh sách người dùng để đổ vào dropdown "Người kiểm kê" ở modal
+  const data=await apiGet('KiemKe');C.KK=data;
+  fKK();
+}
+// Gộp theo NGÀY + ĐỐI TƯỢNG (Kho tổng hay Gian hàng nào) — 1 ngày có thể có nhiều phiếu kiểm kê khác đối tượng
+function groupKKByDate(data){
+  const map=new Map();
+  data.forEach(r=>{
+    const ngay=r[0]||'(chưa có ngày)';
+    const gh=r[8]||'';
+    const key=ngay+'|'+gh;
+    if(!map.has(key))map.set(key,{ngay,gianHang:gh,items:[]});
+    map.get(key).items.push(r);
+  });
+  return[...map.values()].map(g=>({
+    ...g,
+    soSP:g.items.length,
+    soLech:g.items.filter(r=>Number(r[5]||0)!==0).length,
+    tongChenh:g.items.reduce((s,r)=>s+Number(r[5]||0),0),
+    nguoiKK:[...new Set(g.items.map(r=>r[7]).filter(Boolean))]
+  }));
+}
+function fKK(){
+  const q=(document.getElementById('q-kk').value||'').toLowerCase();
+  const from=document.getElementById('from-kk').value;
+  const to=document.getElementById('to-kk').value;
+  let d=[...C.KK];
+  if(from)d=d.filter(r=>r[0]>=from);
+  if(to)d=d.filter(r=>r[0]<=to);
+  if(q)d=d.filter(r=>(r[7]||'').toLowerCase().includes(q)||(r[8]||'').toLowerCase().includes(q));
+  const groups=groupKKByDate(d).sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
+  rKK(groups);
+}
+function rKK(groups){
+  const flat=groups.flatMap(g=>g.items);
+  document.getElementById('kk-sum').innerHTML=flat.length?`<div class="grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số đợt kiểm kê</div><div class="val">${groups.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng SP đã đếm</div><div class="val">${flat.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng SP lệch</div><div class="val">${flat.filter(r=>Number(r[5]||0)!==0).length}</div></div></div>`:'';
+  const el=document.getElementById('kk-tbl');
+  if(!groups.length){el.innerHTML='<div class="empty">📋 Chưa có đợt kiểm kê nào</div>';return;}
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Ngày kiểm kê</th><th>Đối tượng</th><th>Người kiểm kê</th><th>Số SP đã đếm</th><th>Số SP lệch</th><th>Tổng chênh lệch</th></tr></thead><tbody>`+
+    groups.map(g=>{
+      const cl=g.tongChenh===0?'':(g.tongChenh>0?'color:#0ca30c':'color:#d03b3b');
+      const doiTuong=g.gianHang?`🏬 ${esc(g.gianHang)}`:'📦 Kho tổng';
+      return`<tr style="cursor:pointer" onclick="openKKDay('${esc(g.ngay)}','${esc(g.gianHang)}')"><td><b>${esc(g.ngay)}</b></td><td>${doiTuong}</td><td>${esc(g.nguoiKK.join(', '))}</td><td>${g.soSP}</td><td>${g.soLech}</td><td style="${cl};font-weight:600">${g.tongChenh>0?'+':''}${g.tongChenh}</td></tr>`;
+    }).join('')+'</tbody></table>';
+}
+let kkDayCurrent=null;// {ngay,gianHang}
+function openKKDay(ngay,gianHang){
+  kkDayCurrent={ngay,gianHang:gianHang||''};
+  document.getElementById('kk-day-t').textContent=`Phiếu kiểm kê ${gianHang?`"${gianHang}"`:'Kho tổng'} ngày ${ngay}`;
+  renderKKDayDetail();
+  om('m-kk-day');
+}
+function renderKKDayDetail(){
+  if(!kkDayCurrent)return;
+  const items=C.KK.filter(r=>(r[0]||'(chưa có ngày)')===kkDayCurrent.ngay&&(r[8]||'')===kkDayCurrent.gianHang);
+  const soLech=items.filter(r=>Number(r[5]||0)!==0).length;
+  document.getElementById('kk-day-sum').innerHTML=`<p style="font-size:12px;color:var(--text2);margin-bottom:12px">${items.length} SP đã đếm · ${soLech} SP lệch</p>`;
+  document.getElementById('kk-day-tbl').innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Sản phẩm</th><th>Mã SP</th><th>Sổ sách</th><th>Thực tế</th><th>Chênh lệch</th><th>Ghi chú</th><th>Người kiểm kê</th></tr></thead><tbody>`+
+    items.map(r=>{
+      const chenh=Number(r[5]||0);
+      const cl=chenh===0?'':(chenh>0?'color:#0ca30c':'color:#d03b3b');
+      return`<tr><td><b>${esc(r[2])}</b></td><td>${r[1]?`<span class="bg bg-b">${esc(r[1])}</span>`:''}</td><td>${r[3]}</td><td>${r[4]}</td><td style="${cl};font-weight:600">${chenh>0?'+':''}${chenh}</td><td>${esc(r[6]||'')}</td><td>${esc(r[7]||'')}</td></tr>`;
+    }).join('')+'</tbody></table></div>';
+}
+async function delKKDay(){
+  if(!kkDayCurrent)return;
+  const idxs=C.KK.map((r,i)=>i).filter(i=>(C.KK[i][0]||'(chưa có ngày)')===kkDayCurrent.ngay&&(C.KK[i][8]||'')===kkDayCurrent.gianHang).sort((a,b)=>b-a);
+  if(!idxs.length){toast('Không có gì để xóa','err');return;}
+  confirmDel(`Xóa toàn bộ lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng)? LƯU Ý: thao tác này KHÔNG hoàn tác lại số liệu (Tồn kho/Đồ gian hàng) — vì có thể đã bị thay đổi bởi Nhập/Xếp hàng khác sau thời điểm kiểm kê, tự hoàn tác dễ gây sai số hơn. Chỉ nên xóa nếu ghi nhầm phiếu.`,async()=>{
+    toast('Đang xóa...');
+    for(const idx of idxs)await apiPost({sheet:'KiemKe',action:'delete',row:idx+2});
+    logAction('Xóa','Kiểm kê',`Xóa lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng)`);
+    toast('Đã xóa!');
+    cm('m-kk-day');
+    setTimeout(loadKK,800);
+  });
 }
 
 // ══ BÁO CÁO THEO THÁNG ══ thống kê trong 1 khoảng thời gian, mỗi "Người nhập" đã nhập tổng bao nhiêu tiền

@@ -177,6 +177,13 @@ tr:hover td{background:#f8fafc}
 
 /* ══════════ RESPONSIVE ĐIỆN THOẠI (iPhone 11 ~414px và các máy tương tự, <=480px) ══════════ */
 @media (max-width:480px){
+  /* iOS Safari (và vài trình duyệt Android) tự động ZOOM CẢ TRANG khi bấm vào ô input/select/textarea có
+     font-size < 16px — không phải lỗi, là hành vi mặc định của trình duyệt để tránh chữ quá nhỏ khi gõ.
+     App đang để font-size 12-14px cho các ô (cho gọn) nên bị zoom liên tục khi thao tác trên điện thoại.
+     Ép về đúng 16px CHỈ ở mobile (desktop giữ nguyên kích thước gọn cũ) để tắt hẳn hành vi zoom này —
+     dùng !important vì có nhiều rule cụ thể hơn (.fg input, .sb input, .item-table td input...) đang tự set font-size riêng. */
+  input,select,textarea{font-size:16px!important}
+
   /* Sidebar cố định 215px không dùng được trên điện thoại
      → ẩn đi, thay bằng nút hamburger (☰) ở topbar; bấm vào mới trượt ra toàn bộ menu */
   #mnu-btn{display:inline-flex;align-items:center;justify-content:center}
