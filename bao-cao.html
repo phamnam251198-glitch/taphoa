@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Báo cáo theo tháng</title>
+<link rel="stylesheet" href="style.css?v=20260828o">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-bc">
+      <div class="card">
+        <div class="ch"><h2>Bộ lọc thời gian</h2></div>
+        <div style="padding:14px 18px">
+          <div class="fr3">
+            <div class="fg"><label>Từ ngày</label><input type="date" id="bc-tu" onchange="loadBC()"></div>
+            <div class="fg"><label>Đến ngày</label><input type="date" id="bc-den" onchange="loadBC()"></div>
+            <div class="fg"><label>Hoặc chọn nhanh theo tháng</label><input type="month" id="bc-thang" onchange="bcSetMonth()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label>Người nhập</label><select id="bc-user" onchange="loadBC()"><option value="">Tất cả người nhập</option></select></div>
+          </div>
+          <div class="mf" style="border-top:none;padding-top:8px">
+            <button class="btn btn-g" onclick="bcShiftMonth(-1)">◀ Tháng trước</button>
+            <button class="btn btn-g" onclick="bcShiftMonth(1)">Tháng sau ▶</button>
+            <button class="btn btn-p" onclick="loadBC()">Xem báo cáo</button>
+          </div>
+        </div>
+      </div>
+      <div id="bc-sum"></div>
+      <div class="card"><div class="ch"><h2>Tổng tiền đã thanh toán theo Người nhập</h2></div><div id="bc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+    </div>
+  </div>
+</div>
+
+
+<div id="toast"></div>
+<script src="app.js?v=20260828o"></script>
+<script>
+// ── JS riêng cho màn Báo cáo theo tháng ──
+function bcMonthRange(ym){
+  const[y,m]=ym.split('-').map(Number);
+  const from=`${ym}-01`;
+  const lastDay=new Date(y,m,0).getDate();// ngày cuối cùng của tháng
+  const to=`${ym}-${String(lastDay).padStart(2,'0')}`;
+  return{from,to};
+}
+function bcSetMonth(){
+  const ym=document.getElementById('bc-thang').value;
+  if(!ym)return;
+  const{from,to}=bcMonthRange(ym);
+  document.getElementById('bc-tu').value=from;
+  document.getElementById('bc-den').value=to;
+  loadBC();
+}
+function bcShiftMonth(delta){
+  let ym=document.getElementById('bc-thang').value;
+  if(!ym){const d=new Date();ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  let[y,m]=ym.split('-').map(Number);
+  m+=delta;
+  if(m<1){m=12;y--;}else if(m>12){m=1;y++;}
+  document.getElementById('bc-thang').value=`${y}-${String(m).padStart(2,'0')}`;
+  bcSetMonth();
+}
+async function openBC(){
+  const d=new Date();
+  const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('bc-thang').value=ym;
+  const{from,to}=bcMonthRange(ym);
+  document.getElementById('bc-tu').value=from;
+  document.getElementById('bc-den').value=to;
+  await ensureUser();
+  document.getElementById('bc-user').innerHTML='<option value="">Tất cả người nhập</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  await loadBC();
+}
+async function loadBC(){
+  document.getElementById('bc-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  const data=await apiGet('NhapHang');C.NH=data;
+  const from=document.getElementById('bc-tu').value;
+  const to=document.getElementById('bc-den').value;
+  const user=document.getElementById('bc-user')?.value||'';
+  const filtered=data.filter(r=>(!from||(r[4]||'')>=from)&&(!to||(r[4]||'')<=to)&&(!user||r[6]===user));
+  const groups=new Map();
+  filtered.forEach(r=>{
+    const user=r[6]||'(Không rõ người nhập)';
+    if(!groups.has(user))groups.set(user,[]);
+    groups.get(user).push(r);
+  });
+  const rows=[...groups.entries()].map(([user,items])=>({
+    user,
+    soSP:new Set(items.map(r=>r[0])).size,
+    tongSL:items.reduce((s,r)=>s+Number(r[1]||0),0),
+    tongTien:items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0)
+  })).sort((a,b)=>b.tongTien-a.tongTien);
+  const grandTotal=rows.reduce((s,r)=>s+r.tongTien,0);
+  document.getElementById('bc-sum').innerHTML=`<div class="grid3 stat-grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số sản phẩm nhập</div><div class="val">${new Set(filtered.map(r=>r[0])).size}</div></div>
+    <div class="kpi p"><div class="lb">Số người nhập</div><div class="val">${rows.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng tiền đã thanh toán</div><div class="val">${fmt(grandTotal)}đ</div></div></div>`;
+  const el=document.getElementById('bc-tbl');
+  if(!rows.length){el.innerHTML='<div class="empty">📊 Không có dữ liệu nhập hàng trong khoảng thời gian này</div>';return;}
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Người nhập</th><th>Số sản phẩm nhập</th><th>Tổng SL</th><th>Tổng tiền đã thanh toán</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td data-label="Người nhập"><span class="bg bg-p">${esc(r.user)}</span></td><td data-label="Số sản phẩm nhập">${r.soSP}</td><td data-label="Tổng SL">${fmt(r.tongSL)}</td><td data-label="Tổng tiền đã thanh toán"><b>${fmt(r.tongTien)}đ</b></td></tr>`).join('')+
+    '</tbody></table>';
+}
+
+
+bootPage('bc',function(){
+  document.getElementById('acts').innerHTML=`<button class="btn btn-g" onclick="loadBC()">↻ Làm mới</button>`;
+  openBC();
+});
+</script>
+</body>
+</html>

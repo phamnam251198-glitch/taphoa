@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Tồn kho</title>
+<link rel="stylesheet" href="style.css?v=20260828o">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-tk">
+      <div class="alert" id="la">⚠️ <span id="la-txt"></span></div>
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+      <div class="sb">
+        <input type="text" id="q-tk" placeholder="Tìm sản phẩm, mã SP..." oninput="fTK()">
+        <select id="st-tk" onchange="fTK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả trạng thái</option>
+          <option value="het">Hết hàng</option>
+          <option value="gan">Gần hết</option>
+          <option value="sap">Sắp hết</option>
+          <option value="con">Còn hàng</option>
+        </select>
+        <select id="loai-tk" onchange="fTK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả loại hàng</option>
+        </select>
+        <button class="btn btn-g" onclick="loadTK()">↻ Làm mới</button>
+        <button class="btn btn-g" id="tk-toggle-all-btn" onclick="toggleTKAll()">▲ Thu gọn tất cả</button>
+        <button class="btn btn-d" id="tk-delsel-btn" onclick="delSelTK()" style="display:none">🗑 Xóa đã chọn (<span id="tk-selcnt">0</span>)</button>
+      </div>
+      </details>
+      <div class="card">
+        <div class="ch"><h2>Danh sách tồn kho</h2><span id="tk-cnt" style="font-size:11px;color:var(--text2)"></span></div>
+        <div id="tk-tbl"><div class="ld"><div class="spin"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SP -->
+<div class="mo" id="m-sp">
+  <div class="mb mb-sm">
+    <h3 id="m-sp-t">Thêm sản phẩm</h3>
+    <input type="hidden" id="sp-row">
+    <div class="fr">
+      <div class="fg"><label>Mã SP *</label><input id="sp-ma" placeholder="Để trống sẽ tự sinh mã"></div>
+      <div class="fg"><label>Tên sản phẩm *</label><input id="sp-ten" placeholder="VD: Bimbim Oishi"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Số lượng tồn</label><input id="sp-sl" type="number" placeholder="0"></div>
+      <div class="fg"><label>Đơn vị</label><input id="sp-dv" placeholder="gói, chai..."></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Giá nhập (đ)</label><input id="sp-gn" type="number" placeholder="0"></div>
+      <div class="fg"><label>Giá bán (đ)</label><input id="sp-gb" type="number" placeholder="0"></div>
+    </div>
+    <div class="fg"><label>Hạn sử dụng</label><input id="sp-hsd" type="date"></div>
+    <div class="fr">
+      <div class="fg"><label>Ngưỡng "Sắp hết" riêng</label><input id="sp-ng" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
+      <div class="fg"><label>Ngưỡng "Gần hết" riêng</label><input id="sp-gh" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Sắp hết hạn trong (ngày) riêng</label><input id="sp-hsdsap" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
+      <div class="fg"><label>Gấp nếu còn ≤ (ngày) riêng</label><input id="sp-hsdgan" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Nhà cung cấp</label><input id="sp-ncc" placeholder="Tên NCC" autocomplete="off"></div>
+      <div class="fg"><label>Loại hàng</label><input id="sp-loai" placeholder="Gõ để tìm loại hàng..." autocomplete="off"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-sp')">Hủy</button>
+      <button class="btn btn-p" onclick="saveSP()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260828o"></script>
+<script>
+// ── JS riêng cho màn Tồn kho ──
+let selTK=new Set();
+// Trạng thái thu gọn/mở của các khối Loại hàng — mặc định mở hết; bấm nút để đảo trạng thái cho TẤT CẢ khối
+let tkAllOpen=true;
+function toggleTKAll(){
+  tkAllOpen=!tkAllOpen;
+  document.querySelectorAll('#tk-tbl .acc-group').forEach(d=>{d.open=tkAllOpen;});
+  updateTKToggleBtn();
+}
+function updateTKToggleBtn(){
+  const btn=document.getElementById('tk-toggle-all-btn');
+  if(btn)btn.textContent=tkAllOpen?'▲ Thu gọn tất cả':'▼ Mở tất cả';
+}
+async function loadTK(){
+  document.getElementById('tk-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selTK.clear();updateTKSelUI();
+  tkPageByLoai={};// tải mới hẳn thì reset về trang 1 cho mọi khối Loại hàng
+  const data=await apiGet('TonKho');C.TK=data;
+  const low=data.filter(r=>Number(r[1]||0)<=getSapHet(r));
+  const al=document.getElementById('la');
+  if(low.length){al.style.display='flex';document.getElementById('la-txt').textContent=low.length+' SP sắp hết: '+low.slice(0,4).map(r=>r[0]).join(', ')+(low.length>4?'...':'');}
+  else al.style.display='none';
+  document.getElementById('tk-cnt').textContent=data.length+' sản phẩm';
+  await ensureLoai();
+  fillLoaiFilterOptions();
+  fTK();
+}
+// Nạp danh sách "Loại hàng" đang có (gom từ Tồn kho) vào ô lọc — giữ nguyên lựa chọn hiện tại nếu còn hợp lệ
+function fillLoaiFilterOptions(){
+  const sel=document.getElementById('loai-tk');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tất cả loại hàng</option>'+C.LOAI.map(r=>`<option${r[0]===cur?' selected':''}>${r[0]}</option>`).join('');
+}
+// Tiêu đề cột bấm được để sắp xếp — mỗi cột 1 khóa so sánh riêng
+const TK_COLS=[
+  {key:'ma',label:'Mã SP',w:'90px'},{key:'ten',label:'Tên SP',w:'220px'},{key:'ton',label:'Tồn',w:'70px'},
+  {key:'gia',label:'Giá nhập',w:'100px'},{key:'hsd',label:'Hạn sử dụng',w:'120px'},{key:'status',label:'Trạng thái',w:'100px'}
+];
+let tkSortCol='status',tkSortDir=1;// dir: 1=tăng dần, -1=giảm dần
+function sortTKClick(col){
+  if(tkSortCol===col)tkSortDir*=-1;else{tkSortCol=col;tkSortDir=1;}
+  fTK();
+}
+function tkCompare(a,b,col){
+  switch(col){
+    case'ma':return(a[9]||'').localeCompare(b[9]||'');
+    case'ten':return(a[0]||'').localeCompare(b[0]||'');
+    case'loai':return(a[13]||'').localeCompare(b[13]||'');
+    case'ton':return Number(a[1]||0)-Number(b[1]||0);
+    case'gia':return Number(a[3]||0)-Number(b[3]||0);
+    case'hsd':return(a[5]||'').localeCompare(b[5]||'');
+    default:return statusRank(a)-statusRank(b)||(a[0]||'').localeCompare(b[0]||'');
+  }
+}
+// Màu cho từng khối "Loại hàng" — xoay vòng theo thứ tự, riêng "(Chưa phân loại)" luôn màu xám trung tính
+let tkPageByLoai={};
+function gotoTKPage(loai,p){tkPageByLoai[loai]=p;rTK(tkLastData);}
+let tkLastData=[];
+function rTK(data){
+  tkLastData=data;
+  const el=document.getElementById('tk-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">📦 Chưa có sản phẩm</div>';return;}
+  // Gộp theo Loại hàng — mỗi loại là 1 khối xổ (accordion) riêng, xổ được nhiều khối cùng lúc
+  const groups=new Map();
+  data.forEach(r=>{
+    const loai=r[13]||'(Chưa phân loại)';
+    if(!groups.has(loai))groups.set(loai,[]);
+    groups.get(loai).push(r);
+  });
+  const loaiNames=sortLoaiNames([...groups.keys()]);
+  const ths=TK_COLS.map(c=>{
+    const on=tkSortCol===c.key;
+    return`<th${c.w?` style="width:${c.w}"`:''} class="th-sort${on?' th-sort-on':''}" onclick="sortTKClick('${c.key}')">${c.label} <span class="sort-ic">${on?(tkSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
+  }).join('');
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--text2)">
+    <input type="checkbox" id="tk-selall" onchange="toggleAllTK(this)"><label for="tk-selall">Chọn tất cả đang hiển thị</label>
+  </div>`+
+    loaiNames.map((loai,idx)=>{
+      const items=groups.get(loai);
+      const totalPages=Math.max(1,Math.ceil(items.length/LIST_PAGE_SIZE));
+      let page=tkPageByLoai[loai]||1;
+      if(page>totalPages)page=totalPages;if(page<1)page=1;
+      tkPageByLoai[loai]=page;
+      const pageItems=items.slice((page-1)*LIST_PAGE_SIZE,page*LIST_PAGE_SIZE);
+      const rows=pageItems.map((r,i)=>{
+        const gi=C.TK.indexOf(r);// vị trí thật trong C.TK, tránh lệch dòng khi đang lọc/sắp xếp
+        const sl=Number(r[1]||0),gn=Number(r[3]||0);
+        const chk=selTK.has(r[0])?'checked':'';
+        return`<tr><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${(page-1)*LIST_PAGE_SIZE+i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
+        <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2})">Xóa</button></td></tr>`;
+      }).join('');
+      const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
+      const moveBtns=loai==='(Chưa phân loại)'?'':`<span style="display:flex;gap:2px" onclick="event.preventDefault();event.stopPropagation()">
+        <button class="btn btn-g btn-sm" ${idx<=0?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',-1,fTK)" title="Đưa loại này lên">↑</button>
+        <button class="btn btn-g btn-sm" ${idx>=loaiNames.length-1?'disabled':''} onclick="event.preventDefault();event.stopPropagation();moveLoaiByName('${esc(loai)}',1,fTK)" title="Đưa loại này xuống">↓</button>
+      </span>`;
+      const pager=pagerHTML(page,items.length,p=>`gotoTKPage('${esc(loai)}',${p})`);
+      return`<details class="acc-group ${loaiColorClass(loai,idx)}"${tkAllOpen?' open':''}>
+        <summary>${moveBtns}🏷️ ${esc(loai)}<span class="acc-cnt">${items.length} SP · Tổng tồn: ${fmt(tongSL)}</span></summary>
+        <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th style="width:34px"></th><th style="width:40px">STT</th>${ths}<th style="width:130px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${pager}
+      </details>`;
+    }).join('');
+  updateTKSelUI();
+  updateTKToggleBtn();
+}
+// Ngưỡng "Sắp hết"/"Gần hết" của 1 sản phẩm: ưu tiên số riêng SP đã đặt, không có thì dùng mặc định ở Cài đặt
+function fTK(){
+  const q=document.getElementById('q-tk').value.toLowerCase();
+  const st=document.getElementById('st-tk').value;
+  const loai=document.getElementById('loai-tk')?.value||'';
+  const filtered=C.TK.filter(r=>((r[0]||'').toLowerCase().includes(q)||(r[9]||'').toLowerCase().includes(q))&&(!st||stTK(r)===st)&&(!loai||r[13]===loai));
+  filtered.sort((a,b)=>tkCompare(a,b,tkSortCol)*tkSortDir);
+  rTK(filtered);
+}
+
+// ── chọn nhiều & xóa hàng loạt ──
+function toggleTKChk(el){
+  const name=el.dataset.name;
+  if(el.checked)selTK.add(name);else selTK.delete(name);
+  updateTKSelUI();
+}
+function toggleAllTK(el){
+  document.querySelectorAll('#tk-tbl .tk-chk').forEach(c=>{
+    c.checked=el.checked;
+    if(el.checked)selTK.add(c.dataset.name);else selTK.delete(c.dataset.name);
+  });
+  updateTKSelUI();
+}
+function updateTKSelUI(){
+  const btn=document.getElementById('tk-delsel-btn');
+  document.getElementById('tk-selcnt').textContent=selTK.size;
+  btn.style.display=selTK.size?'inline-flex':'none';
+  const all=document.getElementById('tk-selall');
+  if(all){
+    const chks=[...document.querySelectorAll('#tk-tbl .tk-chk')];
+    all.checked=chks.length>0&&chks.every(c=>c.checked);
+    all.indeterminate=chks.some(c=>c.checked)&&!all.checked;
+  }
+}
+async function delSelTK(){
+  const names=[...selTK];
+  if(!names.length){toast('Chưa chọn sản phẩm nào','err');return;}
+  confirmDel(`Xóa ${names.length} sản phẩm đã chọn?`,async()=>{
+    toast('Đang xóa '+names.length+' sản phẩm...');
+    // xóa từ index lớn → nhỏ để tránh lệch vị trí các dòng còn lại
+    const idxs=names.map(n=>C.TK.findIndex(r=>r[0]===n)).filter(i=>i>=0).sort((a,b)=>b-a);
+    for(const i of idxs){
+      await apiPost({sheet:'TonKho',action:'delete',row:i+2});
+    }
+    logAction('Xóa','Tồn kho',`Xóa hàng loạt ${idxs.length} sản phẩm: ${names.join(', ')}`);
+    selTK.clear();
+    toast('Đã xóa '+idxs.length+' sản phẩm!');setTimeout(loadTK,800);
+  });
+}
+// Nạp gợi ý NCC (datalist dùng chung) cho các ô "Nhà cung cấp" — vẫn cho gõ tự do, không bắt buộc chọn
+async function initSPForm(){
+  await ensureLoai();
+  document.getElementById('m-sp-t').textContent='Thêm sản phẩm';
+  ['sp-ma','sp-ten','sp-sl','sp-dv','sp-gn','sp-gb','sp-hsd','sp-ng','sp-gh','sp-hsdsap','sp-hsdgan','sp-ncc','sp-loai'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sp-row').value='';
+  await ensureNCC();
+  attachSearchList(document.getElementById('sp-ncc'),()=>C.NCC.map(r=>r[0]));
+  attachSearchList(document.getElementById('sp-loai'),()=>C.LOAI.map(r=>r[0]));
+  om('m-sp');
+}
+async function editSP(row){
+  const r=C.TK[row-2];document.getElementById('m-sp-t').textContent='Sửa sản phẩm';
+  document.getElementById('sp-ten').value=r[0]||'';document.getElementById('sp-sl').value=r[1]||'';
+  document.getElementById('sp-dv').value=r[2]||'';document.getElementById('sp-gn').value=r[3]||'';
+  document.getElementById('sp-gb').value=r[4]||'';document.getElementById('sp-hsd').value=r[5]||'';
+  document.getElementById('sp-ng').value=r[7]||'';document.getElementById('sp-ncc').value=r[8]||'';
+  document.getElementById('sp-ma').value=r[9]||'';
+  document.getElementById('sp-gh').value=r[10]||'';
+  document.getElementById('sp-hsdsap').value=r[11]||'';
+  document.getElementById('sp-hsdgan').value=r[12]||'';
+  document.getElementById('sp-loai').value=r[13]||'';
+  document.getElementById('sp-row').value=row;
+  await ensureLoai();
+  await ensureNCC();
+  attachSearchList(document.getElementById('sp-ncc'),()=>C.NCC.map(r=>r[0]));
+  attachSearchList(document.getElementById('sp-loai'),()=>C.LOAI.map(r=>r[0]));
+  om('m-sp');
+}
+async function delSP(row){
+  // Lấy tên trực tiếp từ C.TK theo vị trí dòng thay vì nhận qua tham số chuỗi trong onclick —
+  // tránh lỗi/kẹt nút khi tên sản phẩm chứa dấu nháy đơn (') làm hỏng chuỗi JS nhúng trong HTML
+  const r=C.TK[row-2];
+  const name=r?r[0]:'';
+  confirmDel(`Xóa sản phẩm "${name}"?`,async()=>{
+    toast('Đang xóa...');
+    await apiPost({sheet:'TonKho',action:'delete',row:Number(row)});
+    logAction('Xóa','Tồn kho',`Sản phẩm "${name}"`);
+    toast('Đã xóa '+name);setTimeout(loadTK,800);
+  });
+}
+async function saveSP(){
+  const ten=document.getElementById('sp-ten').value.trim();if(!ten){toast('Nhập tên SP','err');return;}
+  const ng=document.getElementById('sp-ng').value, gh=document.getElementById('sp-gh').value;
+  if(ng&&gh&&Number(gh)>Number(ng)){toast('Ngưỡng "Gần hết" phải ≤ ngưỡng "Sắp hết"','err');return;}
+  const hsdSap=document.getElementById('sp-hsdsap').value, hsdGan=document.getElementById('sp-hsdgan').value;
+  if(hsdSap&&hsdGan&&Number(hsdGan)>Number(hsdSap)){toast('Ngưỡng HSD "Gấp" phải ≤ ngưỡng "Sắp hết hạn"','err');return;}
+  const er=document.getElementById('sp-row').value;
+  let ma=document.getElementById('sp-ma').value.trim();
+  if(!ma&&!er)ma=genNextMaSP();// SP mới mà chưa gõ mã → tự sinh, để luôn có khóa liên kết ổn định (không phụ thuộc tên nữa)
+  if(!ma){toast('Thiếu Mã SP — không được để trống (sẽ làm hỏng liên kết với phiếu Nhập/Xếp hàng)','err');return;}
+  if(C.TK.some((t,i)=>t[9]===ma&&String(i+2)!==er)){toast(`Mã SP "${ma}" đã được dùng cho sản phẩm khác`,'err');return;}
+  const row=[ten,document.getElementById('sp-sl').value||0,document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
+  toast('Đang lưu...');
+  await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
+  logAction(er?'Cập nhật':'Tạo mới','Tồn kho',`Sản phẩm "${ten}", SL: ${row[1]}`);
+  toast(er?'Đã cập nhật':'Đã thêm sản phẩm');cm('m-sp');setTimeout(loadTK,800);
+}
+
+
+bootPage('tk',function(){
+  document.getElementById('acts').innerHTML=`<button class="btn btn-p" onclick="initSPForm()">+ Thêm sản phẩm</button>`;
+  loadTK();
+});
+</script>
+</body>
+</html>

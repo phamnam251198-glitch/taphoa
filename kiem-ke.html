@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Kiểm kê</title>
+<link rel="stylesheet" href="style.css?v=20260828o">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-kk">
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+      <div class="sb">
+        <input type="text" id="q-kk" placeholder="Tìm người kiểm kê..." oninput="fKK()">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-kk" onchange="fKK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
+        <button class="btn btn-g" onclick="document.getElementById('from-kk').value='';document.getElementById('to-kk').value='';document.getElementById('q-kk').value='';fKK()">✕</button>
+        <button class="btn btn-g" onclick="loadKK()">↻ Làm mới</button>
+      </div>
+      </details>
+      <div id="kk-sum"></div>
+      <div class="card"><div class="ch"><h2>Lịch sử kiểm kê</h2></div><div id="kk-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL KIỂM KÊ MỚI -->
+<div class="mo" id="m-kk">
+  <div class="mb mb-lg">
+    <h3>Kiểm kê</h3>
+    <div class="fr3">
+      <div class="fg"><label>Đối tượng kiểm kê *</label><select id="kk-target" onchange="kkTargetChanged()"><option value="">📦 Kho tổng (Tồn kho)</option></select></div>
+      <div class="fg"><label>Ngày kiểm kê</label><input id="kk-ngay" type="date"></div>
+      <div class="fg"><label>Người kiểm kê *</label><select id="kk-user"><option value="">-- Chọn --</option></select></div>
+    </div>
+    <div class="fg">
+      <label>Đánh dấu mốc kỳ (dùng cho Bestseller) — tùy chọn</label>
+      <select id="kk-moc">
+        <option value="">Không đánh dấu</option>
+        <option value="dau">📍 Đầu kỳ</option>
+        <option value="cuoi">🏁 Cuối kỳ</option>
+      </select>
+      <small style="color:var(--text2);font-size:11px">Đánh dấu lần kiểm kê này là mốc Đầu kỳ hoặc Cuối kỳ để sau vào màn Bestseller chọn ghép cặp tính SL đã bán — không cần đúng thứ 6/cuối tháng, chọn ngày nào tùy ý.</small>
+    </div>
+    <div class="fg"><label>Tìm sản phẩm</label><input id="kk-q" placeholder="Gõ tên/mã SP để lọc..." oninput="renderKKRows()"></div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Chỉ những dòng có nhập "Tồn thực tế" mới được lưu &amp; điều chỉnh lại Tồn kho — để trống nghĩa là chưa đếm, bỏ qua sản phẩm đó.</p>
+    <div class="scroll-tbl" style="max-height:420px;overflow-y:auto"><table class="item-table">
+      <thead><tr><th>Sản phẩm</th><th style="width:90px">Tồn sổ sách</th><th style="width:110px">Tồn thực tế</th><th style="width:90px">Chênh lệch</th><th>Ghi chú</th></tr></thead>
+      <tbody id="kk-rows"></tbody>
+    </table></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-kk')">Hủy</button>
+      <button class="btn btn-p" onclick="saveKKNew()">💾 Lưu kết quả kiểm kê</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CHI TIẾT KIỂM KÊ THEO NGÀY -->
+<div class="mo" id="m-kk-day">
+  <div class="mb mb-lg">
+    <h3 id="kk-day-t">Phiếu kiểm kê ngày ...</h3>
+    <div id="kk-day-sum"></div>
+    <div id="kk-day-tbl"></div>
+    <div class="mf">
+      <button class="btn btn-d" style="margin-right:auto" onclick="delKKDay()">🗑 Xóa phiếu này</button>
+      <button class="btn btn-g" onclick="cm('m-kk-day')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260828o"></script>
+<script>
+// ── JS riêng cho màn Kiểm kê ──
+let kkEntries={};// {key: {tt,gc,label,maSP,soSach}} — key ổn định theo SP/đối tượng, giữ state khi lọc/tìm trong modal
+let kkCurrentList=[];// danh sách [{key,label,maSP,soSach}] đang render — tra theo VỊ TRÍ (pos) trong onclick,
+// không nhúng thẳng tên SP vào chuỗi onclick (tên có thể chứa dấu nháy đơn, xem bug đã sửa ở delSP/delNH/delXH)
+async function openKKNew(){
+  kkEntries={};
+  document.getElementById('kk-ngay').value=td();
+  document.getElementById('kk-moc').value='';
+  const userSel=document.getElementById('kk-user');
+  userSel.innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  await ensureGH();
+  await ensureTK();
+  C.XH=await apiGet('XepHang');// tươi, để tính đúng số hiện có ở từng gian hàng (ghkBase/ghkQty)
+  C.GHK=await apiGet('GianHangKho');
+  const targetSel=document.getElementById('kk-target');
+  targetSel.innerHTML='<option value="">📦 Kho tổng (Tồn kho)</option>'+C.GH.map(g=>`<option value="${esc(g[0])}">🏬 ${esc(g[0])}</option>`).join('');
+  document.getElementById('kk-q').value='';
+  kkTargetChanged();
+  om('m-kk');
+}
+// Đổi Đối tượng kiểm kê (Kho tổng ↔ 1 Gian hàng) → danh sách SP khác hẳn nhau, không giữ dở dữ liệu đang gõ
+function kkTargetChanged(){
+  kkEntries={};
+  renderKKRows();
+}
+function kkDiffText(d){
+  if(d===0)return'<span style="color:var(--text2)">0</span>';
+  return`<span style="color:${d>0?'#0ca30c':'#d03b3b'}">${d>0?'+':''}${d}</span>`;
+}
+// Xây danh sách SP cần kiểm kê theo đối tượng đang chọn: '' = Kho tổng (mọi SP Tồn kho),
+// còn lại = 1 Gian hàng (mọi SP từng có phiếu Xếp hàng vào đó, hợp với SP có sửa tay riêng — giống namesOf() ở rGHKView)
+function kkBuildList(target){
+  if(!target)return C.TK.map((r,idx)=>({key:'tk'+idx,label:r[0],maSP:r[9]||'',soSach:Number(r[1]||0)}));
+  const names=new Set(C.XH.filter(r=>r[2]===target).map(r=>r[0]));
+  C.GHK.filter(r=>r[1]===target).forEach(r=>names.add(r[0]));
+  return[...names].sort((a,b)=>a.localeCompare(b)).map(name=>{
+    const tk=C.TK.find(t=>t[0]===name);
+    return{key:'gh:'+target+':'+name,label:name,maSP:tk?tk[9]||'':'',soSach:ghkQty(name,target)};
+  });
+}
+function kkCalcRow(pos){
+  const it=kkCurrentList[pos];if(!it)return;
+  const v=document.getElementById('kk-tt-'+pos).value;
+  kkEntries[it.key]=kkEntries[it.key]||{};
+  Object.assign(kkEntries[it.key],{tt:v,label:it.label,maSP:it.maSP,soSach:it.soSach});
+  document.getElementById('kk-cl-'+pos).innerHTML=v!==''?kkDiffText(Number(v)-it.soSach):'';
+}
+function kkSetNote(pos,val){
+  const it=kkCurrentList[pos];if(!it)return;
+  kkEntries[it.key]=kkEntries[it.key]||{};
+  Object.assign(kkEntries[it.key],{gc:val,label:it.label,maSP:it.maSP,soSach:it.soSach});
+}
+function renderKKRows(){
+  const target=document.getElementById('kk-target').value;
+  const q=(document.getElementById('kk-q').value||'').trim().toLowerCase();
+  const full=kkBuildList(target);
+  const list=full.filter(it=>!q||it.label.toLowerCase().includes(q)||it.maSP.toLowerCase().includes(q));
+  kkCurrentList=list;
+  const el=document.getElementById('kk-rows');
+  if(!list.length){el.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">Không có sản phẩm nào${target?' ở gian hàng này':' khớp'}</td></tr>`;return;}
+  el.innerHTML=list.map((it,pos)=>{
+    const ent=kkEntries[it.key]||{};
+    const ttVal=ent.tt!==undefined?ent.tt:'';
+    return`<tr>
+      <td><b>${esc(it.label)}</b>${it.maSP?` <span class="bg bg-b" style="font-size:10px">${esc(it.maSP)}</span>`:''}</td>
+      <td style="text-align:center"><b>${it.soSach}</b></td>
+      <td><input type="number" id="kk-tt-${pos}" value="${esc(ttVal)}" oninput="kkCalcRow(${pos})" style="width:90px"></td>
+      <td id="kk-cl-${pos}" style="text-align:center;font-weight:600">${ttVal!==''?kkDiffText(Number(ttVal)-it.soSach):''}</td>
+      <td><input id="kk-gc-${pos}" value="${esc(ent.gc||'')}" oninput="kkSetNote(${pos},this.value)" placeholder="Lý do lệch (nếu có)" style="width:140px"></td>
+    </tr>`;
+  }).join('');
+}
+async function saveKKNew(){
+  const ngay=document.getElementById('kk-ngay').value;
+  const nguoi=document.getElementById('kk-user').value;
+  const target=document.getElementById('kk-target').value;// '' = Kho tổng, khác thì là tên Gian hàng
+  const moc=document.getElementById('kk-moc').value;// ''/'dau'/'cuoi' — mốc kỳ cho Bestseller, tùy chọn
+  if(!ngay){toast('Chọn ngày kiểm kê','err');return;}
+  if(!nguoi){toast('Chọn người kiểm kê','err');return;}
+  const entries=Object.entries(kkEntries).filter(([,e])=>e.tt!==undefined&&e.tt!=='');
+  if(!entries.length){toast('Chưa nhập Tồn thực tế cho sản phẩm nào','err');return;}
+  toast('Đang lưu kiểm kê...');
+  let soLech=0;
+  for(const[,e] of entries){
+    const soSach=Number(e.soSach||0);
+    const thucTe=Number(e.tt||0);
+    const chenh=thucTe-soSach;
+    const row=[ngay,e.maSP||'',e.label,soSach,thucTe,chenh,e.gc||'',nguoi,target,moc];
+    await apiPost({sheet:'KiemKe',action:'append',row});
+    C.KK.push(row);
+    if(chenh===0)continue;
+    soLech++;
+    if(!target){
+      // Kho tổng: ghi đè thẳng SL trong Tồn kho — tra theo Mã SP trước (ổn định), dự phòng theo tên
+      const idx=e.maSP?C.TK.findIndex(t=>t[9]===e.maSP):-1;
+      const spIdx=idx>=0?idx:C.TK.findIndex(t=>t[0]===e.label);
+      if(spIdx>=0){
+        const upd=[...C.TK[spIdx]];upd[1]=thucTe;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=thucTe;
+      }
+    } else {
+      // Gian hàng: lưu phần CHÊNH LỆCH (offset) so với số tính từ lịch sử Xếp hàng — giống hệt saveGHK()
+      const offset=thucTe-ghkBase(e.label,target);
+      const gi=C.GHK.findIndex(r=>r[0]===e.label&&r[1]===target);
+      const grow=[e.label,target,offset];
+      await apiPost(gi>=0?{sheet:'GianHangKho',action:'update',row:gi+2,data:grow}:{sheet:'GianHangKho',action:'append',row:grow});
+      if(gi>=0)C.GHK[gi]=grow;else C.GHK.push(grow);
+    }
+  }
+  const doiTuongTxt=target?`Gian hàng "${target}"`:'Kho tổng';
+  const mocTxt=moc==='dau'?' [Đánh dấu: Đầu kỳ]':moc==='cuoi'?' [Đánh dấu: Cuối kỳ]':'';
+  logAction('Tạo mới','Kiểm kê',`Kiểm kê ${doiTuongTxt} ngày ${ngay} bởi ${nguoi}: ${entries.length} SP đã đếm, ${soLech} SP lệch.${mocTxt}`);
+  toast(`Đã lưu kiểm kê: ${entries.length} SP đã đếm, ${soLech} SP lệch!`);
+  cm('m-kk');kkEntries={};
+  setTimeout(loadKK,800);
+}
+async function loadKK(){
+  document.getElementById('kk-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  await ensureUser();// cần sẵn danh sách người dùng để đổ vào dropdown "Người kiểm kê" ở modal
+  const data=await apiGet('KiemKe');C.KK=data;
+  fKK();
+}
+// Gộp theo NGÀY + ĐỐI TƯỢNG (Kho tổng hay Gian hàng nào) — 1 ngày có thể có nhiều phiếu kiểm kê khác đối tượng
+function groupKKByDate(data){
+  const map=new Map();
+  data.forEach(r=>{
+    const ngay=r[0]||'(chưa có ngày)';
+    const gh=r[8]||'';
+    const key=ngay+'|'+gh;
+    if(!map.has(key))map.set(key,{ngay,gianHang:gh,items:[]});
+    map.get(key).items.push(r);
+  });
+  return[...map.values()].map(g=>({
+    ...g,
+    soSP:g.items.length,
+    soLech:g.items.filter(r=>Number(r[5]||0)!==0).length,
+    tongChenh:g.items.reduce((s,r)=>s+Number(r[5]||0),0),
+    nguoiKK:[...new Set(g.items.map(r=>r[7]).filter(Boolean))]
+  }));
+}
+function fKK(){
+  const q=(document.getElementById('q-kk').value||'').toLowerCase();
+  const from=document.getElementById('from-kk').value;
+  const to=document.getElementById('to-kk').value;
+  let d=[...C.KK];
+  if(from)d=d.filter(r=>r[0]>=from);
+  if(to)d=d.filter(r=>r[0]<=to);
+  if(q)d=d.filter(r=>(r[7]||'').toLowerCase().includes(q)||(r[8]||'').toLowerCase().includes(q));
+  const groups=groupKKByDate(d).sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
+  rKK(groups);
+}
+function rKK(groups){
+  const flat=groups.flatMap(g=>g.items);
+  document.getElementById('kk-sum').innerHTML=flat.length?`<div class="grid3 stat-grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số đợt kiểm kê</div><div class="val">${groups.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng SP đã đếm</div><div class="val">${flat.length}</div></div>
+    <div class="kpi r"><div class="lb">Tổng SP lệch</div><div class="val">${flat.filter(r=>Number(r[5]||0)!==0).length}</div></div></div>`:'';
+  const el=document.getElementById('kk-tbl');
+  if(!groups.length){el.innerHTML='<div class="empty">📋 Chưa có đợt kiểm kê nào</div>';return;}
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Ngày kiểm kê</th><th>Đối tượng</th><th>Mốc kỳ</th><th>Người kiểm kê</th><th>Số SP đã đếm</th><th>Số SP lệch</th><th>Tổng chênh lệch</th></tr></thead><tbody>`+
+    groups.map(g=>{
+      const cl=g.tongChenh===0?'':(g.tongChenh>0?'color:#0ca30c':'color:#d03b3b');
+      const doiTuong=g.gianHang?`🏬 ${esc(g.gianHang)}`:'📦 Kho tổng';
+      const moc=g.items[0]&&g.items[0][9];
+      const mocBadge=moc==='dau'?'<span class="bg bg-b">📍 Đầu kỳ</span>':moc==='cuoi'?'<span class="bg bg-p">🏁 Cuối kỳ</span>':'';
+      return`<tr style="cursor:pointer" onclick="openKKDay('${esc(g.ngay)}','${esc(g.gianHang)}')"><td><b>${esc(g.ngay)}</b></td><td>${doiTuong}</td><td>${mocBadge}</td><td>${esc(g.nguoiKK.join(', '))}</td><td>${g.soSP}</td><td>${g.soLech}</td><td style="${cl};font-weight:600">${g.tongChenh>0?'+':''}${g.tongChenh}</td></tr>`;
+    }).join('')+'</tbody></table>';
+}
+let kkDayCurrent=null;// {ngay,gianHang}
+function openKKDay(ngay,gianHang){
+  kkDayCurrent={ngay,gianHang:gianHang||''};
+  document.getElementById('kk-day-t').textContent=`Phiếu kiểm kê ${gianHang?`"${gianHang}"`:'Kho tổng'} ngày ${ngay}`;
+  renderKKDayDetail();
+  om('m-kk-day');
+}
+function renderKKDayDetail(){
+  if(!kkDayCurrent)return;
+  const items=C.KK.filter(r=>(r[0]||'(chưa có ngày)')===kkDayCurrent.ngay&&(r[8]||'')===kkDayCurrent.gianHang);
+  const soLech=items.filter(r=>Number(r[5]||0)!==0).length;
+  document.getElementById('kk-day-sum').innerHTML=`<p style="font-size:12px;color:var(--text2);margin-bottom:12px">${items.length} SP đã đếm · ${soLech} SP lệch</p>`;
+  document.getElementById('kk-day-tbl').innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Sản phẩm</th><th>Mã SP</th><th>Sổ sách</th><th>Thực tế</th><th>Chênh lệch</th><th>Ghi chú</th><th>Người kiểm kê</th><th></th></tr></thead><tbody>`+
+    items.map(r=>{
+      const chenh=Number(r[5]||0);
+      const cl=chenh===0?'':(chenh>0?'color:#0ca30c':'color:#d03b3b');
+      const row=C.KK.indexOf(r)+2;// vị trí thật trong C.KK, tránh lệch dòng khi lọc theo ngày/gian hàng
+      return`<tr><td><b>${esc(r[2])}</b></td><td>${r[1]?`<span class="bg bg-b">${esc(r[1])}</span>`:''}</td><td>${r[3]}</td><td>${r[4]}</td><td style="${cl};font-weight:600">${chenh>0?'+':''}${chenh}</td><td>${esc(r[6]||'')}</td><td>${esc(r[7]||'')}</td><td class="td-del"><button class="btn btn-d btn-sm" onclick="delKKRow(${row})" title="Xóa dòng này (chỉ xóa lịch sử, không hoàn tác tồn kho)">✕</button></td></tr>`;
+    }).join('')+'</tbody></table></div>';
+}
+// Hủy/xóa 1 DÒNG kiểm kê riêng lẻ (VD gõ nhầm 1 sản phẩm) — không cần xóa cả phiếu cả ngày như delKKDay().
+// Giống delKKDay(): CHỈ xóa bản ghi lịch sử, không tự hoàn tác Tồn kho/Đồ gian hàng (lý do xem ghi chú ở đó).
+// Kiểm tra: từ sau ngày kiểm kê r, có phát sinh giao dịch nào khác (Nhập/Xếp/Kiểm kê khác) ảnh hưởng tới
+// CHÍNH sản phẩm đó không (cùng đối tượng Kho tổng/Gian hàng). Không có → AN TOÀN để tự hoàn tác đúng số liệu
+// trước khi kiểm kê khi xóa dòng này. Có rồi thì không dám đoán — vì hoàn tác mù sẽ xóa mất giao dịch hợp lệ
+// phát sinh sau đó (VD: kiểm kê xong lại có phiếu Nhập mới, hoàn tác về số cũ sẽ làm mất luôn phần mới nhập).
+function kkHasLaterActivity(r,excludeRowIdx){
+  const ngay=r[0],ma=r[1],ten=r[2],gianHang=r[8];
+  const matchP=(rMa,rTen)=>ma?rMa===ma:rTen===ten;
+  if(!gianHang){
+    return C.NH.some(x=>(x[4]||'')>=ngay&&matchP(x[9],x[0]))
+      ||C.XH.some(x=>(x[3]||'')>=ngay&&matchP(x[5],x[0]))
+      ||C.KK.some((x,i)=>i!==excludeRowIdx&&!x[8]&&(x[0]||'')>=ngay&&matchP(x[1],x[2]));
+  }
+  return C.XH.some(x=>x[2]===gianHang&&(x[3]||'')>=ngay&&matchP(x[5],x[0]))
+    ||C.KK.some((x,i)=>i!==excludeRowIdx&&x[8]===gianHang&&(x[0]||'')>=ngay&&matchP(x[1],x[2]));
+}
+// Hoàn tác lại số liệu về đúng như TRƯỚC lần kiểm kê r (chỉ gọi khi kkHasLaterActivity() báo an toàn)
+async function kkRevertOne(r){
+  const ma=r[1],ten=r[2],soSach=Number(r[3]||0),gianHang=r[8];
+  if(!gianHang){
+    const idx=ma?C.TK.findIndex(t=>t[9]===ma):C.TK.findIndex(t=>t[0]===ten);
+    if(idx>=0){
+      const upd=[...C.TK[idx]];upd[1]=soSach;
+      await apiPost({sheet:'TonKho',action:'update',row:idx+2,data:upd});
+      C.TK[idx][1]=soSach;
+    }
+  }else{
+    const offset=soSach-ghkBase(ten,gianHang);
+    const gi=C.GHK.findIndex(x=>x[0]===ten&&x[1]===gianHang);
+    const grow=[ten,gianHang,offset];
+    await apiPost(gi>=0?{sheet:'GianHangKho',action:'update',row:gi+2,data:grow}:{sheet:'GianHangKho',action:'append',row:grow});
+    if(gi>=0)C.GHK[gi]=grow;else C.GHK.push(grow);
+  }
+}
+async function delKKRow(row){
+  const r=C.KK[row-2];if(!r)return;
+  const ngay=r[0],ten=r[2];
+  toast('Đang kiểm tra dữ liệu liên quan...');
+  C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+  const hasLater=kkHasLaterActivity(r,row-2);
+  const msg=hasLater
+    ?`Xóa dòng kiểm kê "${ten}" (ngày ${ngay})? Đã có giao dịch khác sau ngày này cho SP này nên KHÔNG THỂ tự hoàn tác an toàn — chỉ xóa lịch sử, giữ nguyên số liệu hiện tại.`
+    :`Xóa dòng kiểm kê "${ten}" (ngày ${ngay})? Không có giao dịch nào khác sau đó cho SP này → sẽ TỰ HOÀN TÁC lại đúng số liệu như trước khi kiểm kê.`;
+  confirmDel(msg,async()=>{
+    toast('Đang xóa...');
+    await apiPost({sheet:'KiemKe',action:'delete',row:Number(row)});
+    C.KK.splice(row-2,1);
+    if(!hasLater)await kkRevertOne(r);
+    logAction('Xóa','Kiểm kê',`Xóa 1 dòng kiểm kê: "${ten}" ngày ${ngay}${hasLater?'':' (đã tự hoàn tác lại số liệu)'}`);
+    toast(hasLater?'Đã xóa dòng!':'Đã xóa dòng & hoàn tác số liệu!');
+    renderKKDayDetail();
+    fKK();// cập nhật lại danh sách/tổng số đằng sau popup luôn, không cần đóng popup mới thấy đúng
+    // (không cần vẽ lại Tồn kho/Đồ gian hàng ở đây nữa — 2 màn đó giờ là trang riêng, C.TK/C.GHK trong bộ nhớ đã đúng)
+  });
+}
+async function delKKDay(){
+  if(!kkDayCurrent)return;
+  const idxs=C.KK.map((r,i)=>i).filter(i=>(C.KK[i][0]||'(chưa có ngày)')===kkDayCurrent.ngay&&(C.KK[i][8]||'')===kkDayCurrent.gianHang).sort((a,b)=>b-a);
+  if(!idxs.length){toast('Không có gì để xóa','err');return;}
+  confirmDel(`Xóa toàn bộ lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng)? Với mỗi SP: nếu KHÔNG có giao dịch nào khác xảy ra sau ngày này thì tự hoàn tác lại đúng số liệu trước khi kiểm kê; SP nào đã có giao dịch sau đó thì chỉ xóa lịch sử, giữ nguyên số hiện tại (không đoán mò).`,async()=>{
+    toast('Đang xóa...');
+    C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+    let soHoanTac=0;
+    for(const idx of idxs){
+      const r=C.KK[idx];if(!r)continue;
+      const hasLater=kkHasLaterActivity(r,idx);
+      await apiPost({sheet:'KiemKe',action:'delete',row:idx+2});
+      if(!hasLater){await kkRevertOne(r);soHoanTac++;}
+    }
+    logAction('Xóa','Kiểm kê',`Xóa lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay} (${idxs.length} dòng, tự hoàn tác ${soHoanTac} dòng)`);
+    toast(`Đã xóa! (Tự hoàn tác số liệu cho ${soHoanTac}/${idxs.length} dòng)`);
+    cm('m-kk-day');
+    setTimeout(loadKK,800);
+  });
+}
+
+// không xếp hạng trực tiếp theo số lượng thêm/xếp hàng (xếp nhiều ≠ bán chạy — có thể chỉ đang tồn kho nhiều).
+// Công thức: Đã bán = Tồn đầu kỳ (Đồ gian hàng, gộp mọi gian hàng) + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ.
+// KHÔNG cố định kỳ theo tuần/tháng — App không có server/cron nên không thể tự "chốt" đúng nửa đêm Thứ 6/cuối
+// tháng. Thay vào đó, khi chạy Kiểm kê Gian hàng, người dùng tự đánh dấu lần đó là "Đầu kỳ"/"Cuối kỳ" (xem
+// kk-moc ở modal Kiểm kê); màn này chỉ liệt kê các mốc đã đánh dấu cho người dùng chọn 1 cặp bất kỳ để tính.
+// LƯU Ý: luôn dựng/đọc Date qua Date.UTC + getUTC*/setUTC* — dựng bằng "new Date(dateStr+'T00:00:00')" (giờ
+// LOCAL) rồi gọi toISOString() (quy đổi UTC) sẽ bị lệch NGÀY ở múi giờ UTC+ (như VN, UTC+7): nửa đêm local
+// bị lùi về chiều/tối hôm trước theo UTC. Toàn bộ hàm tính ngày của Bestseller phải né lỗi này.
+
+bootPage('kk',function(){
+  document.getElementById('acts').innerHTML=`<button class="btn btn-s" onclick="openKKNew()">+ Kiểm kê mới</button>`;
+  loadKK();
+});
+</script>
+</body>
+</html>

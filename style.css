@@ -1,5 +1,5 @@
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#f0f2f5;--sidebar:#1e2736;--white:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;--radius:10px;--shadow:0 1px 4px rgba(0,0,0,0.07)}
+:root{--bg:#f0f2f5;--sidebar:#1e2736;--white:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;--radius:10px;--shadow:0 3px 10px rgba(15,23,42,0.09),0 1px 2px rgba(15,23,42,0.06)}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px}
 
 /* LOGIN */
@@ -13,22 +13,31 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 #login-box .fg label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-weight:500}
 #login-box .fg input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border .15s}
 #login-box .fg input:focus{border-color:var(--blue)}
-#login-btn{width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;margin-top:4px}
-#login-btn:hover{background:#2563eb}
-#login-btn:disabled{background:#94a3b8;cursor:not-allowed}
+#login-btn{width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;
+  box-shadow:0 4px 0 #1d4ed8;transition:transform .08s ease,box-shadow .08s ease,background .15s}
+#login-btn:hover{background:#2563eb;transform:translateY(-1px);box-shadow:0 5px 0 #1d4ed8}
+#login-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #1d4ed8}
+#login-btn:disabled{background:#94a3b8;cursor:not-allowed;box-shadow:0 4px 0 #64748b;transform:none}
 #login-err{color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none}
 #logout-btn{padding:6px 12px;background:transparent;color:#94a3b8;border:1px solid #2a3547;border-radius:6px;font-size:12px;cursor:pointer}
 #logout-btn:hover{background:#2a3547;color:#fff}
 #sb{width:215px;background:var(--sidebar);display:flex;flex-direction:column;flex-shrink:0}
-#sb .logo{padding:18px 16px 14px;border-bottom:1px solid #2a3547}
-#sb .logo b{font-size:16px;color:#fff;display:block}
-#sb .logo small{font-size:10px;color:#546278}
-#sb nav a{display:flex;align-items:center;gap:9px;padding:9px 16px;color:#8899aa;font-size:13px;cursor:pointer;border-left:3px solid transparent;text-decoration:none}
+#sb .logo{padding:18px 16px 14px;border-bottom:1px solid #2a3547;display:flex;align-items:center;gap:10px}
+.logo-ic{width:34px;height:34px;border-radius:9px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-txt{display:flex;flex-direction:column;min-width:0}
+#sb .logo b{font-size:15px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sb .logo small{font-size:10.5px;color:#7c8b9e}
+#sb nav a{display:flex;align-items:center;gap:11px;padding:9px 16px;color:#8899aa;font-size:13px;cursor:pointer;border-left:3px solid transparent;text-decoration:none}
+#sb nav a svg{flex-shrink:0}
 #sb nav a:hover{background:#2a3547;color:#fff}
 #sb nav a.on{background:#2a3547;color:#fff;border-left-color:#3b82f6}
 .nbadge{background:#ef4444;color:#fff;font-size:10px;padding:1px 5px;border-radius:10px;margin-left:auto}
-#sync{padding:10px 16px;border-top:1px solid #2a3547;font-size:11px;color:#546278}
-#sync b{color:#10b981}
+#logout-btn{display:flex;align-items:center;justify-content:center;gap:7px}
+.sb-version{display:block;padding:8px 16px 0;font-size:10.5px;color:#546278;text-align:center}
+#sync.sb-sync{padding:6px 16px 14px;border-top:none;font-size:11.5px;color:#8899aa;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+.sync-dot.ok{background:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
+#sync.sb-sync small{flex-basis:100%;color:#546278;font-size:10.5px}
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 #topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 22px;height:54px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 #topbar h1{font-size:15px;font-weight:600}
@@ -44,6 +53,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .kpi .val{font-size:22px;font-weight:700}
 .kpi .sub{font-size:11px;color:var(--text2);margin-top:3px}
 .kpi.g .val{color:var(--green)}.kpi.r .val{color:var(--red)}.kpi.b .val{color:var(--blue)}.kpi.y .val{color:var(--yellow)}.kpi.p .val{color:var(--purple)}
+/* Ô KPI có icon (chỉ dùng ở Tổng quan) — TÁCH riêng khỏi .kpi (bảng thống kê dạng chữ đơn giản, không icon,
+   dùng ở nhiều màn khác như Nhập/Xếp hàng/Kiểm kê/Báo cáo) để không ảnh hưởng các màn đó */
+.kpi-card{background:#fff;border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;
+  border-top:3px solid transparent}
+.kpi-ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;
+  box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.kpi-card.kpi-blue{border-top-color:var(--blue)}.kpi-card.kpi-blue .kpi-ic{background:var(--blue)}
+.kpi-card.kpi-red{border-top-color:var(--red)}.kpi-card.kpi-red .kpi-ic{background:var(--red)}
+.kpi-card.kpi-orange{border-top-color:var(--yellow)}.kpi-card.kpi-orange .kpi-ic{background:var(--yellow)}
+.kpi-card.kpi-green{border-top-color:var(--green)}.kpi-card.kpi-green .kpi-ic{background:var(--green)}
+.kpi-body{min-width:0}
+.kpi-body .lb{font-size:12px;color:var(--text2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-body .val{font-size:24px;font-weight:700;line-height:1.1}
+/* Trạng thái "trống" nổi bật hơn .empty thường (chỉ chữ) — dùng khi 1 danh sách rỗng là tin TỐT (VD không
+   có hàng sắp hết hạn) nên đáng được nhấn mạnh bằng icon lớn thay vì chỉ 1 dòng chữ nhạt nhòa */
+.empty-hero{text-align:center;padding:28px 20px}
+.empty-hero .eh-ic{width:56px;height:56px;border-radius:50%;background:#e8f8ef;color:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.empty-hero .eh-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.empty-hero .eh-sub{font-size:12px;color:var(--text2)}
 .card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px}
 /* Khối "xổ" (accordion) theo từng nhóm (VD: Loại hàng) — LUÔN bấm được để đóng/mở ở mọi kích thước màn hình
    (khác .sb-wrap/.sb-toggle vốn chỉ dùng cho ô tìm kiếm và chỉ ẩn/hiện được trên mobile) */
@@ -79,15 +107,21 @@ tr:hover td{background:#f8fafc}
 .bg-g{background:#dcfce7;color:#166534}.bg-r{background:#fee2e2;color:#991b1b}
 .bg-y{background:#fef9c3;color:#854d0e}.bg-b{background:#dbeafe;color:#1e40af}.bg-p{background:#ede9fe;color:#5b21b6}
 .bg-o{background:#ffedd5;color:#9a3412}
-.btn{padding:7px 13px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
-.btn-p{background:var(--blue);color:#fff}.btn-p:hover{background:#2563eb}
-.btn-s{background:var(--green);color:#fff}.btn-s:hover{background:#059669}
-.btn-g{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-g:hover{background:var(--bg)}
-.btn-d{background:#fee2e2;color:#991b1b;border:none}.btn-d:hover{background:#fecaca}
+/* Nút "nổi khối" 3D: mỗi nút có 1 lớp bóng đổ đậm màu ngay dưới đáy (--btn-deep) trông như nút bấm thật
+   nổi lên khỏi mặt phẳng — di chuột vào thì nổi cao hơn 1 chút, bấm xuống thì lún vào (translateY + bóng co lại) */
+.btn{padding:7px 13px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;
+  position:relative;box-shadow:0 3px 0 var(--btn-deep,rgba(0,0,0,.18));transition:transform .08s ease,box-shadow .08s ease,background .15s}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 0 var(--btn-deep,rgba(0,0,0,.18))}
+.btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 var(--btn-deep,rgba(0,0,0,.18))}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
+.btn-p{background:var(--blue);color:#fff;--btn-deep:#1d4ed8}.btn-p:hover{background:#2563eb}
+.btn-s{background:var(--green);color:#fff;--btn-deep:#047857}.btn-s:hover{background:#059669}
+.btn-g{background:#f8fafc;color:var(--text2);border:1px solid var(--border);--btn-deep:#cbd5e1}.btn-g:hover{background:#eef2f7}
+.btn-d{background:#fee2e2;color:#991b1b;border:none;--btn-deep:#fca5a5}.btn-d:hover{background:#fecaca}
 .btn-sm{padding:4px 9px;font-size:12px}
 .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;align-items:center;justify-content:center}
 .mo.on{display:flex}
-.mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto;position:relative}
+.mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .modal-x{position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:var(--bg);border-radius:50%;font-size:14px;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
 .modal-x:hover{background:var(--border);color:var(--text)}
 .mb h3{font-size:15px;font-weight:600;margin-bottom:18px}
@@ -170,7 +204,7 @@ tr:hover td{background:#f8fafc}
 .donut-total-num{font-size:32px;font-weight:700;fill:var(--text)}
 .donut-total-lb{font-size:11px;fill:var(--text2)}
 .donut-list{display:flex;flex-direction:column;gap:13px}
-.donut-row{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text)}
+.donut-row{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;color:var(--text)}
 .donut-row .lg-dot{width:11px;height:11px}
 .donut-row-lb{color:var(--text2);min-width:68px}
 .donut-row b{font-size:16px}
@@ -230,6 +264,10 @@ tr:hover td{background:#f8fafc}
   .grid4,.stat-grid3{grid-template-columns:1fr 1fr;gap:10px}
   .kpi{padding:11px 14px}
   .kpi .val{font-size:19px}
+  .kpi-card{padding:12px;gap:10px}
+  .kpi-ic{width:36px;height:36px;border-radius:9px}
+  .kpi-ic svg{width:16px;height:16px}
+  .kpi-body .val{font-size:19px}
 
   /* Thanh công cụ tìm kiếm/lọc: mỗi ô full-width, xếp dọc cho dễ chạm */
   .sb{gap:8px}

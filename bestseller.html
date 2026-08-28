@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Bestseller</title>
+<link rel="stylesheet" href="style.css?v=20260828o">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-best">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Số lượng "Đã bán" được suy ra từ: <b>Tồn đầu kỳ + Xếp hàng ra gian hàng trong kỳ − Tồn cuối kỳ</b> (gộp tất cả gian hàng) — <b>không</b> tính theo số lượng xếp hàng nhiều hay ít. Mặc định lấy <b>2 lần Kiểm kê Gian hàng gần nhất</b> làm Đầu kỳ/Cuối kỳ — bạn có thể tự chọn lại cặp mốc khác bên dưới. Đánh dấu "📍 Đầu kỳ"/"🏁 Cuối kỳ" lúc <a href="kiem-ke.html" style="color:var(--blue)">Kiểm kê Gian hàng</a> là tùy chọn, chỉ để dễ nhận ra mốc nào bạn đã chốt cố ý.</p>
+      <div class="card">
+        <div class="ch"><h2>Chọn cặp mốc để tính</h2></div>
+        <div style="padding:14px 18px">
+          <div class="fr">
+            <div class="fg"><label>📍 Mốc Đầu kỳ</label><select id="best-dau" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
+            <div class="fg"><label>🏁 Mốc Cuối kỳ</label><select id="best-cuoi" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
+          </div>
+          <div id="best-info" style="font-size:12px;color:var(--text2)"></div>
+        </div>
+      </div>
+      <div id="best-tbl"></div>
+    </div>
+  </div>
+</div>
+
+
+<div id="toast"></div>
+<script src="app.js?v=20260828o"></script>
+<script>
+// ── JS riêng cho màn Bestseller ── (bAddDays/kkStockOnDate/xhAddedInRange/computeBestsellerPeriod/
+// mostRecentKKPair giờ dùng CHUNG với card Bestseller ở Tổng quan, đã chuyển sang app.js)
+function bDaysBetween(a,b){
+  const[y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number);
+  return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/86400000);
+}
+async function loadBestseller(){
+  await ensureTK();
+  C.KK=await apiGet('KiemKe');
+  C.XH=await apiGet('XepHang');
+  fillBestMocOptions();
+  renderBestPeriod();
+}
+// Đổ 2 dropdown từ MỌI ngày đã có ít nhất 1 dòng Kiểm kê Gian hàng (không bắt buộc phải đánh dấu Đầu/Cuối
+// kỳ nữa — tag chỉ còn là gợi ý hiển thị). Nếu người dùng CHƯA tự chọn gì (lần đầu vào trang), tự động chọn
+// sẵn 2 LẦN KIỂM KÊ GẦN NHẤT làm Đầu kỳ/Cuối kỳ để trang có dữ liệu ngay, không bắt phải tự bấm chọn trước.
+function fillBestMocOptions(){
+  const dauSel=document.getElementById('best-dau'),cuoiSel=document.getElementById('best-cuoi');
+  const curDau=dauSel.value,curCuoi=cuoiSel.value;
+  const tagOf=new Map();// ngày -> 'dau'/'cuoi' nếu có đánh dấu, chỉ để hiện gợi ý trong option
+  C.KK.forEach(r=>{if(r[8]&&r[9])tagOf.set(r[0],r[9]);});
+  const dates=[...new Set(C.KK.filter(r=>r[8]).map(r=>r[0]))].sort((a,b)=>b.localeCompare(a));// mới nhất trước
+  const label=d=>d+(tagOf.get(d)==='dau'?' (📍 đã đánh dấu Đầu kỳ)':tagOf.get(d)==='cuoi'?' (🏁 đã đánh dấu Cuối kỳ)':'');
+  const opts=sel=>'<option value="">-- Chọn --</option>'+dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${label(d)}</option>`).join('');
+  dauSel.innerHTML=opts(curDau);
+  cuoiSel.innerHTML=opts(curCuoi);
+  // Chưa từng chọn gì (cả 2 ô đang trống) → tự chọn sẵn 2 lần kiểm kê gần nhất (hàm dùng chung với Tổng quan)
+  if(!curDau&&!curCuoi){
+    const pair=mostRecentKKPair();
+    if(pair){dauSel.value=pair.dau;cuoiSel.value=pair.cuoi;}
+  }
+}
+function rBestList(computed,warnMsg){
+  const el=document.getElementById('best-tbl');
+  if(!computed){el.innerHTML=`<div class="card"><div class="empty">⚠️ ${esc(warnMsg)}</div></div>`;return;}
+  const{items,missing,tongSP}=computed;
+  let html='';
+  if(missing>0)html+=`<div class="alert" style="display:flex">⚠️ ${missing}/${tongSP} sản phẩm bị loại khỏi xếp hạng do thiếu dữ liệu kiểm kê đầu/cuối kỳ cho riêng SP đó (gian hàng chứa SP đó chưa được kiểm kê đúng ngày mốc).</div>`;
+  if(!items.length){html+='<div class="card"><div class="empty">📭 Chưa đủ dữ liệu để xếp hạng Bestseller kỳ này</div></div>';el.innerHTML=html;return;}
+  html+=`<div class="card"><div class="ch"><h2>🏆 Xếp hạng theo SL đã bán</h2></div>
+    <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Tồn đầu kỳ</th><th>Đã xếp</th><th>Tồn cuối kỳ</th><th>Đã bán</th></tr></thead><tbody>`+
+    items.map((it,i)=>{
+      const cl=it.daBan<0?'color:#d03b3b':'';
+      return`<tr><td>${i+1}</td><td><b>${esc(it.ten)}</b></td><td>${fmt(it.dauKy)}</td><td>${fmt(it.them)}</td><td>${fmt(it.cuoiKy)}</td><td style="font-weight:700;${cl}">${fmt(it.daBan)}</td></tr>`;
+    }).join('')+'</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+function renderBestPeriod(){
+  const dau=document.getElementById('best-dau').value,cuoi=document.getElementById('best-cuoi').value;
+  const infoEl=document.getElementById('best-info');
+  if(!dau||!cuoi){
+    const chuaDu=document.getElementById('best-dau').options.length<3;// chỉ có "-- Chọn --" (+ tối đa 1 ngày)
+    infoEl.textContent=chuaDu
+      ?'Cần ít nhất 2 lần Kiểm kê Gian hàng (ngày khác nhau) mới tính được Bestseller — vào Kiểm kê để thêm.'
+      :'Chọn cả 2 mốc Đầu kỳ và Cuối kỳ để xem xếp hạng.';
+    rBestList(null,chuaDu?'Chưa đủ dữ liệu Kiểm kê Gian hàng (cần ít nhất 2 lần, ở 2 ngày khác nhau).':'Chưa chọn đủ 2 mốc Đầu kỳ / Cuối kỳ.');
+    return;
+  }
+  if(dau>=cuoi){
+    infoEl.textContent='';
+    rBestList(null,`Mốc Đầu kỳ (${dau}) phải TRƯỚC mốc Cuối kỳ (${cuoi}) — chọn lại.`);
+    return;
+  }
+  infoEl.textContent=`Kỳ từ ${dau} đến ${cuoi} (${bDaysBetween(dau,cuoi)} ngày).`;
+  rBestList(computeBestsellerPeriod(dau,cuoi));
+}
+
+// (dùng để đối chiếu/thanh toán lại cho người đã tạm ứng tiền mua hàng)
+
+bootPage('best',function(){
+  document.getElementById('acts').innerHTML=`<button class="btn btn-g" onclick="loadBestseller()">↻ Làm mới</button>`;
+  loadBestseller();
+});
+</script>
+</body>
+</html>

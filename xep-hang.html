@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Xếp hàng</title>
+<link rel="stylesheet" href="style.css?v=20260828o">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-xh">
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+      <div class="sb">
+        <input type="text" id="q-xh" placeholder="Tìm sản phẩm, gian hàng..." oninput="fXH()">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
+        <button class="btn btn-g" onclick="document.getElementById('from-xh').value='';document.getElementById('to-xh').value='';fXH()">✕</button>
+        <select id="pg-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="30">30 ngày</option>
+          <option value="50">50 ngày</option>
+          <option value="100">100 ngày</option>
+          <option value="0">Tất cả</option>
+        </select>
+        <button class="btn btn-g" onclick="loadXH()">↻ Làm mới</button>
+        <button class="btn btn-d" id="xh-delsel-btn" onclick="delSelXH()" style="display:none">🗑 Xóa đã chọn (<span id="xh-selcnt">0</span>)</button>
+      </div>
+      </details>
+      <div id="xh-sum"></div>
+      <div class="card"><div class="ch"><h2>Lịch sử xếp hàng</h2></div><div id="xh-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL XẾP HÀNG NHIỀU DÒNG -->
+<div class="mo" id="m-xh">
+  <div class="mb">
+    <h3>Tạo phiếu xếp hàng</h3>
+    <div class="fr3">
+      <div class="fg"><label>Gian hàng *</label><select id="xh-gh"><option value="">-- Chọn --</option></select></div>
+      <div class="fg"><label>Ngày xếp hàng</label><input id="xh-ngay" type="date"></div>
+      <div class="fg"><label>Ghi chú</label><input id="xh-gc" placeholder="Ghi chú thêm..."></div>
+    </div>
+    <label style="font-size:11px;color:var(--text2);font-weight:500;display:block;margin-bottom:6px">Danh sách hàng xếp *</label>
+    <table class="item-table">
+      <thead><tr><th>Sản phẩm</th><th>Số lượng</th><th></th></tr></thead>
+      <tbody id="xh-rows"></tbody>
+    </table>
+    <button class="add-row-btn" onclick="addXHRow()">+ Thêm sản phẩm</button>
+    <div class="total-bar">
+      <span>Tổng SL: <b id="xh-tsl">0</b></span>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-xh')">Hủy</button>
+      <button class="btn btn-s" onclick="saveXH()">✓ Xác nhận xếp</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CHI TIẾT XẾP HÀNG THEO NGÀY -->
+<div class="mo" id="m-xh-day">
+  <div class="mb mb-lg">
+    <h3 id="xh-day-t">Phiếu xếp hàng ngày ...</h3>
+    <div id="xh-day-sum"></div>
+    <div class="sb">
+      <input type="text" id="xh-day-q" placeholder="🔍 Tìm sản phẩm trong phiếu này..." oninput="renderXHDayDetail()">
+      <select id="xh-day-gh-q" onchange="renderXHDayDetail()"><option value="">Tất cả gian hàng</option></select>
+    </div>
+    <div id="xh-day-tbl"></div>
+    <button class="add-row-btn" onclick="addXHDayRow()">+ Thêm sản phẩm</button>
+    <div class="mf">
+      <button class="btn btn-d" style="margin-right:auto" onclick="delXHDay()">🗑 Xóa cả phiếu này</button>
+      <button class="btn btn-g" onclick="cm('m-xh-day')">Đóng</button>
+      <button class="btn btn-p" onclick="saveXHDayAll()">💾 Lưu tất cả</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260828o"></script>
+<script>
+// ── JS riêng cho màn Xếp hàng ──
+let xhRowCount=0;
+function addXHRow(){
+  xhRowCount++;const id=xhRowCount;
+  const tr=document.createElement('tr');tr.id='xh-r-'+id;
+  tr.innerHTML=`<td><input id="xh-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." style="min-width:150px"></td>
+    <td><input type="number" id="xh-sl-${id}" placeholder="0" oninput="calcXH()" style="width:90px"></td>
+    <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(document.getElementById('xh-r-${id}'));calcXH()">✕</button></td>`;
+  document.getElementById('xh-rows').appendChild(tr);
+  attachSearchList(document.getElementById('xh-sp-'+id),()=>C.TK.map(t=>t[0]));
+}
+function calcXH(){
+  let tsl=0;
+  document.getElementById('xh-rows').querySelectorAll('tr').forEach(tr=>{
+    const id=tr.id.replace('xh-r-','');
+    tsl+=Number(document.getElementById('xh-sl-'+id)?.value||0);
+  });
+  document.getElementById('xh-tsl').textContent=fmt(tsl);
+}
+async function openXH(){
+  await ensureTK();
+  await ensureGH();
+  if(!C.GH.length){toast('Chưa có gian hàng nào, vào mục Gian hàng để thêm trước','err');return;}
+  document.getElementById('xh-gh').innerHTML='<option value="">-- Chọn --</option>'+C.GH.map(r=>`<option>${r[0]}</option>`).join('');
+  document.getElementById('xh-ngay').value=td();
+  document.getElementById('xh-gc').value='';
+  cleanupSearchLists(document.getElementById('xh-rows'));
+  document.getElementById('xh-rows').innerHTML='';xhRowCount=0;
+  addXHRow();calcXH();om('m-xh');
+}
+async function saveXH(){
+  const gh=document.getElementById('xh-gh').value;
+  const ngay=document.getElementById('xh-ngay').value;
+  const gc=document.getElementById('xh-gc').value;
+  const rows=document.getElementById('xh-rows').querySelectorAll('tr');
+  const items=[];
+  rows.forEach(tr=>{
+    const id=tr.id.replace('xh-r-','');
+    const spVal=document.getElementById('xh-sp-'+id)?.value||'';
+    const idx=C.TK.findIndex(t=>t[0]===spVal);
+    const sl=Number(document.getElementById('xh-sl-'+id)?.value||0);
+    if(idx>=0&&sl>0)items.push({idx,sp:C.TK[idx],sl});
+  });
+  if(!gh){toast('Chọn gian hàng','err');return;}
+  if(!items.length){toast('Thêm ít nhất 1 sản phẩm','err');return;}
+  // Kiểm tra tồn, không cho xếp vượt quá tồn kho hiện có
+  for(const it of items){
+    if(it.sl>Number(it.sp[1]||0)){toast(`${it.sp[0]}: tồn chỉ còn ${it.sp[1]}!`,'err');return;}
+  }
+  toast('Đang lưu '+items.length+' sản phẩm...');
+  for(const it of items){
+    await apiPost({sheet:'XepHang',action:'append',row:[it.sp[0],it.sl,gh,ngay,gc,it.sp[9]||'']});
+    const newSL=Number(it.sp[1]||0)-it.sl;const upd=[...it.sp];upd[1]=newSL;
+    await apiPost({sheet:'TonKho',action:'update',row:it.idx+2,data:upd});
+    C.TK[it.idx][1]=newSL;
+  }
+  logAction('Tạo mới','Xếp hàng',`Gian hàng: ${gh} — ${items.map(it=>`${it.sp[0]} x${it.sl}`).join(', ')}`);
+  toast('Đã xếp '+items.length+' sản phẩm!');cm('m-xh');setTimeout(loadXH,800);
+}
+
+let selXH=new Set();
+// Danh sách Xếp hàng hiển thị GỘP THEO NGÀY (mỗi ngày 1 dòng) — bấm vào xem/sửa chi tiết từng dòng
+// xếp của ngày đó trong popup, giống cách đã làm ở Nhập hàng
+function groupXHByDate(data){
+  const map=new Map();
+  data.forEach(r=>{
+    const ngay=r[3]||'(chưa có ngày)';
+    if(!map.has(ngay))map.set(ngay,[]);
+    map.get(ngay).push(r);
+  });
+  return[...map.entries()].map(([ngay,items])=>({
+    ngay,items,
+    soSP:new Set(items.map(r=>r[0])).size,
+    tongSL:items.reduce((s,r)=>s+Number(r[1]||0),0),
+    gianHang:[...new Set(items.map(r=>r[2]).filter(Boolean))]
+  }));
+}
+async function loadXH(){
+  document.getElementById('xh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selXH.clear();updateSelUI('xh-delsel-btn','xh-selcnt',0);
+  const data=await apiGet('XepHang');C.XH=data;
+  rXH(groupXHByDate(data).sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||'')));
+  // Không tự vẽ lại popup nếu đang có dòng mới chưa lưu (bấm "+ Thêm") — tránh mất trắng nội dung đang gõ dở
+  if(xhDayCurrent&&document.getElementById('m-xh-day').classList.contains('on')&&!document.querySelector('#xh-day-tbl tr[data-new="1"]'))renderXHDayDetail();
+}
+const XH_COLS=[
+  {key:'ngay',label:'Ngày xếp'},{key:'sosp',label:'Số sản phẩm'},{key:'tongsl',label:'Tổng SL'},{key:'gh',label:'Gian hàng'}
+];
+let xhSortCol=null,xhSortDir=1;
+function sortXHClick(col){if(xhSortCol===col)xhSortDir*=-1;else{xhSortCol=col;xhSortDir=1;}fXH();}
+function xhCompare(a,b,col){
+  switch(col){
+    case'sosp':return a.soSP-b.soSP;
+    case'tongsl':return a.tongSL-b.tongSL;
+    case'gh':return a.gianHang.join(',').localeCompare(b.gianHang.join(','));
+    default:return(a.ngay||'').localeCompare(b.ngay||'');
+  }
+}
+function rXH(groups){
+  const flat=groups.flatMap(g=>g.items);
+  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid3 stat-grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số ngày xếp</div><div class="val">${groups.length}</div></div>
+    <div class="kpi p"><div class="lb">Tổng SL đã xếp</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
+    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
+  const el=document.getElementById('xh-tbl');
+  if(!groups.length){el.innerHTML='<div class="empty">🏷️ Chưa có phiếu xếp hàng</div>';return;}
+  const ths=XH_COLS.map(c=>{
+    const on=xhSortCol===c.key;
+    return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortXHClick('${c.key}')">${c.label} <span class="sort-ic">${on?(xhSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
+  }).join('');
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="xh-selall" onchange="toggleAllXH(this)"></th>${ths}<th></th></tr></thead><tbody>`+
+    groups.map(g=>{
+      const chk=selXH.has(g.ngay)?'checked':'';
+      return`<tr style="cursor:pointer" onclick="openXHDay('${esc(g.ngay)}')">
+      <td data-label="" onclick="event.stopPropagation()"><input type="checkbox" class="xh-chk" data-ngay="${esc(g.ngay)}" ${chk} onchange="toggleXHChk(this)"></td>
+      <td data-label="Ngày xếp"><b>${esc(g.ngay)}</b></td>
+      <td data-label="Số sản phẩm">${g.soSP}</td>
+      <td data-label="Tổng SL">${fmt(g.tongSL)}</td>
+      <td data-label="Gian hàng">${g.gianHang.map(n=>`<span class="bg bg-p">${esc(n)}</span>`).join(' ')||''}</td>
+      <td data-label="" onclick="event.stopPropagation()"><button class="btn btn-g btn-sm" onclick="openXHDay('${esc(g.ngay)}')">Xem</button></td></tr>`;
+    }).join('')+'</tbody></table>';
+  updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
+  updateXHSelAllTri();
+}
+// selXH giờ chứa các NGÀY được chọn (không phải index dòng) — như đã làm ở Nhập hàng
+function updateXHSelAllTri(){
+  const all=document.getElementById('xh-selall');
+  if(!all)return;
+  const chks=[...document.querySelectorAll('.xh-chk')];
+  const checkedCnt=chks.filter(c=>selXH.has(c.dataset.ngay)).length;
+  all.checked=chks.length>0&&checkedCnt===chks.length;
+  all.indeterminate=checkedCnt>0&&checkedCnt<chks.length;
+}
+function toggleXHChk(el){
+  const ngay=el.dataset.ngay;
+  if(el.checked)selXH.add(ngay);else selXH.delete(ngay);
+  updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
+  updateXHSelAllTri();
+}
+function toggleAllXH(el){
+  document.querySelectorAll('.xh-chk').forEach(c=>{
+    c.checked=el.checked;
+    const ngay=c.dataset.ngay;
+    if(el.checked)selXH.add(ngay);else selXH.delete(ngay);
+  });
+  updateSelUI('xh-delsel-btn','xh-selcnt',selXH.size);
+}
+async function delSelXH(){
+  if(!selXH.size){toast('Chưa chọn ngày nào','err');return;}
+  const days=[...selXH];
+  const items=C.XH.map((r,i)=>[r,i]).filter(([r])=>days.includes(r[3]||'(chưa có ngày)'));
+  if(!items.length){toast('Không tìm thấy phiếu nào','err');return;}
+  confirmDel(`Xóa toàn bộ phiếu xếp của ${days.length} ngày đã chọn (${items.length} dòng)? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
+    toast('Đang xóa '+items.length+' dòng...');
+    const idxs=items.map(([,i])=>i).sort((a,b)=>b-a);
+    const delNames=[];
+    for(const idx of idxs){
+      const r=C.XH[idx];if(!r)continue;
+      delNames.push(`${r[0]} x${r[1]}`);
+      await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
+      const spIdx=xhTKIndex(r);
+      if(spIdx>=0){
+        const newSL=Number(C.TK[spIdx][1]||0)+Number(r[1]||0);
+        const upd=[...C.TK[spIdx]];upd[1]=newSL;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=newSL;
+      }
+    }
+    logAction('Xóa','Xếp hàng',`Xóa hàng loạt ${days.length} ngày (${delNames.length} dòng): ${delNames.join(', ')}`);
+    selXH.clear();
+    toast('Đã xóa '+idxs.length+' dòng xếp!');setTimeout(loadXH,800);
+  });
+}
+function fXH(){
+  const q=document.getElementById('q-xh').value.toLowerCase();
+  const from=document.getElementById('from-xh').value;
+  const to=document.getElementById('to-xh').value;
+  const pg=Number(document.getElementById('pg-xh').value);
+  let d=[...C.XH];
+  if(from)d=d.filter(r=>r[3]>=from);
+  if(to)d=d.filter(r=>r[3]<=to);
+  if(q)d=d.filter(r=>(r[0]||'').toLowerCase().includes(q)||(r[2]||'').toLowerCase().includes(q));
+  let groups=groupXHByDate(d);
+  if(xhSortCol)groups.sort((a,b)=>xhCompare(a,b,xhSortCol)*xhSortDir);
+  else groups.sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
+  if(pg>0)groups=groups.slice(0,pg);// pg giờ giới hạn theo số NGÀY, không phải số dòng
+  rXH(groups);
+}
+// Lõi dùng chung để sửa 1 dòng Xếp hàng (dùng cho popup sửa nhanh theo ngày)
+async function saveXHEditCore(row,spIdx,sl,gh,ngay,gc){
+  const old=C.XH[row-2];if(!old)return{ok:false,msg:'Không tìm thấy phiếu xếp hàng'};
+  const sp=C.TK[spIdx];
+  if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
+  if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
+  if(!gh)return{ok:false,msg:'Chọn gian hàng'};
+  const oldIdx=xhTKIndex(old);
+  const oldSL=Number(old[1]||0);
+  // Kiểm tra tồn khả dụng (cộng hoàn lại phần phiếu cũ đã trừ trước khi so sánh)
+  if(oldIdx>=0&&oldIdx===spIdx){
+    const available=Number(C.TK[spIdx][1]||0)+oldSL;
+    if(sl>available)return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${available}!`};
+  } else if(sl>Number(sp[1]||0)){
+    return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${sp[1]}!`};
+  }
+  await apiPost({sheet:'XepHang',action:'update',row,data:[sp[0],sl,gh,ngay,gc,sp[9]||'']});
+  // đồng bộ ngay vào cache C.XH — tránh trường hợp sửa lại CÙNG dòng này lần nữa trước khi loadXH()
+  // kịp tải lại, khiến "SL cũ" đọc được bị lỗi thời và tồn kho bị tính sai
+  C.XH[row-2]=[sp[0],sl,gh,ngay,gc,sp[9]||''];
+  if(oldIdx>=0&&oldIdx===spIdx){
+    const newStock=Math.max(0,Number(C.TK[spIdx][1]||0)+oldSL-sl);
+    const upd=[...C.TK[spIdx]];upd[1]=newStock;
+    await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+    C.TK[spIdx][1]=newStock;
+  } else {
+    if(oldIdx>=0){
+      const newStockOld=Number(C.TK[oldIdx][1]||0)+oldSL;
+      const updOld=[...C.TK[oldIdx]];updOld[1]=newStockOld;
+      await apiPost({sheet:'TonKho',action:'update',row:oldIdx+2,data:updOld});
+      C.TK[oldIdx][1]=newStockOld;
+    }
+    const newStockNew=Math.max(0,Number(C.TK[spIdx][1]||0)-sl);
+    const updNew=[...C.TK[spIdx]];updNew[1]=newStockNew;
+    await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:updNew});
+    C.TK[spIdx][1]=newStockNew;
+  }
+  // (Không cần tự tay cập nhật "Đồ gian hàng" — màn đó tính thẳng từ lịch sử Xếp hàng mỗi lần hiển thị)
+  logAction('Cập nhật','Xếp hàng',`"${old[0]}" SL ${old[1]}→${sl}, Gian hàng: ${gh}`);
+  return{ok:true};
+}
+// ── Popup chi tiết + sửa nhanh các dòng xếp hàng của 1 ngày ──
+let xhDayCurrent=null;
+async function openXHDay(ngay){
+  xhDayCurrent=ngay;
+  await ensureTK();
+  await ensureGH();
+  document.getElementById('xh-day-q').value='';
+  document.getElementById('xh-day-gh-q').innerHTML='<option value="">Tất cả gian hàng</option>'+C.GH.map(g=>`<option>${esc(g[0])}</option>`).join('');
+  renderXHDayDetail();
+  om('m-xh-day');
+}
+function renderXHDayDetail(){
+  const wrap=document.getElementById('xh-day-tbl');
+  if(!wrap)return;
+  cleanupSearchLists(wrap);// dọn menu gợi ý cũ trước khi ghi đè innerHTML bên dưới
+  const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
+  document.getElementById('xh-day-t').textContent='Phiếu xếp hàng ngày '+(xhDayCurrent||'');
+  const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
+  document.getElementById('xh-day-sum').innerHTML=items.length?`<div class="grid3 stat-grid3" style="margin-bottom:14px">
+    <div class="kpi b"><div class="lb">Số dòng</div><div class="val">${items.length}</div></div>
+    <div class="kpi p"><div class="lb">Tổng SL</div><div class="val">${fmt(tongSL)}</div></div>
+    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(items.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
+  // Tìm nhanh sản phẩm/gian hàng ngay trong phiếu này — chỉ lọc dòng hiển thị, không đụng tới dữ liệu/tổng số ở trên
+  const q=(document.getElementById('xh-day-q')?.value||'').trim().toLowerCase();
+  const qGh=document.getElementById('xh-day-gh-q')?.value||'';// chọn đúng tên từ danh mục Gian hàng ở Cài đặt, không phải gõ tự do
+  const shown=items.filter(r=>
+    (!q||(r[0]||'').toLowerCase().includes(q))&&
+    (!qGh||r[2]===qGh)
+  );
+  const rowsHtml=shown.map(r=>{
+    const gi=C.XH.indexOf(r);const row=gi+2;
+    return`<tr>
+      <td><input id="xhd-sp-${row}" value="${esc(r[0])}" autocomplete="off" style="min-width:150px"></td>
+      <td><input type="number" id="xhd-sl-${row}" value="${r[1]||0}" style="width:70px"></td>
+      <td><input id="xhd-gh-${row}" value="${esc(r[2]||'')}" autocomplete="off" style="min-width:100px"></td>
+      <td><input type="date" id="xhd-ngay-${row}" value="${r[3]||''}" style="width:135px"></td>
+      <td><input id="xhd-gc-${row}" value="${r[4]||''}" style="width:130px"></td>
+      <td class="td-del"><button class="btn btn-d btn-sm" onclick="delXH(${row})">✕</button></td>
+    </tr>`;
+  }).join('');
+  let emptyMsg='';
+  if(!items.length)emptyMsg='<div class="empty">Không còn phiếu nào trong ngày này — bấm "+ Thêm sản phẩm" để thêm mới</div>';
+  else if(!shown.length)emptyMsg=`<div class="empty">Không có dòng nào khớp với bộ lọc đang tìm</div>`;
+  wrap.innerHTML=`<div class="scroll-tbl"><table class="item-table"><thead><tr>
+    <th>Sản phẩm</th><th>SL</th><th>Gian hàng</th><th>Ngày</th><th>Ghi chú</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`+emptyMsg;
+  wrap.querySelectorAll('[id^="xhd-sp-"]').forEach(el=>attachSearchList(el,()=>C.TK.map(t=>t[0])));
+  wrap.querySelectorAll('[id^="xhd-gh-"]').forEach(el=>attachSearchList(el,()=>C.GH.map(g=>g[0])));
+}
+// Thêm 1 dòng TRỐNG (chưa lưu) vào popup để xếp thêm sản phẩm mới cho đúng ngày này
+let xhDayNewCount=0;
+function addXHDayRow(){
+  const tbody=document.querySelector('#xh-day-tbl tbody');
+  if(!tbody)return;
+  xhDayNewCount++;
+  const id='new'+xhDayNewCount;
+  const ngayVal=xhDayCurrent&&xhDayCurrent!=='(chưa có ngày)'?xhDayCurrent:'';
+  const tr=document.createElement('tr');
+  tr.dataset.new='1';tr.dataset.tempId=id;
+  tr.innerHTML=`
+    <td><input id="xhd-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." style="min-width:150px"></td>
+    <td><input type="number" id="xhd-sl-${id}" placeholder="0" style="width:70px"></td>
+    <td><input id="xhd-gh-${id}" autocomplete="off" placeholder="Gõ tên gian hàng..." style="min-width:100px"></td>
+    <td><input type="date" id="xhd-ngay-${id}" value="${ngayVal}" style="width:135px"></td>
+    <td><input id="xhd-gc-${id}" style="width:130px"></td>
+    <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(this.closest('tr'))">✕</button></td>`;
+  tbody.appendChild(tr);
+  attachSearchList(document.getElementById('xhd-sp-'+id),()=>C.TK.map(t=>t[0]));
+  attachSearchList(document.getElementById('xhd-gh-'+id),()=>C.GH.map(g=>g[0]));
+}
+// Tạo mới 1 dòng Xếp hàng (dùng cho dòng vừa "+ Thêm" trong popup theo ngày) — cùng logic trừ tồn kho như saveXH()
+async function saveXHCreateCore(spIdx,sl,gh,ngay,gc){
+  const sp=C.TK[spIdx];
+  if(!sp)return{ok:false,msg:'Chọn sản phẩm'};
+  if(!sl||sl<=0)return{ok:false,msg:'Số lượng phải lớn hơn 0'};
+  if(!gh)return{ok:false,msg:'Chọn gian hàng'};
+  if(sl>Number(sp[1]||0))return{ok:false,msg:`${sp[0]}: tồn chỉ còn ${sp[1]}!`};
+  await apiPost({sheet:'XepHang',action:'append',row:[sp[0],sl,gh,ngay,gc,sp[9]||'']});
+  const newSL=Number(sp[1]||0)-sl;const upd=[...sp];upd[1]=newSL;
+  await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+  C.TK[spIdx][1]=newSL;
+  C.XH.push([sp[0],sl,gh,ngay,gc,sp[9]||'']);
+  return{ok:true};
+}
+// Lưu tất cả các dòng đang sửa trong popup (cả dòng có sẵn lẫn dòng vừa "+ Thêm")
+// Xóa cả phiếu (mọi dòng) của ngày đang xem trong popup — tiện hơn phải đóng popup rồi ra danh sách tick chọn
+async function delXHDay(){
+  const idxs=C.XH.map((r,i)=>i).filter(i=>(C.XH[i][3]||'(chưa có ngày)')===xhDayCurrent).sort((a,b)=>b-a);
+  if(!idxs.length){toast('Không có phiếu nào để xóa','err');return;}
+  confirmDel(`Xóa toàn bộ phiếu xếp ngày ${xhDayCurrent} (${idxs.length} dòng)? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
+    toast('Đang xóa '+idxs.length+' dòng...');
+    const delNames=[];
+    for(const idx of idxs){
+      const r=C.XH[idx];if(!r)continue;
+      delNames.push(`${r[0]} x${r[1]}`);
+      await apiPost({sheet:'XepHang',action:'delete',row:idx+2});
+      const spIdx=xhTKIndex(r);
+      if(spIdx>=0){
+        const newSL=Number(C.TK[spIdx][1]||0)+Number(r[1]||0);
+        const upd=[...C.TK[spIdx]];upd[1]=newSL;
+        await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+        C.TK[spIdx][1]=newSL;
+      }
+    }
+    logAction('Xóa','Xếp hàng',`Xóa cả phiếu ngày ${xhDayCurrent} (${delNames.length} dòng): ${delNames.join(', ')}`);
+    toast('Đã xóa phiếu xếp ngày '+xhDayCurrent+'!');
+    cm('m-xh-day');
+    setTimeout(loadXH,800);
+  });
+}
+async function saveXHDayAll(){
+  toast('Đang lưu...');
+  const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
+  for(const r of items){
+    const row=C.XH.indexOf(r)+2;
+    const spEl=document.getElementById('xhd-sp-'+row);
+    if(!spEl)continue;// dòng đã bị xóa khỏi DOM (bấm ✕) trong lúc sửa, bỏ qua
+    const spIdx=C.TK.findIndex(t=>t[0]===spEl.value);
+    const sl=Number(document.getElementById('xhd-sl-'+row).value||0);
+    const gh=document.getElementById('xhd-gh-'+row).value;
+    const ngay=document.getElementById('xhd-ngay-'+row).value;
+    const gc=document.getElementById('xhd-gc-'+row).value;
+    const res=await saveXHEditCore(row,spIdx,sl,gh,ngay,gc);
+    if(!res.ok){toast(`Dòng "${r[0]}": ${res.msg}`,'err');return;}
+  }
+  const newTrs=[...document.querySelectorAll('#xh-day-tbl tbody tr[data-new="1"]')];
+  const created=[];
+  for(const tr of newTrs){
+    const id=tr.dataset.tempId;
+    const spVal=document.getElementById('xhd-sp-'+id).value;
+    const sl=Number(document.getElementById('xhd-sl-'+id).value||0);
+    if(!spVal&&!sl)continue;// dòng để trống hoàn toàn (bấm + Thêm nhưng không gõ gì), bỏ qua
+    const spIdx=C.TK.findIndex(t=>t[0]===spVal);
+    const gh=document.getElementById('xhd-gh-'+id).value;
+    const ngay=document.getElementById('xhd-ngay-'+id).value;
+    const gc=document.getElementById('xhd-gc-'+id).value;
+    const res=await saveXHCreateCore(spIdx,sl,gh,ngay,gc);
+    if(!res.ok){toast(`Dòng mới: ${res.msg}`,'err');return;}
+    created.push(`${C.TK[spIdx][0]} x${sl}`);
+  }
+  if(created.length)logAction('Tạo mới','Xếp hàng',`Thêm vào ngày ${xhDayCurrent}: ${created.join(', ')}`);
+  toast('Đã lưu tất cả thay đổi!');
+  cm('m-xh-day');
+  setTimeout(loadXH,800);
+}
+
+// ── XÓA XẾP HÀNG → hoàn lại tồn kho ──
+async function delXH(row){
+  const r=C.XH[row-2];if(!r)return;
+  const tenSP=r[0],sl=Number(r[1]||0);
+  confirmDel(`Xóa phiếu xếp "${tenSP}" (${sl})? Tồn kho sẽ được hoàn lại ${sl}.`,async()=>{
+    toast('Đang xóa...');
+    await apiPost({sheet:'XepHang',action:'delete',row:Number(row)});
+    const spIdx=xhTKIndex(r);
+    if(spIdx>=0){
+      const newSL=Number(C.TK[spIdx][1]||0)+sl;
+      const upd=[...C.TK[spIdx]];upd[1]=newSL;
+      await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
+      C.TK[spIdx][1]=newSL;
+    }
+    logAction('Xóa','Xếp hàng',`Phiếu xếp "${tenSP}" x${sl}`);
+    toast('Đã xóa & hoàn tồn kho!');setTimeout(loadXH,800);
+  });
+}
+
+// KHÔNG dùng 1 bảng riêng cộng dồn dần (dễ thiếu dữ liệu cũ, dễ lệch) — mà TÍNH THẲNG từ lịch sử Xếp hàng
+// (C.XH) mỗi lần hiển thị: gộp theo (Sản phẩm, Gian hàng) rồi cộng SL → tự động có đủ mọi phiếu xếp,
+// kể cả những phiếu đã xếp từ TRƯỚC khi có màn hình này, không cần "backfill" gì cả.
+// C.GHK chỉ còn dùng để lưu phần CHÊNH LỆCH khi người dùng tự "Sửa" (kiểm kê lại cho đúng thực tế) —
+// mỗi dòng là 1 độ lệch (offset, có thể âm) cộng thêm vào số tính từ Xếp hàng, không phải số tuyệt đối.
+
+bootPage('xh',function(){
+  document.getElementById('acts').innerHTML=`<button class="btn btn-s" onclick="openXH()">+ Tạo phiếu xếp</button>`;
+  loadXH();
+});
+</script>
+</body>
+</html>

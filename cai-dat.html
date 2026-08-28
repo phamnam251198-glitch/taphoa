@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Cài đặt</title>
+<link rel="stylesheet" href="style.css?v=20260828o">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-setting">
+      <div class="tabs">
+        <div class="tab on" id="st-nguong" onclick="goSetTab('nguong')">Ngưỡng cảnh báo</div>
+        <div class="tab" id="st-user" onclick="goSetTab('user')">Người dùng</div>
+        <div class="tab" id="st-ncc" onclick="goSetTab('ncc')">Nhà cung cấp</div>
+        <div class="tab" id="st-gh" onclick="goSetTab('gh')">Gian hàng</div>
+        <div class="tab" id="st-loai" onclick="goSetTab('loai')">Loại hàng</div>
+      </div>
+
+      <div class="set-tab on" id="set-nguong">
+        <div class="card">
+          <div class="ch"><h2>Ngưỡng cảnh báo mặc định</h2></div>
+          <div style="padding:18px">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Áp dụng cho những sản phẩm <b>không đặt ngưỡng riêng</b> (để trống ở form Sửa sản phẩm). Sản phẩm nào đã đặt ngưỡng riêng thì dùng ngưỡng riêng đó, không dùng số mặc định này.</p>
+            <div class="fr">
+              <div class="fg"><label>Ngưỡng "Sắp hết" mặc định</label><input id="set-saphet" type="number" placeholder="10"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Sắp hết"</small></div>
+              <div class="fg"><label>Ngưỡng "Gần hết" mặc định</label><input id="set-ganhet" type="number" placeholder="3"><small style="color:var(--text2);font-size:11px">Tồn kho ≤ số này → tính là "Gần hết" (khẩn cấp hơn)</small></div>
+            </div>
+            <p style="font-size:12px;color:var(--text2);margin:18px 0 16px;padding-top:16px;border-top:1px solid var(--border)">Áp dụng cho card <b>"Hàng sắp hết hạn sử dụng"</b> ở Tổng quan — chỉ tính sản phẩm có ghi Hạn sử dụng.</p>
+            <div class="fr">
+              <div class="fg"><label>Sắp hết hạn trong (ngày)</label><input id="set-hsdsap" type="number" placeholder="30"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → liệt kê vào danh sách</small></div>
+              <div class="fg"><label>Gấp nếu còn ≤ (ngày)</label><input id="set-hsdgan" type="number" placeholder="7"><small style="color:var(--text2);font-size:11px">HSD còn ≤ số ngày này → đánh dấu đỏ (khẩn cấp)</small></div>
+            </div>
+            <div class="mf" style="border-top:none;padding-top:8px">
+              <button class="btn btn-p" onclick="saveCaiDat()">💾 Lưu cài đặt</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h2>Mã SP (liên kết dữ liệu)</h2></div>
+          <div style="padding:18px">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Nhập hàng/Xếp hàng giờ liên kết với sản phẩm qua <b>Mã SP</b> (thay vì tên) để đổi tên sản phẩm không làm sai lệch phiếu cũ. Chạy nút dưới đây <b>1 lần</b> để: tự sinh Mã SP cho các sản phẩm đang thiếu, và gán mã vào lịch sử phiếu Nhập/Xếp hàng cũ (khớp theo tên hiện tại). Nên chạy <b>trước khi đổi tên</b> bất kỳ sản phẩm nào.</p>
+            <div class="mf" style="border-top:none;padding-top:8px">
+              <button class="btn btn-g" onclick="askRunMaSPMigration()">🔗 Quét & gán Mã SP</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h2>🤖 Quét hóa đơn (Google Cloud Vision)</h2></div>
+          <div style="padding:18px">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Dùng cho nút "📷 Quét hóa đơn (OCR)" ở màn <a href="nhap-hang.html" style="color:var(--blue)">Nhập hàng</a> — chụp ảnh hóa đơn, Cloud Vision đọc chữ (OCR) rồi app tự đoán sản phẩm/số lượng/giá theo từng dòng, điền sẵn vào phiếu nhập.</p>
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Cần <b>API key Google Cloud Vision</b>:</p>
+            <ol style="font-size:12px;color:var(--text2);margin:0 0 16px 18px;line-height:1.8">
+              <li>Vào <a href="https://console.cloud.google.com/" target="_blank" rel="noopener" style="color:var(--blue)">console.cloud.google.com</a>, tạo 1 project mới (hoặc dùng project có sẵn)</li>
+              <li>Vào mục <b>APIs & Services → Library</b>, tìm và bật <b>"Cloud Vision API"</b></li>
+              <li>⚠️ Google bắt buộc gắn <b>thẻ thanh toán</b> để bật API này (dù có <b>1.000 lượt/tháng miễn phí</b>, dùng trong hạn mức đó không bị trừ tiền)</li>
+              <li>Vào <b>APIs & Services → Credentials → Create Credentials → API key</b>, nên bấm "Restrict key" → chỉ cho phép dùng với Cloud Vision API để an toàn hơn</li>
+              <li>Copy key dán vào ô bên dưới</li>
+            </ol>
+            <p style="font-size:12px;color:var(--text2);margin-bottom:16px">⚠️ App không có server riêng nên key được gọi <b>thẳng từ trình duyệt</b> — ai xem được mã nguồn/DevTools trên máy đã đăng nhập đều có thể lấy và dùng key này. Vì key này gắn với thẻ thanh toán (khác các key miễn phí hoàn toàn), nên <b>giới hạn key theo API</b> (bước 4) và thỉnh thoảng kiểm tra mục <b>Billing</b> trên Google Cloud để phát hiện sớm nếu bị dùng bất thường.</p>
+            <div class="fg" style="max-width:420px"><label>API key</label><input id="set-visionkey" type="password" placeholder="AIza..." autocomplete="off"></div>
+            <div class="mf" style="border-top:none;padding-top:8px">
+              <button class="btn btn-p" onclick="saveVisionKey()">💾 Lưu API key</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-user">
+        <div class="card">
+          <div class="ch"><h2>Người dùng</h2><button class="btn btn-p btn-sm" onclick="initUser()">+ Thêm người dùng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <button class="btn btn-g" onclick="loadUser()">↻ Làm mới</button>
+              <button class="btn btn-d" id="user-delsel-btn" onclick="delSelUser()" style="display:none">🗑 Xóa đã chọn (<span id="user-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="user-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-ncc">
+        <div class="card">
+          <div class="ch"><h2>Nhà cung cấp</h2><button class="btn btn-p btn-sm" onclick="initNCC()">+ Thêm NCC</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-ncc" placeholder="Tìm nhà cung cấp..." oninput="fNCC()">
+              <button class="btn btn-g" onclick="loadNCC()">↻ Làm mới</button>
+              <button class="btn btn-d" id="ncc-delsel-btn" onclick="delSelNCC()" style="display:none">🗑 Xóa đã chọn (<span id="ncc-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="ncc-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-gh">
+        <div class="card">
+          <div class="ch"><h2>Gian hàng</h2><button class="btn btn-p btn-sm" onclick="initGH()">+ Thêm gian hàng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-gh" placeholder="Tìm gian hàng..." oninput="fGH()">
+              <button class="btn btn-g" onclick="loadGH()">↻ Làm mới</button>
+              <button class="btn btn-d" id="gh-delsel-btn" onclick="delSelGH()" style="display:none">🗑 Xóa đã chọn (<span id="gh-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="gh-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+
+      <div class="set-tab" id="set-loai">
+        <div class="card">
+          <div class="ch"><h2>Loại hàng</h2><button class="btn btn-p btn-sm" onclick="initLoai()">+ Thêm loại hàng</button></div>
+          <div style="padding:14px 18px 0">
+            <details class="sb-wrap">
+            <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+            <div class="sb">
+              <input type="text" id="q-loai" placeholder="Tìm loại hàng..." oninput="fLoai()">
+              <button class="btn btn-g" onclick="loadLoai()">↻ Làm mới</button>
+              <button class="btn btn-d" id="loai-delsel-btn" onclick="delSelLoai()" style="display:none">🗑 Xóa đã chọn (<span id="loai-selcnt">0</span>)</button>
+            </div>
+            </details>
+          </div>
+          <div id="loai-tbl"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NCC -->
+<div class="mo" id="m-ncc">
+  <div class="mb mb-sm">
+    <h3 id="m-ncc-t">Thêm nhà cung cấp</h3>
+    <input type="hidden" id="ncc-row">
+    <div class="fg"><label>Tên NCC *</label><input id="ncc-ten"></div>
+    <div class="fr">
+      <div class="fg"><label>Số điện thoại</label><input id="ncc-sdt"></div>
+      <div class="fg"><label>Mặt hàng</label><input id="ncc-mh"></div>
+    </div>
+    <div class="fg"><label>Địa chỉ</label><input id="ncc-dc"></div>
+    <div class="fg"><label>Ghi chú</label><textarea id="ncc-gc" rows="2"></textarea></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-ncc')">Hủy</button>
+      <button class="btn btn-p" onclick="saveNCC()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GIAN HÀNG -->
+<div class="mo" id="m-gh">
+  <div class="mb mb-sm">
+    <h3 id="m-gh-t">Thêm gian hàng</h3>
+    <input type="hidden" id="gh-row">
+    <div class="fg"><label>Tên gian hàng *</label><input id="gh-ten" placeholder="VD: Gian hàng bánh kẹo"></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-gh')">Hủy</button>
+      <button class="btn btn-p" onclick="saveGH()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOẠI HÀNG -->
+<div class="mo" id="m-loai">
+  <div class="mb mb-sm">
+    <h3 id="m-loai-t">Thêm loại hàng</h3>
+    <input type="hidden" id="loai-row">
+    <div class="fg"><label>Tên loại hàng *</label><input id="loai-ten" placeholder="VD: Đồ uống, Bánh kẹo..."></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cm('m-loai')">Hủy</button>
+      <button class="btn btn-p" onclick="saveLoai()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL USER -->
+<div class="mo" id="m-user">
+  <div class="mb mb-sm">
+    <h3 id="m-user-t">Thêm người dùng</h3>
+    <input type="hidden" id="user-row">
+    <div class="fg"><label>Họ tên *</label><input id="user-ten" placeholder="Nguyễn Văn A"></div>
+    <div class="fg"><label>Số điện thoại</label><input id="user-sdt" placeholder="0xxx..."></div>
+    <div class="fg"><label>Vai trò</label><input id="user-vaitro" placeholder="Chủ cửa hàng, Nhân viên..."></div>
+    <div class="fg"><label>Email đăng nhập</label><input id="user-email" type="email" placeholder="email@vidu.com" autocomplete="off"></div>
+    <div class="fg" id="user-pass-wrap">
+      <label>Mật khẩu đăng nhập</label>
+      <div style="display:flex;gap:6px">
+        <input id="user-pass" type="password" placeholder="Từ 6 ký tự" autocomplete="new-password" style="flex:1">
+        <button type="button" class="btn btn-g btn-sm" onclick="toggleUserPassInput()">👁️</button>
+      </div>
+      <small style="color:var(--text2);font-size:11px" id="user-pass-hint">Nhập cả Email &amp; Mật khẩu nếu muốn người này tự đăng nhập được vào app. Để trống nếu chỉ cần lưu tên tham khảo. Nếu email đã có tài khoản từ trước (VD: tài khoản admin gốc), chỉ cần gõ email đó — hệ thống sẽ tự liên kết vào đây.</small>
+    </div>
+    <div class="fg"><label>Ghi chú</label><textarea id="user-gc" rows="2"></textarea></div>
+    <div class="mf">
+      <button class="btn btn-g" id="user-reset-btn" onclick="sendUserResetPass()" style="display:none">🔑 Gửi email đặt lại mật khẩu</button>
+      <button class="btn btn-g" onclick="cm('m-user')">Hủy</button>
+      <button class="btn btn-p" onclick="saveUser()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260828o"></script>
+<script>
+// ── JS riêng cho màn Cài đặt ──
+function goSetTab(name){
+  document.querySelectorAll('#s-setting .tabs .tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#s-setting .set-tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('st-'+name).classList.add('on');
+  document.getElementById('set-'+name).classList.add('on');
+}
+
+// ══ MÃ SP (quét & gán 1 lần) ══
+async function runMaSPMigration(){
+  toast('Đang quét & gán Mã SP...');
+  const tk=await apiGet('TonKho');C.TK=tk;
+  let tkCount=0;
+  for(let i=0;i<C.TK.length;i++){
+    if(!C.TK[i][9]){
+      const row=[...C.TK[i]];row[9]=genNextMaSP();
+      await apiPost({sheet:'TonKho',action:'update',row:i+2,data:row});
+      C.TK[i]=row;tkCount++;
+    }
+  }
+  const nh=await apiGet('NhapHang');C.NH=nh;
+  let nhCount=0;
+  for(let i=0;i<C.NH.length;i++){
+    const r=C.NH[i];
+    if(!r[9]){
+      const idx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(idx>=0&&C.TK[idx][9]){
+        const row=[...r];row[9]=C.TK[idx][9];
+        await apiPost({sheet:'NhapHang',action:'update',row:i+2,data:row});
+        C.NH[i]=row;nhCount++;
+      }
+    }
+  }
+  const xh=await apiGet('XepHang');C.XH=xh;
+  let xhCount=0;
+  for(let i=0;i<C.XH.length;i++){
+    const r=C.XH[i];
+    if(!r[5]){
+      const idx=C.TK.findIndex(t=>t[0]===r[0]);
+      if(idx>=0&&C.TK[idx][9]){
+        const row=[...r];row[5]=C.TK[idx][9];
+        await apiPost({sheet:'XepHang',action:'update',row:i+2,data:row});
+        C.XH[i]=row;xhCount++;
+      }
+    }
+  }
+  logAction('Cập nhật','Hệ thống',`Quét gán Mã SP: ${tkCount} sản phẩm được sinh mã mới, ${nhCount} phiếu nhập & ${xhCount} phiếu xếp được gán mã.`);
+  toast(`Xong! Đã sinh mã cho ${tkCount} SP, gán mã cho ${nhCount} phiếu nhập & ${xhCount} phiếu xếp.`);
+}
+function askRunMaSPMigration(){
+  confirmDel('Quét & gán Mã SP cho toàn bộ sản phẩm + lịch sử Nhập/Xếp hàng đang thiếu mã?\n\nChỉ cần chạy 1 lần. Nên chạy trước khi đổi tên bất kỳ sản phẩm nào để việc khớp theo tên (cho phiếu cũ) được chính xác.',runMaSPMigration);
+}
+// Vị trí của 1 Loại hàng theo đúng thứ tự đã sắp ở Cài đặt → Loại hàng (kéo lên/xuống bằng nút ↑↓) —
+// dùng để quyết định khối nào hiện trước khi gộp accordion ở Tồn kho & Đồ gian hàng
+let selNCC=new Set();
+async function loadNCC(){
+  document.getElementById('ncc-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selNCC.clear();updateSelUI('ncc-delsel-btn','ncc-selcnt',0);
+  nccPage=1;
+  const data=await apiGet('NhaCungCap');C.NCC=data;rNCC(data);
+}
+const NCC_COLS=[
+  {key:'ten',label:'Tên NCC'},{key:'sdt',label:'SĐT'},{key:'mh',label:'Mặt hàng'},{key:'dc',label:'Địa chỉ'},{key:'gc',label:'Ghi chú'}
+];
+let nccSortCol=null,nccSortDir=1;
+function sortNCCClick(col){if(nccSortCol===col)nccSortDir*=-1;else{nccSortCol=col;nccSortDir=1;}fNCC();}
+function nccCompare(a,b,col){
+  const idx={ten:0,sdt:1,mh:2,dc:3,gc:4}[col];
+  return(a[idx]||'').localeCompare(b[idx]||'');
+}
+let nccPage=1,nccLastData=[];
+function gotoNCCPage(p){nccPage=p;rNCC(nccLastData);}
+function rNCC(data){
+  nccLastData=data;
+  const el=document.getElementById('ncc-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">🚚 Chưa có NCC</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(nccPage>totalPages)nccPage=totalPages;if(nccPage<1)nccPage=1;
+  const pageData=data.slice((nccPage-1)*LIST_PAGE_SIZE,nccPage*LIST_PAGE_SIZE);
+  const ths=NCC_COLS.map(c=>{
+    const on=nccSortCol===c.key;
+    return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortNCCClick('${c.key}')">${c.label} <span class="sort-ic">${on?(nccSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
+  }).join('');
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="ncc-selall" onchange="toggleAllNCC(this)"></th>${ths}<th></th></tr></thead><tbody>`+
+    pageData.map(r=>{
+      const gi=C.NCC.indexOf(r);// vị trí thật, tránh lệch dòng khi đang lọc/sắp xếp
+      const chk=selNCC.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="ncc-chk" data-idx="${gi}" ${chk} onchange="toggleNCCChk(this)"></td><td data-label="Tên NCC"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Mặt hàng">${r[2]||''}</td><td data-label="Địa chỉ">${r[3]||''}</td><td class="mobile-hide" data-label="Ghi chú">${r[4]||''}</td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editNCC(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('NhaCungCap',${gi+2},'NCC')">Xóa</button></td></tr>`;
+    }).join('')+'</tbody></table>'+pagerHTML(nccPage,data.length,p=>`gotoNCCPage(${p})`);
+  updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
+  updateSelAllTri('ncc-selall','ncc-chk',selNCC);
+}
+function toggleNCCChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selNCC.add(idx);else selNCC.delete(idx);
+  updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
+  updateSelAllTri('ncc-selall','ncc-chk',selNCC);
+}
+function toggleAllNCC(el){
+  document.querySelectorAll('.ncc-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selNCC.add(idx);else selNCC.delete(idx);
+  });
+  updateSelUI('ncc-delsel-btn','ncc-selcnt',selNCC.size);
+}
+async function delSelNCC(){
+  if(!selNCC.size){toast('Chưa chọn NCC nào','err');return;}
+  confirmDel(`Xóa ${selNCC.size} nhà cung cấp đã chọn?`,async()=>{
+    toast('Đang xóa '+selNCC.size+' NCC...');
+    const idxs=[...selNCC].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'NhaCungCap',action:'delete',row:idx+2});
+    selNCC.clear();
+    toast('Đã xóa '+idxs.length+' NCC!');setTimeout(loadNCC,800);
+  });
+}
+function fNCC(){
+  const q=document.getElementById('q-ncc').value.toLowerCase();
+  const d=C.NCC.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  if(nccSortCol)d.sort((a,b)=>nccCompare(a,b,nccSortCol)*nccSortDir);
+  nccPage=1;
+  rNCC(d);
+}
+function initNCC(){document.getElementById('m-ncc-t').textContent='Thêm NCC';['ncc-ten','ncc-sdt','ncc-mh','ncc-dc','ncc-gc'].forEach(id=>document.getElementById(id).value='');document.getElementById('ncc-row').value='';om('m-ncc');}
+function editNCC(row){const r=C.NCC[row-2];document.getElementById('m-ncc-t').textContent='Sửa NCC';document.getElementById('ncc-ten').value=r[0]||'';document.getElementById('ncc-sdt').value=r[1]||'';document.getElementById('ncc-mh').value=r[2]||'';document.getElementById('ncc-dc').value=r[3]||'';document.getElementById('ncc-gc').value=r[4]||'';document.getElementById('ncc-row').value=row;om('m-ncc');}
+async function saveNCC(){
+  const ten=document.getElementById('ncc-ten').value.trim();if(!ten){toast('Nhập tên NCC','err');return;}
+  const row=[ten,document.getElementById('ncc-sdt').value,document.getElementById('ncc-mh').value,document.getElementById('ncc-dc').value,document.getElementById('ncc-gc').value];
+  const er=document.getElementById('ncc-row').value;
+  await apiPost(er?{sheet:'NhaCungCap',action:'update',row:Number(er),data:row}:{sheet:'NhaCungCap',action:'append',row});
+  toast(er?'Đã cập nhật NCC':'Đã thêm NCC');cm('m-ncc');setTimeout(loadNCC,800);
+}
+
+// ══ GIAN HÀNG ══
+let selGH=new Set();
+async function loadGH(){
+  document.getElementById('gh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selGH.clear();updateSelUI('gh-delsel-btn','gh-selcnt',0);
+  ghPage=1;
+  const data=await apiGet('GianHang');C.GH=data;fGH();
+}
+let ghSortDir=1;
+function sortGHClick(){ghSortDir*=-1;fGH();}
+let ghPage=1,ghLastData=[];
+function gotoGHPage(p){ghPage=p;rGH(ghLastData);}
+function rGH(data){
+  ghLastData=data;
+  const el=document.getElementById('gh-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">🏬 Chưa có gian hàng</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(ghPage>totalPages)ghPage=totalPages;if(ghPage<1)ghPage=1;
+  const pageData=data.slice((ghPage-1)*LIST_PAGE_SIZE,ghPage*LIST_PAGE_SIZE);
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="gh-selall" onchange="toggleAllGH(this)"></th><th class="th-sort th-sort-on" onclick="sortGHClick()">Tên gian hàng <span class="sort-ic">${ghSortDir===1?'▲':'▼'}</span></th><th></th></tr></thead><tbody>`+
+    pageData.map(r=>{
+      const gi=C.GH.indexOf(r);
+      const chk=selGH.has(gi)?'checked':'';
+      return`<tr><td data-label=""><input type="checkbox" class="gh-chk" data-idx="${gi}" ${chk} onchange="toggleGHChk(this)"></td><td data-label="Tên gian hàng"><b>${r[0]}</b></td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGH(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('GianHang',${gi+2},'gian hàng')">Xóa</button></td></tr>`;
+    }).join('')+'</tbody></table>'+pagerHTML(ghPage,data.length,p=>`gotoGHPage(${p})`);
+  updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
+  updateSelAllTri('gh-selall','gh-chk',selGH);
+}
+function toggleGHChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selGH.add(idx);else selGH.delete(idx);
+  updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
+  updateSelAllTri('gh-selall','gh-chk',selGH);
+}
+function toggleAllGH(el){
+  document.querySelectorAll('.gh-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selGH.add(idx);else selGH.delete(idx);
+  });
+  updateSelUI('gh-delsel-btn','gh-selcnt',selGH.size);
+}
+async function delSelGH(){
+  if(!selGH.size){toast('Chưa chọn gian hàng nào','err');return;}
+  confirmDel(`Xóa ${selGH.size} gian hàng đã chọn?`,async()=>{
+    toast('Đang xóa '+selGH.size+' gian hàng...');
+    const idxs=[...selGH].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'GianHang',action:'delete',row:idx+2});
+    selGH.clear();
+    toast('Đã xóa '+idxs.length+' gian hàng!');setTimeout(loadGH,800);
+  });
+}
+function fGH(){
+  const q=document.getElementById('q-gh').value.toLowerCase();
+  const d=C.GH.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  d.sort((a,b)=>(a[0]||'').localeCompare(b[0]||'')*ghSortDir);
+  ghPage=1;
+  rGH(d);
+}
+function initGH(){document.getElementById('m-gh-t').textContent='Thêm gian hàng';document.getElementById('gh-ten').value='';document.getElementById('gh-row').value='';om('m-gh');}
+function editGH(row){const r=C.GH[row-2];document.getElementById('m-gh-t').textContent='Sửa gian hàng';document.getElementById('gh-ten').value=r[0]||'';document.getElementById('gh-row').value=row;om('m-gh');}
+async function saveGH(){
+  const ten=document.getElementById('gh-ten').value.trim();if(!ten){toast('Nhập tên gian hàng','err');return;}
+  const row=[ten];
+  const er=document.getElementById('gh-row').value;
+  await apiPost(er?{sheet:'GianHang',action:'update',row:Number(er),data:row}:{sheet:'GianHang',action:'append',row});
+  toast(er?'Đã cập nhật gian hàng':'Đã thêm gian hàng');cm('m-gh');setTimeout(loadGH,800);
+}
+
+// ══ LOẠI HÀNG ══
+let selLoai=new Set();
+async function loadLoai(){
+  document.getElementById('loai-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selLoai.clear();updateSelUI('loai-delsel-btn','loai-selcnt',0);
+  loaiPage=1;
+  const data=await apiGet('LoaiHang');C.LOAI=data;fLoai();
+}
+// Thứ tự Loại hàng hiển thị đúng theo thứ tự đã lưu trong C.LOAI (kéo/đưa lên xuống bằng nút ↑↓ bên dưới) —
+// thứ tự này được TK/Đồ gian hàng dùng để quyết định khối nào hiện trước khi gộp accordion
+let loaiPage=1,loaiLastData=[];
+function gotoLoaiPage(p){loaiPage=p;rLoai(loaiLastData);}
+function rLoai(data){
+  loaiLastData=data;
+  const el=document.getElementById('loai-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">🏷️ Chưa có loại hàng</div>';return;}
+  const filtering=!!document.getElementById('q-loai').value.trim();
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(loaiPage>totalPages)loaiPage=totalPages;if(loaiPage<1)loaiPage=1;
+  const pageData=data.slice((loaiPage-1)*LIST_PAGE_SIZE,loaiPage*LIST_PAGE_SIZE);
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="loai-selall" onchange="toggleAllLoai(this)"></th><th style="width:80px">Thứ tự</th><th>Tên loại hàng</th><th></th></tr></thead><tbody>`+
+    pageData.map(r=>{
+      const gi=C.LOAI.indexOf(r);
+      const chk=selLoai.has(gi)?'checked':'';
+      const upDis=filtering||gi<=0?'disabled':'';
+      const downDis=filtering||gi>=C.LOAI.length-1?'disabled':'';
+      return`<tr><td data-label=""><input type="checkbox" class="loai-chk" data-idx="${gi}" ${chk} onchange="toggleLoaiChk(this)"></td>
+      <td data-label="Thứ tự"><button class="btn btn-g btn-sm" ${upDis} onclick="moveLoaiSettings(${gi},-1)" title="Đưa lên">↑</button> <button class="btn btn-g btn-sm" ${downDis} onclick="moveLoaiSettings(${gi},1)" title="Đưa xuống">↓</button></td>
+      <td data-label="Tên loại hàng"><b>${r[0]}</b></td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editLoai(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('LoaiHang',${gi+2},'loại hàng')">Xóa</button></td></tr>`;
+    }).join('')+'</tbody></table>'+pagerHTML(loaiPage,data.length,p=>`gotoLoaiPage(${p})`)+(filtering?'<p style="font-size:11px;color:var(--text2);padding:10px 18px 0">Xóa ô tìm kiếm để sắp xếp lại thứ tự</p>':'');
+  updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
+  updateSelAllTri('loai-selall','loai-chk',selLoai);
+}
+// Đổi chỗ 1 loại hàng với loại liền kề (lên/xuống) — ghi thẳng xuống sheet để giữ đúng thứ tự sau khi tải lại
+// Lõi đổi chỗ dùng chung — không tự vẽ lại màn hình nào cả, để chỗ nào gọi thì chỗ đó tự làm mới đúng view của mình
+async function moveLoaiSettings(idx,dir){if(await moveLoai(idx,dir))fLoai();}
+// Đổi thứ tự ngay từ khối accordion ở Tồn kho / Đồ gian hàng (theo tên loại, vì các màn đó không có sẵn vị trí dòng)
+function toggleLoaiChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selLoai.add(idx);else selLoai.delete(idx);
+  updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
+  updateSelAllTri('loai-selall','loai-chk',selLoai);
+}
+function toggleAllLoai(el){
+  document.querySelectorAll('.loai-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selLoai.add(idx);else selLoai.delete(idx);
+  });
+  updateSelUI('loai-delsel-btn','loai-selcnt',selLoai.size);
+}
+async function delSelLoai(){
+  if(!selLoai.size){toast('Chưa chọn loại hàng nào','err');return;}
+  confirmDel(`Xóa ${selLoai.size} loại hàng đã chọn?`,async()=>{
+    toast('Đang xóa '+selLoai.size+' loại hàng...');
+    const idxs=[...selLoai].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'LoaiHang',action:'delete',row:idx+2});
+    selLoai.clear();
+    toast('Đã xóa '+idxs.length+' loại hàng!');setTimeout(loadLoai,800);
+  });
+}
+let loaiLastQ='';
+function fLoai(){
+  const q=document.getElementById('q-loai').value.toLowerCase();
+  if(q!==loaiLastQ){loaiPage=1;loaiLastQ=q;}// chỉ về trang 1 khi Ô TÌM KIẾM thực sự đổi — không phải mỗi lần bấm ↑↓ đưa lên/xuống (fLoai() cũng được gọi lại sau đó để vẽ lại đúng thứ tự)
+  const d=C.LOAI.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  rLoai(d);
+}
+function initLoai(){document.getElementById('m-loai-t').textContent='Thêm loại hàng';document.getElementById('loai-ten').value='';document.getElementById('loai-row').value='';om('m-loai');}
+function editLoai(row){const r=C.LOAI[row-2];document.getElementById('m-loai-t').textContent='Sửa loại hàng';document.getElementById('loai-ten').value=r[0]||'';document.getElementById('loai-row').value=row;om('m-loai');}
+async function saveLoai(){
+  const ten=document.getElementById('loai-ten').value.trim();if(!ten){toast('Nhập tên loại hàng','err');return;}
+  const row=[ten];
+  const er=document.getElementById('loai-row').value;
+  await apiPost(er?{sheet:'LoaiHang',action:'update',row:Number(er),data:row}:{sheet:'LoaiHang',action:'append',row});
+  toast(er?'Đã cập nhật loại hàng':'Đã thêm loại hàng');cm('m-loai');setTimeout(loadLoai,800);
+}
+
+// ══ NGƯỜI DÙNG ══
+const USER_COLS=[
+  {key:'ten',label:'Họ tên'},{key:'sdt',label:'SĐT'},{key:'vaitro',label:'Vai trò'},{key:'email',label:'Email đăng nhập'},{key:'pass',label:'Mật khẩu'},{key:'gc',label:'Ghi chú'}
+];
+let userSortCol=null,userSortDir=1;
+function sortUserClick(col){if(userSortCol===col)userSortDir*=-1;else{userSortCol=col;userSortDir=1;}renderUserSorted();}
+function userCompare(a,b,col){
+  const idx={ten:0,sdt:1,vaitro:2,email:4,pass:5,gc:3}[col];
+  return(a[idx]||'').localeCompare(b[idx]||'');
+}
+function renderUserSorted(){
+  const d=[...C.USER];
+  if(userSortCol)d.sort((a,b)=>userCompare(a,b,userSortCol)*userSortDir);
+  userPage=1;
+  rUser(d);
+}
+let selUser=new Set();
+async function loadUser(){
+  document.getElementById('user-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  selUser.clear();updateSelUI('user-delsel-btn','user-selcnt',0);
+  const data=await apiGet('User');C.USER=data;renderUserSorted();
+}
+let userPage=1,userLastData=[];
+function gotoUserPage(p){userPage=p;rUser(userLastData);}
+function rUser(data){
+  userLastData=data;
+  const el=document.getElementById('user-tbl');
+  if(!data.length){el.innerHTML='<div class="empty">👤 Chưa có người dùng nào</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/LIST_PAGE_SIZE));
+  if(userPage>totalPages)userPage=totalPages;if(userPage<1)userPage=1;
+  const pageData=data.slice((userPage-1)*LIST_PAGE_SIZE,userPage*LIST_PAGE_SIZE);
+  const ths=USER_COLS.map(c=>{
+    const on=userSortCol===c.key;
+    return`<th class="th-sort${on?' th-sort-on':''}" onclick="sortUserClick('${c.key}')">${c.label} <span class="sort-ic">${on?(userSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
+  }).join('');
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="user-selall" onchange="toggleAllUser(this)"></th>${ths}<th></th></tr></thead><tbody>`+
+    pageData.map(r=>{
+      const gi=C.USER.indexOf(r);
+      const chk=selUser.has(gi)?'checked':'';
+      const passCell=r[5]
+        ?`<span id="pwm-${gi}">••••••••</span><span id="pwr-${gi}" style="display:none">${esc(r[5])}</span> <button class="btn btn-g btn-sm" onclick="toggleUserPass(${gi})" title="Xem/ẩn mật khẩu">👁️</button>`
+        :'<span style="color:var(--text2);font-size:11px">—</span>';
+      return`<tr><td data-label=""><input type="checkbox" class="user-chk" data-idx="${gi}" ${chk} onchange="toggleUserChk(this)"></td><td data-label="Họ tên"><b>${r[0]}</b></td><td data-label="SĐT">${r[1]||''}</td><td data-label="Vai trò">${r[2]?`<span class="bg bg-p">${r[2]}</span>`:''}</td><td data-label="Email đăng nhập">${r[4]?`<span class="bg bg-b">${r[4]}</span>`:'<span style="color:var(--text2);font-size:11px">Chưa có</span>'}</td><td data-label="Mật khẩu">${passCell}</td><td class="mobile-hide" data-label="Ghi chú">${r[3]||''}</td>
+      <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editUser(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delRow('User',${gi+2},'người dùng')">Xóa</button></td></tr>`;
+    }).join('')+'</tbody></table>'+pagerHTML(userPage,data.length,p=>`gotoUserPage(${p})`);
+  updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
+  updateSelAllTri('user-selall','user-chk',selUser);
+}
+function toggleUserChk(el){
+  const idx=Number(el.dataset.idx);
+  if(el.checked)selUser.add(idx);else selUser.delete(idx);
+  updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
+  updateSelAllTri('user-selall','user-chk',selUser);
+}
+function toggleAllUser(el){
+  document.querySelectorAll('.user-chk').forEach(c=>{
+    c.checked=el.checked;
+    const idx=Number(c.dataset.idx);
+    if(el.checked)selUser.add(idx);else selUser.delete(idx);
+  });
+  updateSelUI('user-delsel-btn','user-selcnt',selUser.size);
+}
+function toggleUserPass(gi){
+  const m=document.getElementById('pwm-'+gi),r=document.getElementById('pwr-'+gi);
+  if(!m||!r)return;
+  const show=r.style.display==='none';
+  r.style.display=show?'':'none';m.style.display=show?'none':'';
+}
+function toggleUserPassInput(){
+  const el=document.getElementById('user-pass');
+  el.type=el.type==='password'?'text':'password';
+}
+async function delSelUser(){
+  if(!selUser.size){toast('Chưa chọn người dùng nào','err');return;}
+  confirmDel(`Xóa ${selUser.size} người dùng đã chọn?`,async()=>{
+    toast('Đang xóa '+selUser.size+' người dùng...');
+    const idxs=[...selUser].sort((a,b)=>b-a);
+    for(const idx of idxs)await apiPost({sheet:'User',action:'delete',row:idx+2});
+    selUser.clear();
+    toast('Đã xóa '+idxs.length+' người dùng!');setTimeout(loadUser,800);
+  });
+}
+function initUser(){
+  document.getElementById('m-user-t').textContent='Thêm người dùng';
+  ['user-ten','user-sdt','user-vaitro','user-gc','user-email','user-pass'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('user-row').value='';
+  document.getElementById('user-pass').type='password';
+  document.getElementById('user-pass-hint').textContent='Nhập cả Email & Mật khẩu nếu muốn người này tự đăng nhập được vào app. Để trống nếu chỉ cần lưu tên tham khảo. Nếu email đã có tài khoản từ trước (VD: tài khoản admin gốc), chỉ cần gõ email đó — hệ thống sẽ tự liên kết vào đây.';
+  document.getElementById('user-reset-btn').style.display='none';
+  om('m-user');
+}
+function editUser(row){
+  const r=C.USER[row-2];
+  document.getElementById('m-user-t').textContent='Sửa người dùng';
+  document.getElementById('user-ten').value=r[0]||'';
+  document.getElementById('user-sdt').value=r[1]||'';
+  document.getElementById('user-vaitro').value=r[2]||'';
+  document.getElementById('user-gc').value=r[3]||'';
+  document.getElementById('user-email').value=r[4]||'';
+  document.getElementById('user-pass').value=r[5]||'';// mật khẩu tham khảo đã lưu — chỉ để xem lại, không tự đổi được mật khẩu đăng nhập thật
+  document.getElementById('user-pass').type='password';
+  document.getElementById('user-row').value=row;
+  // Sửa người dùng đã có: KHÔNG thể tự đổi mật khẩu đăng nhập thật của tài khoản này từ đây (giới hạn của
+  // Firebase phía client) — ô này chỉ sửa bản ghi lưu tham khảo. Muốn đổi mật khẩu thật, dùng nút gửi email bên dưới.
+  document.getElementById('user-pass-hint').textContent='Đây là bản ghi mật khẩu lưu tham khảo — sửa ở đây KHÔNG đổi được mật khẩu đăng nhập thật của tài khoản (giới hạn kỹ thuật). Muốn đổi mật khẩu thật, dùng nút "Gửi email đặt lại mật khẩu" bên dưới.';
+  document.getElementById('user-reset-btn').style.display=r[4]?'':'none';
+  om('m-user');
+}
+// Tạo tài khoản đăng nhập mới (Firebase Auth) mà KHÔNG làm mất phiên đăng nhập hiện tại của admin —
+// dùng 1 app Firebase phụ riêng để tạo, vì createUserWithEmailAndPassword sẽ tự đăng nhập vào app được gọi trên đó
+async function createAuthUser(email,pass){
+  await initFirebase();
+  try{
+    const secApp=firebase.apps.find(a=>a.name==='Secondary')||firebase.initializeApp(firebaseConfig,'Secondary');
+    const secAuth=secApp.auth();
+    await secAuth.createUserWithEmailAndPassword(email,pass);
+    await secAuth.signOut();
+    return{ok:true};
+  }catch(e){return{ok:false,code:e.code};}
+}
+function authErrMsg(code){
+  const m={
+    'auth/email-already-in-use':'Email này đã được đăng ký cho tài khoản khác',
+    'auth/invalid-email':'Email không hợp lệ',
+    'auth/weak-password':'Mật khẩu quá yếu (tối thiểu 6 ký tự)',
+    'auth/user-not-found':'Không tìm thấy tài khoản đăng nhập với email này',
+    'auth/network-request-failed':'Lỗi kết nối mạng, thử lại sau'
+  };
+  return m[code]||'Có lỗi xảy ra, thử lại sau';
+}
+async function sendUserResetPass(){
+  const email=document.getElementById('user-email').value.trim();
+  if(!email){toast('Người dùng này chưa có Email đăng nhập','err');return;}
+  toast('Đang gửi email...');
+  try{
+    await auth.sendPasswordResetEmail(email);
+    toast('Đã gửi email đặt lại mật khẩu tới '+email);
+  }catch(e){toast(authErrMsg(e.code),'err');}
+}
+async function saveUser(){
+  const ten=document.getElementById('user-ten').value.trim();if(!ten){toast('Nhập tên người dùng','err');return;}
+  const er=document.getElementById('user-row').value;
+  const email=document.getElementById('user-email').value.trim();
+  const pass=document.getElementById('user-pass').value;
+  if(!er&&(email||pass)){
+    if(!email||!pass){toast('Cần nhập đủ cả Email và Mật khẩu để tạo tài khoản đăng nhập','err');return;}
+    if(pass.length<6){toast('Mật khẩu phải từ 6 ký tự trở lên','err');return;}
+  }
+  const row=[ten,document.getElementById('user-sdt').value,document.getElementById('user-vaitro').value,document.getElementById('user-gc').value,email,pass];
+  toast('Đang lưu...');
+  let linked=false;
+  if(!er&&email&&pass){
+    const r=await createAuthUser(email,pass);
+    if(!r.ok){
+      if(r.code==='auth/email-already-in-use'){
+        // Email này đã có tài khoản đăng nhập từ trước (VD: tài khoản admin gốc tạo tay trên Firebase Console,
+        // hoặc tạo qua form này trước đó) — không tạo trùng, chỉ liên kết email vào bản ghi Người dùng để hiển thị
+        linked=true;
+      } else {toast(authErrMsg(r.code),'err');return;}
+    }
+  }
+  await apiPost(er?{sheet:'User',action:'update',row:Number(er),data:row}:{sheet:'User',action:'append',row});
+  toast(er?'Đã cập nhật':linked?'Đã thêm & liên kết với tài khoản đăng nhập có sẵn':('Đã thêm người dùng'+(email&&pass?' & tạo tài khoản đăng nhập':'')));
+  cm('m-user');setTimeout(loadUser,800);
+}
+
+async function delRow(sheet,row,label){
+  confirmDel(`Xóa ${label} này?`,async()=>{
+    toast('Đang xóa...');
+    await apiPost({sheet,action:'delete',row:Number(row)});
+    toast('Đã xóa!');
+    setTimeout(()=>{
+      if(sheet==='NhaCungCap')loadNCC();
+      else if(sheet==='GianHang')loadGH();
+      else if(sheet==='User')loadUser();
+      else if(sheet==='LoaiHang')loadLoai();
+    },800);
+  });
+}
+
+
+
+// ── apiGetRaw: lấy toàn bộ kể cả header, dùng để check sheet trống thật sự ──
+async function loadCaiDat(){
+  ['set-saphet','set-ganhet','set-hsdsap','set-hsdgan','set-visionkey'].forEach(id=>document.getElementById(id).value='');
+  await loadSettings();
+  document.getElementById('set-saphet').value=SETTINGS.sapHet;
+  document.getElementById('set-ganhet').value=SETTINGS.ganHet;
+  document.getElementById('set-hsdsap').value=SETTINGS.hsdSap;
+  document.getElementById('set-hsdgan').value=SETTINGS.hsdGan;
+  document.getElementById('set-visionkey').value=SETTINGS.visionApiKey||'';
+}
+async function saveCaiDat(){
+  const sap=Number(document.getElementById('set-saphet').value||10);
+  const gan=Number(document.getElementById('set-ganhet').value||3);
+  const hsdSap=Number(document.getElementById('set-hsdsap').value||30);
+  const hsdGan=Number(document.getElementById('set-hsdgan').value||7);
+  if(gan>sap){toast('Ngưỡng "Gần hết" phải ≤ ngưỡng "Sắp hết"','err');return;}
+  if(hsdGan>hsdSap){toast('Ngưỡng HSD "Gấp" phải ≤ ngưỡng HSD "Sắp hết hạn"','err');return;}
+  toast('Đang lưu...');
+  const data=await apiGet('CaiDat');
+  const row=[gan,sap,hsdGan,hsdSap,SETTINGS.visionApiKey||''];// giữ nguyên API key (cột 5) khi lưu ngưỡng, tránh bị ghi đè mất
+  await apiPost(data.length?{sheet:'CaiDat',action:'update',row:2,data:row}:{sheet:'CaiDat',action:'append',row});
+  SETTINGS.ganHet=gan;SETTINGS.sapHet=sap;SETTINGS.hsdGan=hsdGan;SETTINGS.hsdSap=hsdSap;
+  toast('Đã lưu cài đặt!');
+}
+async function saveVisionKey(){
+  const key=document.getElementById('set-visionkey').value.trim();
+  toast('Đang lưu...');
+  const data=await apiGet('CaiDat');
+  const row=[SETTINGS.ganHet,SETTINGS.sapHet,SETTINGS.hsdGan,SETTINGS.hsdSap,key];// giữ nguyên các ngưỡng, chỉ đổi cột API key
+  await apiPost(data.length?{sheet:'CaiDat',action:'update',row:2,data:row}:{sheet:'CaiDat',action:'append',row});
+  SETTINGS.visionApiKey=key;
+  toast('Đã lưu API key!');
+}
+
+// CẢ Kho tổng (Tồn kho) LẪN từng Gian hàng riêng (chọn ở ô "Đối tượng kiểm kê").
+// Lưu lịch sử đối chiếu (KiemKe) VÀ điều chỉnh thẳng số liệu theo số thực tế đếm được lúc lưu:
+//  - Kho tổng: ghi đè thẳng SL trong Tồn kho (giống trước).
+//  - Gian hàng: ghi vào GianHangKho phần CHÊNH LỆCH (offset) so với số tính từ lịch sử Xếp hàng — dùng
+//    đúng cơ chế offset sẵn có của Đồ gian hàng (xem ghkBase/ghkOffset/saveGHK ở trên) để không phá vỡ
+//    cách tính "cộng dồn từ Xếp hàng" khi có phiếu xếp mới sau này.
+// Lưu ý: khác Nhập/Xếp hàng (chỉnh theo CHÊNH LỆCH số lượng), Kiểm kê ghi đè theo số đếm thực tế tại thời
+// điểm đó — nên xóa lại 1 phiếu kiểm kê CŨ sẽ không tự hoàn tác lại (dễ sai nếu đã có giao dịch sau đó).
+
+bootPage('setting',function(){
+  document.getElementById('acts').innerHTML=``;
+  loadCaiDat();loadUser();loadNCC();loadGH();loadLoai();
+});
+</script>
+</body>
+</html>
