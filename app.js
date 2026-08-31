@@ -254,6 +254,52 @@ async function autoPruneOldLogs(){
     for(const idx of idxs)await apiPost({sheet:'Log',action:'delete',row:idx+2});
   }catch(e){console.error(e);}
 }
+
+// ── CẢNH BÁO TỒN KHO Ở GÓC MÀN HÌNH ────────────────────────────────────────────────────────────────
+// Panel nhỏ góc dưới-trái, hiện trên MỌI trang (gọi sau khi đăng nhập) khi có SP HẾT HÀNG hoặc SẮP/ĐÃ
+// HẾT HẠN. Đóng bằng ✕ — nhớ ở sessionStorage theo "chữ ký" tình trạng: tải lại trang trong cùng phiên mà
+// tình trạng y như cũ thì im, có SP mới rơi vào cảnh báo (hoặc hết cảnh báo cũ) thì hiện lại.
+async function checkStockAlerts(){
+  try{
+    await ensureTK();
+    const het=C.TK.filter(r=>stTK(r)==='het');
+    const ts=td();
+    const daysLeft=r=>Math.round((new Date(r[5])-new Date(ts))/86400000);
+    const hsd=C.TK.filter(r=>r[5]&&Number(r[1]||0)>0&&daysLeft(r)<=getHsdSap(r))
+                  .sort((a,b)=>(a[5]||'').localeCompare(b[5]||''));
+    const el=document.getElementById('stock-alert');
+    if(!het.length&&!hsd.length){if(el)el.remove();return;}
+    const sig=[...het.map(r=>'h:'+(r[9]||r[0])),...hsd.map(r=>'e:'+(r[9]||r[0])+':'+r[5])].join('|');
+    let hidden='';try{hidden=sessionStorage.getItem('stockAlertHidden')||'';}catch(e){}
+    if(hidden===sig){if(el)el.remove();return;}
+    renderStockAlert(het,hsd,daysLeft,sig);
+  }catch(e){console.error(e);}
+}
+function renderStockAlert(het,hsd,daysLeft,sig){
+  let el=document.getElementById('stock-alert');
+  if(el)el.remove();
+  el=document.createElement('div');
+  el.id='stock-alert';
+  if(!het.length)el.style.borderLeftColor='var(--yellow)';// chỉ có cảnh báo HSD → viền vàng thay vì đỏ
+  const CAP=6;
+  const sec=(arr,head,headCls,fmtItem)=>`<div class="sa-sec"><div class="sa-h ${headCls}">${head} <b>(${arr.length})</b></div>`
+    +arr.slice(0,CAP).map(fmtItem).join('')
+    +(arr.length>CAP?`<div class="sa-more">… và ${arr.length-CAP} sản phẩm nữa</div>`:'')+`</div>`;
+  let html=`<button class="sa-x" aria-label="Đóng">✕</button><div class="sa-title">Cảnh báo tồn kho</div>`;
+  if(het.length)html+=sec(het,'⛔ Hết hàng','sa-h-r',r=>`<div class="sa-item">${esc(r[0])}</div>`);
+  if(hsd.length)html+=sec(hsd,'⏰ Sắp hết hạn','sa-h-y',r=>{
+    const d=daysLeft(r);
+    return`<div class="sa-item"><span class="sa-nm">${esc(r[0])}</span><span class="sa-day${d<0?' sa-day-exp':''}">${d<0?'đã hết hạn':'còn '+d+' ngày'}</span></div>`;
+  });
+  if(__pageKey!=='dash')html+=`<a class="sa-link" href="${PAGE_MAP.dash}">Xem ở Tổng quan →</a>`;
+  el.innerHTML=html;
+  document.body.appendChild(el);
+  el.querySelector('.sa-x').onclick=()=>{
+    try{sessionStorage.setItem('stockAlertHidden',sig);}catch(e){}
+    el.remove();
+  };
+}
+
 function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',2500);}
 function om(id){document.getElementById(id).classList.add('on');}
 function cm(id){document.getElementById(id).classList.remove('on');}
@@ -925,6 +971,7 @@ function dmFmtRange(ym){
       if(syncEl)syncEl.innerHTML=`<span class="sync-dot ok"></span>Đã đồng bộ<small id="user-email-display">${esc(sess.name||sess.email)} · TEST</small>`;
       if(__pageInit)__pageInit();
       autoPruneOldLogs();
+      checkStockAlerts();// panel cảnh báo hết hàng / sắp hết hạn ở góc màn hình
     }else{
       renderLogin();
       document.getElementById('sb').style.display='none';
@@ -959,6 +1006,7 @@ function dmFmtRange(ym){
       if(syncEl)syncEl.innerHTML=`<span class="sync-dot ok"></span>Đã đồng bộ<small id="user-email-display">${curRec?`${curRec[0]} · ${user.email}`:user.email}</small>`;
       if(__pageInit)__pageInit();
       autoPruneOldLogs();// chạy ngầm, không chặn/chờ — dọn Nhật ký cũ hơn 30 ngày (tối đa 1 lần/ngày, xem hàm)
+      checkStockAlerts();// panel cảnh báo hết hàng / sắp hết hạn ở góc màn hình (chạy ngầm)
     } else {
       renderLogin();
       document.getElementById('sb').style.display='none';

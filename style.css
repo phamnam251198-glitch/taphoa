@@ -217,6 +217,31 @@ tr.row-edit:hover td{background:#eef4ff}
 #busy-ov .spin{width:26px;height:26px;margin:0}
 #toast.show{transform:translateY(0);opacity:1}
 #toast.ok{background:var(--green)}#toast.err{background:var(--red)}
+
+/* ── Panel cảnh báo tồn kho ở góc dưới-trái (hiện trên mọi trang khi có SP hết hàng / sắp hết hạn) ── */
+#stock-alert{position:fixed;left:16px;bottom:16px;z-index:90;width:300px;max-width:calc(100vw - 32px);
+  background:#fff;border:1px solid var(--border);border-left:4px solid var(--red);border-radius:10px;
+  box-shadow:0 10px 30px rgba(15,23,42,.18);padding:12px 14px;font-size:12px;animation:sa-in .25s ease}
+@keyframes sa-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#stock-alert .sa-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;padding-right:20px}
+#stock-alert .sa-x{position:absolute;top:8px;right:8px;width:22px;height:22px;border:none;background:var(--bg);
+  border-radius:50%;color:var(--text2);font-size:11px;line-height:1;padding:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+#stock-alert .sa-x:hover{background:var(--border);color:var(--text)}
+#stock-alert .sa-sec{margin-top:10px}
+#stock-alert .sa-sec:first-of-type{margin-top:0}
+#stock-alert .sa-h{font-size:11px;font-weight:600;margin-bottom:2px}
+#stock-alert .sa-h-r{color:#b91c1c}
+#stock-alert .sa-h-y{color:#a16207}
+#stock-alert .sa-item{padding:4px 0;color:var(--text);border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+#stock-alert .sa-nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stock-alert .sa-day{color:var(--text2);flex-shrink:0;font-size:11px}
+#stock-alert .sa-day-exp{color:#b91c1c;font-weight:600}
+#stock-alert .sa-more{padding:4px 0;color:var(--text2);border-top:1px solid var(--border);font-style:italic}
+#stock-alert .sa-link{display:inline-block;margin-top:10px;font-size:11px;color:var(--blue);text-decoration:none;font-weight:600}
+#stock-alert .sa-link:hover{text-decoration:underline}
+@media (max-width:480px){#stock-alert{left:10px;right:10px;bottom:10px;width:auto}}
 .ld{text-align:center;padding:36px;color:var(--text2);font-size:13px}
 .spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .6s linear infinite;margin:0 auto 8px}
 @keyframes sp{to{transform:rotate(360deg)}}
