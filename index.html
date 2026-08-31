@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa — Tổng quan</title>
-<link rel="stylesheet" href="style.css?v=20260831a">
+<link rel="stylesheet" href="style.css?v=20260831g">
 </head>
 <body>
 
@@ -66,7 +66,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831a"></script>
+<script src="app.js?v=20260831g"></script>
 <script>
 // ── JS riêng cho màn Tổng quan ──
 let dashLow=[],dashHet=[],dashExp=[],dashSap=[];
@@ -106,7 +106,6 @@ async function loadDash(){
   // "Hàng cần nhập" (card bên dưới): gộp cả Hết hàng + Sắp hết để còn lọc theo trạng thái
   dashLow=tk.filter(r=>{const s=stTK(r);return s==='het'||s==='sap';});
   document.getElementById('d-sh').textContent=dashSap.length;
-  document.getElementById('lbadge').style.display=dashLow.length?'inline':'none';
   renderDLow();
   // Hàng sắp hết hạn sử dụng: HSD đã qua hoặc còn ≤ ngưỡng riêng SP (hoặc mặc định) — chỉ tính SP có ghi HSD
   const ts=td();

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quản Lý Tạp Hóa — Tồn kho</title>
-<link rel="stylesheet" href="style.css?v=20260831a">
+<link rel="stylesheet" href="style.css?v=20260831g">
 </head>
 <body>
 
@@ -27,6 +27,7 @@
           <option value="">Tất cả trạng thái</option>
           <option value="het">Hết hàng</option>
           <option value="sap">Sắp hết</option>
+          <option value="hsd">Sắp hết hạn</option>
           <option value="con">Còn hàng</option>
         </select>
         <select id="loai-tk" onchange="fTK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
@@ -87,7 +88,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831a"></script>
+<script src="app.js?v=20260831g"></script>
 <script>
 // ── JS riêng cho màn Tồn kho ──
 let selTK=new Set();
@@ -194,7 +195,8 @@ function fTK(){
   const q=document.getElementById('q-tk').value.toLowerCase();
   const st=document.getElementById('st-tk').value;
   const loai=document.getElementById('loai-tk')?.value||'';
-  const filtered=C.TK.filter(r=>((r[0]||'').toLowerCase().includes(q)||(r[9]||'').toLowerCase().includes(q))&&(!st||stTK(r)===st)&&(!loai||r[13]===loai));
+  const stMatch=r=>!st||(st==='hsd'?isHsdAlert(r):stTK(r)===st);
+  const filtered=C.TK.filter(r=>((r[0]||'').toLowerCase().includes(q)||(r[9]||'').toLowerCase().includes(q))&&stMatch(r)&&(!loai||r[13]===loai));
   filtered.sort((a,b)=>tkCompare(a,b,tkSortCol)*tkSortDir);
   rTK(filtered);
 }
@@ -296,6 +298,13 @@ async function saveSP(){
 
 bootPage('tk',function(){
   document.getElementById('acts').innerHTML=`<button class="btn btn-p" onclick="initSPForm()">+ Thêm sản phẩm</button>`;
+  // Mở từ chuông cảnh báo: ton-kho.html?alert=het|sap|hsd → chọn sẵn bộ lọc trạng thái + bung khối tìm kiếm
+  const al=new URLSearchParams(location.search).get('alert');
+  if(['het','sap','hsd'].includes(al)){
+    const sel=document.getElementById('st-tk');if(sel)sel.value=al;
+    const w=document.querySelector('.sb-wrap');if(w)w.open=true;
+    if(al==='hsd'){tkSortCol='hsd';tkSortDir=1;}// xem hàng sắp hết hạn → xếp hạn gần nhất lên đầu
+  }
   loadTK();
 });
 </script>

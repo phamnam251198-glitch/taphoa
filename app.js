@@ -255,49 +255,81 @@ async function autoPruneOldLogs(){
   }catch(e){console.error(e);}
 }
 
-// ── CẢNH BÁO TỒN KHO Ở GÓC MÀN HÌNH ────────────────────────────────────────────────────────────────
-// Panel nhỏ góc dưới-trái, hiện trên MỌI trang (gọi sau khi đăng nhập) khi có SP HẾT HÀNG hoặc SẮP/ĐÃ
-// HẾT HẠN. Đóng bằng ✕ — nhớ ở sessionStorage theo "chữ ký" tình trạng: tải lại trang trong cùng phiên mà
-// tình trạng y như cũ thì im, có SP mới rơi vào cảnh báo (hoặc hết cảnh báo cũ) thì hiện lại.
+// ── CẢNH BÁO TỒN KHO / CHUÔNG THÔNG BÁO ────────────────────────────────────────────────────────────
+// Nút chuông 🔔 nằm ở góc PHẢI TRÊN thanh tiêu đề — CHỈ hiện ở màn Tổng quan (dash). Có SP HẾT HÀNG,
+// SẮP HẾT (tồn ≤ ngưỡng) hoặc SẮP/ĐÃ HẾT HẠN thì chuông nổi chấm (số lượng) và panel tự bung ra ở góc
+// phải-trên. Panel liệt kê tên SP theo từng loại cảnh báo; bấm 1 loại → sang màn Tồn kho lọc sẵn đúng
+// trạng thái (ton-kho.html?alert=het|sap|hsd). Bấm ✕ để đóng, bấm lại chuông để mở/đóng thủ công. Nhớ ở
+// sessionStorage theo "chữ ký" tình trạng: tải lại trang cùng phiên mà tình trạng y như cũ thì không tự
+// bung lại (vẫn còn chấm ở chuông), tình trạng đổi thì bung.
+let __saData=null;// {het,sap,hsd,daysLeft,sig} — kết quả lần quét gần nhất, để nút chuông mở lại panel
 async function checkStockAlerts(){
+  if(__pageKey!=='dash')return;// chuông thông báo chỉ chạy ở màn Tổng quan
   try{
     await ensureTK();
     const het=C.TK.filter(r=>stTK(r)==='het');
+    const sap=C.TK.filter(r=>stTK(r)==='sap').sort((a,b)=>Number(a[1]||0)-Number(b[1]||0));
     const ts=td();
     const daysLeft=r=>Math.round((new Date(r[5])-new Date(ts))/86400000);
-    const hsd=C.TK.filter(r=>r[5]&&Number(r[1]||0)>0&&daysLeft(r)<=getHsdSap(r))
-                  .sort((a,b)=>(a[5]||'').localeCompare(b[5]||''));
+    const hsd=C.TK.filter(isHsdAlert).sort((a,b)=>(a[5]||'').localeCompare(b[5]||''));
     const el=document.getElementById('stock-alert');
-    if(!het.length&&!hsd.length){if(el)el.remove();return;}
-    const sig=[...het.map(r=>'h:'+(r[9]||r[0])),...hsd.map(r=>'e:'+(r[9]||r[0])+':'+r[5])].join('|');
+    if(!het.length&&!sap.length&&!hsd.length){__saData=null;updateNotifBadge();if(el)el.remove();return;}
+    const sig=[...het.map(r=>'h:'+(r[9]||r[0])),...sap.map(r=>'s:'+(r[9]||r[0])),
+               ...hsd.map(r=>'e:'+(r[9]||r[0])+':'+r[5])].join('|');
+    __saData={het,sap,hsd,daysLeft,sig};
+    updateNotifBadge();
     let hidden='';try{hidden=sessionStorage.getItem('stockAlertHidden')||'';}catch(e){}
-    if(hidden===sig){if(el)el.remove();return;}
-    renderStockAlert(het,hsd,daysLeft,sig);
+    if(hidden===sig){if(el)el.remove();return;}// không tự bung, nhưng chuông vẫn còn chấm
+    renderStockAlert(het,sap,hsd,daysLeft,sig);
   }catch(e){console.error(e);}
 }
-function renderStockAlert(het,hsd,daysLeft,sig){
+// Cập nhật chấm trên nút chuông ở topbar — hiện SỐ LOẠI cảnh báo đang bật (tối đa 3: hết hàng / sắp hết /
+// sắp hết hạn), KHÔNG phải tổng số sản phẩm. Đỏ nếu có hàng hết/sắp hết, vàng nếu chỉ còn cảnh báo HSD.
+function updateNotifBadge(){
+  const bell=document.getElementById('notif-bell'),badge=document.getElementById('notif-badge');
+  if(!bell||!badge)return;
+  const has=__saData?[__saData.het.length,__saData.sap.length,__saData.hsd.length].filter(Boolean):[];
+  badge.hidden=!has.length;
+  badge.textContent=has.length;
+  bell.classList.toggle('has-alert',!!has.length);
+  bell.classList.toggle('warn-only',!!has.length&&!__saData.het.length&&!__saData.sap.length);
+}
+// Bấm nút chuông: đang mở panel → đóng (và nhớ ẩn theo chữ ký); đang đóng → mở lại nếu còn cảnh báo
+function toggleStockAlert(){
+  const el=document.getElementById('stock-alert');
+  if(el){
+    if(__saData){try{sessionStorage.setItem('stockAlertHidden',__saData.sig);}catch(e){}}
+    el.remove();return;
+  }
+  if(__saData){
+    try{sessionStorage.removeItem('stockAlertHidden');}catch(e){}
+    renderStockAlert(__saData.het,__saData.sap,__saData.hsd,__saData.daysLeft,__saData.sig);
+  }else toast('Không có thông báo mới');
+}
+function renderStockAlert(het,sap,hsd,daysLeft,sig){
   let el=document.getElementById('stock-alert');
   if(el)el.remove();
   el=document.createElement('div');
   el.id='stock-alert';
-  if(!het.length)el.style.borderLeftColor='var(--yellow)';// chỉ có cảnh báo HSD → viền vàng thay vì đỏ
-  const CAP=6;
-  const sec=(arr,head,headCls,fmtItem)=>`<div class="sa-sec"><div class="sa-h ${headCls}">${head} <b>(${arr.length})</b></div>`
-    +arr.slice(0,CAP).map(fmtItem).join('')
-    +(arr.length>CAP?`<div class="sa-more">… và ${arr.length-CAP} sản phẩm nữa</div>`:'')+`</div>`;
-  let html=`<button class="sa-x" aria-label="Đóng">✕</button><div class="sa-title">Cảnh báo tồn kho</div>`;
-  if(het.length)html+=sec(het,'⛔ Hết hàng','sa-h-r',r=>`<div class="sa-item">${esc(r[0])}</div>`);
-  if(hsd.length)html+=sec(hsd,'⏰ Sắp hết hạn','sa-h-y',r=>{
-    const d=daysLeft(r);
-    return`<div class="sa-item"><span class="sa-nm">${esc(r[0])}</span><span class="sa-day${d<0?' sa-day-exp':''}">${d<0?'đã hết hạn':'còn '+d+' ngày'}</span></div>`;
-  });
-  if(__pageKey!=='dash')html+=`<a class="sa-link" href="${PAGE_MAP.dash}">Xem ở Tổng quan →</a>`;
-  el.innerHTML=html;
+  if(!het.length)el.style.borderTopColor='var(--yellow)';// không có hàng hết hẳn → viền vàng thay vì đỏ
+  const CAP=10;
+  // Mỗi loại cảnh báo = 1 nút bấm được: hiện tên SP, bấm vào → sang màn Tồn kho lọc đúng trạng thái.
+  const sec=(arr,kind,head,headCls)=>arr.length?`<button type="button" class="sa-sec" data-alert="${kind}">
+      <div class="sa-h ${headCls}">${head} <b>(${arr.length})</b><span class="sa-go">Xem ở Tồn kho →</span></div>
+      <div class="sa-names">${arr.slice(0,CAP).map(r=>esc(r[0])).join(', ')}${arr.length>CAP?` …(+${arr.length-CAP})`:''}</div>
+    </button>`:'';
+  el.innerHTML=`<button class="sa-x" aria-label="Đóng">✕</button>
+    <div class="sa-title">Cảnh báo tồn kho</div>
+    ${sec(het,'het','⛔ Hết hàng','sa-h-r')}
+    ${sec(sap,'sap','⚠️ Sắp hết','sa-h-y')}
+    ${sec(hsd,'hsd','⏰ Sắp hết hạn','sa-h-y')}`;
   document.body.appendChild(el);
-  el.querySelector('.sa-x').onclick=()=>{
+  el.querySelector('.sa-x').onclick=e=>{
+    e.stopPropagation();
     try{sessionStorage.setItem('stockAlertHidden',sig);}catch(e){}
     el.remove();
   };
+  el.querySelectorAll('.sa-sec').forEach(b=>b.onclick=()=>{location.href=PAGE_MAP.tk+'?alert='+b.dataset.alert;});
 }
 
 function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',2500);}
@@ -620,6 +652,9 @@ function getSapHet(r){return Number(r[7])>0?Number(r[7]):SETTINGS.sapHet;}
 // Ngưỡng "Sắp hết hạn"/"Gấp" (theo số ngày còn lại tới HSD) của 1 sản phẩm: ưu tiên số riêng, không có thì dùng mặc định
 function getHsdSap(r){return Number(r[11])>0?Number(r[11]):SETTINGS.hsdSap;}
 function getHsdGan(r){return Number(r[12])>0?Number(r[12]):SETTINGS.hsdGan;}
+// SP đang ở diện "sắp/đã hết hạn": còn hàng (>0), có ghi HSD, số ngày còn lại ≤ ngưỡng của SP.
+// Dùng chung cho chuông cảnh báo + bộ lọc trạng thái ở màn Tồn kho.
+function isHsdAlert(r){return !!r[5]&&Number(r[1]||0)>0&&Math.round((new Date(r[5])-new Date(td()))/86400000)<=getHsdSap(r);}
 // ── Trạng thái tồn kho: ĐỊNH NGHĨA DUY NHẤT dùng chung toàn app (bảng, badge, biểu đồ, filter, sort) ──
 // Sửa tên/màu ở ĐÂY là áp dụng khắp nơi. (Đã bỏ trạng thái "Gần hết" — chỉ còn Hết hàng / Sắp hết / Còn hàng.)
 const STATUS_ORDER=['het','sap','con'];// thứ tự khẩn cấp: khẩn cấp nhất → yên tâm nhất
@@ -774,6 +809,7 @@ const ICONS={
   calcheck:'<rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><path d="M9 15l2 2 4-4"/>',
   receipt:'<path d="M5 3v18l2-1.5L9 21l2-1.5L13 21l2-1.5L17 21l2-1.5V3l-2 1.5L15 3l-2 1.5L11 3 9 4.5 7 3z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/>',
   checkcircle:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/>',
+  bell:'<path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/>',
 };
 function icon(name,size){
   size=size||18;
@@ -820,7 +856,7 @@ function renderShell(activePage){
     <div class="logo"><span class="logo-ic">${icon('store',20)}</span><span class="logo-txt"><b>Tạp Hóa D5</b><small>Quản lý cửa hàng</small></span><button id="sb-tgl" onclick="toggleMenu()" aria-label="Thu gọn / mở menu" title="Thu gọn / mở menu">«</button></div>
     <nav>
       <a href="${PAGE_MAP.dash}"${on('dash')} id="n-dash">${icon('home')}<span>Tổng quan</span></a>
-      <a href="${PAGE_MAP.tk}"${on('tk')} id="n-tk">${icon('box')}<span>Tồn kho</span><span class="nbadge" id="lbadge" style="display:none">!</span></a>
+      <a href="${PAGE_MAP.tk}"${on('tk')} id="n-tk">${icon('box')}<span>Tồn kho</span></a>
       <a href="${PAGE_MAP.nh}"${on('nh')} id="n-nh">${icon('download')}<span>Nhập hàng</span></a>
       <a href="${PAGE_MAP.hd}"${on('hd')} id="n-hd">${icon('receipt')}<span>Kho hóa đơn</span></a>
       <a href="${PAGE_MAP.xh}"${on('xh')} id="n-xh">${icon('tag')}<span>Xếp hàng</span></a>
@@ -840,7 +876,10 @@ function renderShell(activePage){
     </div>`;
   document.getElementById('topbar').innerHTML=`
     <div class="tb-left"><button id="mnu-btn" onclick="toggleMenu()" aria-label="Thu gọn / mở menu" title="Thu gọn / mở menu">☰</button><h1 id="ptitle">${PAGE_TITLES[activePage]||''}</h1>${TAPHOA_ENV==='test'?`<button onclick="if(confirm('Thoát chế độ TEST, quay lại dữ liệu THẬT?')){localStorage.setItem('taphoaEnv','prod');try{sessionStorage.removeItem('taphoaTestAuth')}catch(e){};location.href='${PAGE_MAP.dash}';}" title="Bấm để quay lại dữ liệu thật" style="margin-left:10px;background:#d03b3b;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;letter-spacing:.5px;cursor:pointer">● CHẾ ĐỘ TEST</button>`:''}</div>
-    <div id="acts"></div>`;
+    <div class="tb-right">
+      ${activePage==='dash'?`<button id="notif-bell" class="tb-bell" onclick="toggleStockAlert()" aria-label="Thông báo" title="Thông báo">${icon('bell',20)}<span class="notif-badge" id="notif-badge" hidden></span></button>`:''}
+      <div id="acts"></div>
+    </div>`;
   applySbState();
 }
 // Mỗi file .html tự gọi bootPage('kk', function(){ loadKK(); }) ở cuối <script> của nó — 'kk' để biết
