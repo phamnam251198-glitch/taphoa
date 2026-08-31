@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+tests/node_modules/
+
+# Test / dev-only scripts (không đẩy lên remote)
+tests/
+test-data-clear.js
+test-data-fixnames.js
+test-data-full.js
+test-data-month.js
+test-data-seed.js
+wipe-all.js
+
+# Firebase
+.firebase/
+firebase-debug.log
+*-debug.log
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~

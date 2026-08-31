@@ -1,0 +1,382 @@
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#f0f2f5;--sidebar:#1e2736;--white:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;--radius:10px;--shadow:0 3px 10px rgba(15,23,42,0.09),0 1px 2px rgba(15,23,42,0.06)}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1e2736,#2d3f55);display:flex;align-items:center;justify-content:center;z-index:999}
+#login-box{background:#fff;border-radius:16px;padding:40px 36px;width:380px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+#login-box .login-logo{text-align:center;margin-bottom:28px}
+#login-box .login-logo .icon{font-size:40px;display:block;margin-bottom:8px}
+#login-box .login-logo h2{font-size:20px;font-weight:700;color:var(--text)}
+#login-box .login-logo p{font-size:13px;color:var(--text2);margin-top:4px}
+#login-box .fg{margin-bottom:16px}
+#login-box .fg label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-weight:500}
+#login-box .fg input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border .15s}
+#login-box .fg input:focus{border-color:var(--blue)}
+#login-btn{width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;
+  box-shadow:0 4px 0 #1d4ed8;transition:transform .08s ease,box-shadow .08s ease,background .15s}
+#login-btn:hover{background:#2563eb;transform:translateY(-1px);box-shadow:0 5px 0 #1d4ed8}
+#login-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #1d4ed8}
+#login-btn:disabled{background:#94a3b8;cursor:not-allowed;box-shadow:0 4px 0 #64748b;transform:none}
+#login-err{color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none}
+#logout-btn{padding:6px 12px;background:transparent;color:#94a3b8;border:1px solid #2a3547;border-radius:6px;font-size:12px;cursor:pointer}
+#logout-btn:hover{background:#2a3547;color:#fff}
+#sb{width:215px;background:var(--sidebar);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s ease}
+#sb .logo{padding:18px 16px 14px;border-bottom:1px solid #2a3547;display:flex;align-items:center;gap:10px}
+.logo-ic{width:34px;height:34px;border-radius:9px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-txt{display:flex;flex-direction:column;min-width:0}
+#sb .logo b{font-size:15px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sb .logo small{font-size:10.5px;color:#7c8b9e}
+#sb nav a{display:flex;align-items:center;gap:11px;padding:9px 16px;color:#8899aa;font-size:13px;cursor:pointer;border-left:3px solid transparent;text-decoration:none}
+#sb nav a svg{flex-shrink:0}
+#sb nav a:hover{background:#2a3547;color:#fff}
+#sb nav a.on{background:#2a3547;color:#fff;border-left-color:#3b82f6}
+.nbadge{background:#ef4444;color:#fff;font-size:10px;padding:1px 5px;border-radius:10px;margin-left:auto}
+#logout-btn{display:flex;align-items:center;justify-content:center;gap:7px}
+.sb-version{display:block;padding:8px 16px 0;font-size:10.5px;color:#546278;text-align:center}
+#sync.sb-sync{padding:6px 16px 14px;border-top:none;font-size:11.5px;color:#8899aa;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+.sync-dot.ok{background:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
+#sync.sb-sync small{flex-basis:100%;color:#546278;font-size:10.5px}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 22px;height:54px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#topbar h1{font-size:15px;font-weight:600}
+#acts{display:flex;gap:8px;align-items:center}
+#content{flex:1;overflow-y:auto;padding:22px}
+
+/* ── Sidebar THU GỌN (chỉ desktop) — bấm nút ☰/« ở topbar; chỉ còn icon, chữ ẩn đi ── */
+@media (min-width:481px){
+  body.sb-collapsed #sb{width:58px}
+  body.sb-collapsed #sb .logo{justify-content:center;padding:16px 0 14px}
+  body.sb-collapsed #sb .logo-txt,body.sb-collapsed #sb .logo-ic{display:none}
+  body.sb-collapsed #sb-tgl{margin-left:0}
+  body.sb-collapsed #sb nav a{justify-content:center;gap:0;padding:11px 0;border-left-width:0;position:relative}
+  body.sb-collapsed #sb nav a span:not(.nbadge){display:none}
+  body.sb-collapsed #sb .nbadge{position:absolute;top:6px;right:11px;margin:0;padding:0;width:8px;height:8px;
+    min-width:0;font-size:0;line-height:0;border-radius:50%}
+  body.sb-collapsed #sb-logout-wrap{padding:10px 8px!important}
+  body.sb-collapsed #logout-btn span{display:none}
+  body.sb-collapsed #logout-btn{gap:0}
+  body.sb-collapsed #sb-foot{display:none}
+}
+.sec{display:none}.sec.on{display:block}
+.set-tab{display:none}.set-tab.on{display:block}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.kpi{background:#fff;border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow)}
+.kpi .lb{font-size:11px;color:var(--text2);margin-bottom:5px}
+.kpi .val{font-size:22px;font-weight:700}
+.kpi .sub{font-size:11px;color:var(--text2);margin-top:3px}
+.kpi.g .val{color:var(--green)}.kpi.r .val{color:var(--red)}.kpi.b .val{color:var(--blue)}.kpi.y .val{color:var(--yellow)}.kpi.p .val{color:var(--purple)}
+/* Ô KPI có icon (chỉ dùng ở Tổng quan) — TÁCH riêng khỏi .kpi (bảng thống kê dạng chữ đơn giản, không icon,
+   dùng ở nhiều màn khác như Nhập/Xếp hàng/Kiểm kê/Báo cáo) để không ảnh hưởng các màn đó */
+.kpi-card{background:#fff;border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;
+  border-top:3px solid transparent}
+.kpi-ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;
+  box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.kpi-card.kpi-blue{border-top-color:var(--blue)}.kpi-card.kpi-blue .kpi-ic{background:var(--blue)}
+.kpi-card.kpi-red{border-top-color:var(--red)}.kpi-card.kpi-red .kpi-ic{background:var(--red)}
+.kpi-card.kpi-orange{border-top-color:var(--yellow)}.kpi-card.kpi-orange .kpi-ic{background:var(--yellow)}
+.kpi-card.kpi-green{border-top-color:var(--green)}.kpi-card.kpi-green .kpi-ic{background:var(--green)}
+.kpi-body{min-width:0}
+.kpi-body .lb{font-size:12px;color:var(--text2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-body .val{font-size:24px;font-weight:700;line-height:1.1}
+/* Trạng thái "trống" nổi bật hơn .empty thường (chỉ chữ) — dùng khi 1 danh sách rỗng là tin TỐT (VD không
+   có hàng sắp hết hạn) nên đáng được nhấn mạnh bằng icon lớn thay vì chỉ 1 dòng chữ nhạt nhòa */
+.empty-hero{text-align:center;padding:28px 20px}
+.empty-hero .eh-ic{width:56px;height:56px;border-radius:50%;background:#e8f8ef;color:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.empty-hero .eh-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.empty-hero .eh-sub{font-size:12px;color:var(--text2)}
+.card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px}
+/* Khối "xổ" (accordion) theo từng nhóm (VD: Loại hàng) — LUÔN bấm được để đóng/mở ở mọi kích thước màn hình
+   (khác .sb-wrap/.sb-toggle vốn chỉ dùng cho ô tìm kiếm và chỉ ẩn/hiện được trên mobile) */
+.acc-group{background:#fff;border-radius:var(--radius);box-shadow:0 5px 0 #dde2ea,0 12px 22px rgba(15,23,42,.12);margin-bottom:18px;overflow:visible;border-left:4px solid var(--acc-c,#c3c2b7);padding-bottom:2px}
+.acc-group:not([open]){padding-bottom:10px}
+.acc-group>.scroll-tbl,.acc-group>.scroll-tbl>.m-tbl{border-radius:0 0 var(--radius) var(--radius);overflow:hidden}
+/* Header kiểu 3D nổi: khối đặc phía dưới (--acc-sh) + đổ bóng mềm; hover nhấc lên, bấm lún xuống */
+.acc-group>summary{list-style:none;cursor:pointer;padding:9px 16px;display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:600;
+  background:var(--acc-bg,transparent);border-radius:0 10px 10px 0;margin:10px 0 0;
+  box-shadow:0 4px 0 var(--acc-sh,#c7dede),0 8px 14px rgba(15,23,42,.14);
+  transition:box-shadow .12s ease,transform .12s ease}
+.acc-group>summary:hover{transform:translateY(-2px);box-shadow:0 6px 0 var(--acc-sh,#c7dede),0 12px 20px rgba(15,23,42,.18)}
+.acc-group>summary:active{transform:translateY(2px);box-shadow:0 1px 0 var(--acc-sh,#c7dede),0 3px 8px rgba(15,23,42,.12)}
+.acc-group>summary::-webkit-details-marker{display:none}
+.acc-group>summary .acc-cnt{font-weight:400;color:var(--text2);font-size:12px}
+.acc-group>summary::after{content:'▾';margin-left:10px;color:var(--text2);transition:transform .2s}
+.acc-group:not([open])>summary::after{transform:rotate(-90deg)}
+.acc-group[open]>summary{margin-bottom:14px}
+/* Bảng màu xoay vòng cho từng khối Loại hàng — gán theo thứ tự để mỗi loại 1 màu, dễ phân biệt nhanh */
+.acc-c0{--acc-c:#0ca30c;--acc-bg:#dcfce7}
+.acc-c1{--acc-c:#2563eb;--acc-bg:#dbeafe}
+.acc-c2{--acc-c:#d03b3b;--acc-bg:#fee2e2}
+.acc-c3{--acc-c:#c68a00;--acc-bg:#fef9c3}
+.acc-c4{--acc-c:#7c3aed;--acc-bg:#ede9fe}
+.acc-c5{--acc-c:#ea580c;--acc-bg:#ffedd5}
+.acc-c6{--acc-c:#0891b2;--acc-bg:#cffafe}
+.acc-c7{--acc-c:#db2777;--acc-bg:#fce7f3}
+.acc-cx{--acc-c:#9ca3af;--acc-bg:#f3f4f6}
+.acc-uni{--acc-c:#008080;--acc-bg:#d9f0f0;--acc-sh:#a7d5d5}
+.ch{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ch h2{font-size:13px;font-weight:600}
+table{width:100%;border-collapse:collapse}
+th{padding:9px 14px;text-align:left;font-size:11px;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);background:#f8fafc;white-space:nowrap}
+th.th-sort{cursor:pointer;user-select:none}
+th.th-sort:hover{color:var(--blue)}
+.sort-ic{font-size:9px;color:#c3c2b7}
+th.th-sort-on .sort-ic{color:var(--blue)}
+td{padding:9px 14px;font-size:13px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f8fafc}
+/* Dòng danh sách bấm được để mở form Sửa (xem rowEdit() trong app.js) */
+tr.row-edit{cursor:pointer}
+tr.row-edit:hover td{background:#eef4ff}
+.bg{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.bg-g{background:#dcfce7;color:#166534}.bg-r{background:#fee2e2;color:#991b1b}
+.bg-y{background:#fef9c3;color:#854d0e}.bg-b{background:#dbeafe;color:#1e40af}.bg-p{background:#ede9fe;color:#5b21b6}
+.bg-o{background:#ffedd5;color:#9a3412}
+/* Card "Hàng cần nhập" (Tổng quan): nền dòng phân biệt theo trạng thái */
+#d-low tr.dl-het td{background:#fbdada}
+#d-low tr.dl-het:hover td{background:#f7c9c9}
+#d-low td{border-bottom:2px solid #fff}
+#d-low tr:last-child td{border-bottom:none}
+/* Ẩn thanh cuộn ở card "Hàng cần nhập" — vẫn cuộn được bằng lăn chuột / kéo */
+#d-low .scroll-tbl{scrollbar-width:none;-ms-overflow-style:none}
+#d-low .scroll-tbl::-webkit-scrollbar{width:0;height:0;display:none}
+/* Nút "nổi khối" 3D: mỗi nút có 1 lớp bóng đổ đậm màu ngay dưới đáy (--btn-deep) trông như nút bấm thật
+   nổi lên khỏi mặt phẳng — di chuột vào thì nổi cao hơn 1 chút, bấm xuống thì lún vào (translateY + bóng co lại) */
+.btn{padding:7px 13px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;
+  position:relative;box-shadow:0 3px 0 var(--btn-deep,rgba(0,0,0,.18));transition:transform .08s ease,box-shadow .08s ease,background .15s}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 0 var(--btn-deep,rgba(0,0,0,.18))}
+.btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 var(--btn-deep,rgba(0,0,0,.18))}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
+.btn-p{background:var(--blue);color:#fff;--btn-deep:#1d4ed8}.btn-p:hover{background:#2563eb}
+.btn-s{background:var(--green);color:#fff;--btn-deep:#047857}.btn-s:hover{background:#059669}
+.btn-g{background:#f8fafc;color:var(--text2);border:1px solid var(--border);--btn-deep:#cbd5e1}.btn-g:hover{background:#eef2f7}
+.btn-d{background:#fee2e2;color:#991b1b;border:none;--btn-deep:#fca5a5}.btn-d:hover{background:#fecaca}
+.btn-sm{padding:4px 9px;font-size:12px}
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;align-items:center;justify-content:center}
+.mo.on{display:flex}
+.mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal-x{position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:var(--bg);border-radius:50%;font-size:14px;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
+.modal-x:hover{background:var(--border);color:var(--text)}
+.mb h3{font-size:15px;font-weight:600;margin-bottom:18px}
+.mb-sm{width:420px}
+.mb-lg{width:1080px}
+.fg{margin-bottom:13px}
+.fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.fg input,.fg select,.fg textarea{width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none}
+.fg input:focus,.fg select:focus{border-color:var(--blue)}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
+.mf{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.sb{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+/* Ô tìm kiếm/lọc kiểu "nổi khối 3D" — có gờ bóng đổ ở đáy, bấm vào thì lún nhẹ (đồng bộ với nút .btn) */
+.sb input{flex:1;min-width:160px;padding:7px 11px;border:1px solid #d4dbe8;border-radius:7px;font-size:13px;background:#fff;outline:none;
+  box-shadow:0 2px 0 #e4e9f2;transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease}
+.sb input:hover{box-shadow:0 3px 0 #dde3ee}
+.sb input:focus{border-color:var(--blue);box-shadow:0 1px 0 #c6d6f7;transform:translateY(1px)}
+
+/* ── MỌI <select> trong app: bỏ giao diện mặc định của trình duyệt, dùng chevron riêng + kiểu nổi 3D.
+   Danh sách xổ ra KHÔNG phải của trình duyệt nữa — sel3d (app.js) tự vẽ menu .sel3d-menu. ── */
+#content select,.mb select{
+  appearance:none!important;-webkit-appearance:none!important;-moz-appearance:none!important;
+  padding:7px 30px 7px 11px!important;border:1px solid #d4dbe8;border-radius:7px;font-size:13px;color:var(--text);
+  background-color:#fff!important;outline:none;cursor:pointer;
+  box-shadow:0 2px 0 #e4e9f2;transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease;
+  background-repeat:no-repeat!important;background-position:right 10px center!important;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23708196' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;
+}
+#content select::-ms-expand,.mb select::-ms-expand{display:none}
+#content select:hover,.mb select:hover{box-shadow:0 3px 0 #dde3ee}
+#content select:focus,#content select.sel3d-open,.mb select:focus,.mb select.sel3d-open{border-color:var(--blue);box-shadow:0 1px 0 #c6d6f7;transform:translateY(1px)}
+/* menu xổ ra tự vẽ */
+.sel3d-menu{position:fixed;z-index:400;background:#fff;border:1px solid #d4dbe8;border-radius:9px;padding:5px;
+  box-shadow:0 12px 34px rgba(15,23,42,.18);max-height:min(320px,60vh);overflow-y:auto;font-size:13px;min-width:120px}
+.sel3d-menu .it{padding:8px 11px;border-radius:6px;cursor:pointer;white-space:nowrap;color:var(--text);line-height:1.3}
+.sel3d-menu .it.hi,.sel3d-menu .it:hover{background:#eef4ff}
+.sel3d-menu .it.sel{font-weight:600;color:var(--blue);background:#e8f0ff}
+.sel3d-menu .it.dis{color:var(--text2);cursor:default;background:none}
+@media (max-width:480px){.sel3d-menu .it{padding:11px 12px}}
+/* Nhóm cặp "Từ - Đến" (khoảng ngày) lại thành 1 khối — để .sb>* (ép full-width trên mobile) coi cả cặp
+   là 1 item duy nhất, thay vì mỗi label/input tách rời chiếm hẳn 1 dòng riêng; bên trong khối vẫn luôn
+   nằm ngang cùng 1 dòng dù ở mobile hay desktop */
+.date-range{display:flex;align-items:center;gap:6px}
+.date-range label{flex-shrink:0}
+.date-range input[type=date]{flex:1;min-width:0}
+/* Ô gõ-tìm tự chế (Sản phẩm/Loại hàng/NCC) — thay cho <datalist> vì datalist để trình duyệt tự quyết
+   hiện bao nhiêu dòng (có thể xổ ra cả danh sách dài); cái này giới hạn ~10 dòng rồi cuộn */
+.ac-menu{position:fixed;z-index:300;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow-y:auto;display:none}
+.ac-item{padding:8px 12px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-item:hover,.ac-item.hi{background:var(--bg)}
+.ac-empty{padding:8px 12px;font-size:12px;color:var(--text2)}
+#toast{position:fixed;bottom:22px;right:22px;background:#1e293b;color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s}
+/* Overlay "Đang xử lý…" — phủ cả modal, dưới #toast; hiện khi đang lưu/xóa/tải Firebase */
+#busy-ov{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.28)}
+#busy-ov .busy-box{background:#fff;border-radius:12px;padding:18px 26px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 12px 44px rgba(0,0,0,.25);font-size:13px;color:var(--text2)}
+#busy-ov .spin{width:26px;height:26px;margin:0}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{background:var(--green)}#toast.err{background:var(--red)}
+.ld{text-align:center;padding:36px;color:var(--text2);font-size:13px}
+.spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .6s linear infinite;margin:0 auto 8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:36px;color:var(--text2);font-size:13px}
+/* Danh sách đơn giản 2 cột (Tên - Số lượng) luôn nằm chung 1 hàng, kể cả trên điện thoại —
+   dùng cho popup Hết hàng/Hàng sắp hết/Sắp hết hạn ở Tổng quan (khác .m-tbl vốn dựng cho bảng nhiều cột) */
+/* Lưới 3 cột dùng CHUNG (giống .donut-row ở biểu đồ): tên | số (căn phải, thẳng cột) | đơn vị.
+   .simple-row dùng display:contents để 3 ô vào thẳng lưới .simple-list → số của mọi dòng thẳng hàng,
+   align-items:center để tên & số luôn nằm giữa cùng 1 hàng. Popup Hết hàng/Sắp hết chỉ có tên + số
+   thì thêm 1 ô .u rỗng cho đủ 3 cột. */
+.simple-list{max-height:60vh;overflow-y:auto;display:grid;grid-template-columns:auto auto auto;justify-content:center;column-gap:22px;align-items:center}
+.simple-row{display:contents}
+.simple-row .n,.simple-row .v,.simple-row .u{padding:9px 2px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.4;align-self:center}
+.simple-row:last-child .n,.simple-row:last-child .v,.simple-row:last-child .u{border-bottom:none}
+.simple-row .n{max-width:min(60vw,320px);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simple-row .v{font-weight:700;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.simple-row .u{color:var(--text2);white-space:nowrap}
+.tabs{display:flex;gap:4px;margin-bottom:16px}
+.tab{padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);border:1px solid transparent}
+.tab.on{background:var(--blue);color:#fff}.tab:hover:not(.on){background:var(--bg)}
+.alert{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:9px 14px;margin-bottom:16px;font-size:13px;color:#92400e;display:none;align-items:center;gap:8px}
+.bar-chart{display:flex;flex-direction:column;gap:7px;padding:2px 0}
+.br{display:flex;align-items:center;gap:9px;font-size:12px}
+.br .bl{width:85px;color:var(--text2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.br .bt{flex:1;background:#f1f5f9;border-radius:4px;height:18px;overflow:hidden}
+.br .bf{height:100%;border-radius:4px;background:var(--blue);transition:width .4s}
+.br .bv{font-size:11px;color:var(--text2);width:60px}
+/* Multi-row table in modal */
+.item-table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.item-table th{padding:7px 8px;font-size:11px;color:var(--text2);background:#f8fafc;border-bottom:1px solid var(--border);text-align:left}
+.item-table td{padding:5px 5px}
+.item-table td input,.item-table td select{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none}
+.item-table td input:focus,.item-table td select:focus{border-color:var(--blue)}
+.item-table .td-del{width:30px;text-align:center}
+.add-row-btn{background:#f0f9ff;color:var(--blue);border:1px dashed var(--blue);border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;width:100%;margin-bottom:14px}
+.add-row-btn:hover{background:#e0f2fe}
+.total-bar{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap}
+.total-bar span{font-size:12px;color:var(--text2)}
+.total-bar b{color:var(--green);font-size:14px}
+/* Chia lợi nhuận */
+.profit-card{background:linear-gradient(135deg,#1e2736,#2d3f55);border-radius:12px;padding:20px;color:#fff;margin-bottom:16px}
+.profit-card .pc-title{font-size:13px;color:#94a3b8;margin-bottom:4px}
+.profit-card .pc-val{font-size:28px;font-weight:700;color:#10b981}
+.profit-person{background:#fff;border-radius:10px;padding:16px;box-shadow:var(--shadow);border-left:4px solid var(--blue)}
+.profit-person .pp-name{font-size:14px;font-weight:600;margin-bottom:8px}
+.profit-person .pp-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px}
+.profit-person .pp-total{display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.profit-person .pp-total span:last-child{color:var(--green)}
+
+/* Biểu đồ tròn "Tồn kho theo trạng thái" ở Tổng quan */
+.chart-legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2)}
+.chart-legend .lg-dot,.donut-row .lg-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;flex-shrink:0}
+#d-chart svg{display:block;font-family:inherit}
+.donut-seg{cursor:pointer;transition:filter .1s}
+.donut-total-num{font-size:32px;font-weight:700;fill:var(--text)}
+.donut-total-lb{font-size:11px;fill:var(--text2)}
+.donut-list{display:flex;flex-direction:column;gap:12px}
+/* mỗi dòng chú thích là 1 lưới 4 cột cố định → chấm màu / nhãn / số / % thẳng hàng nhau giữa các dòng */
+.donut-row{display:grid;grid-template-columns:14px minmax(64px,1fr) 30px 44px;align-items:center;column-gap:9px;font-size:14px;color:var(--text)}
+.donut-row .lg-dot{width:11px;height:11px;margin:0}
+.donut-row-lb{color:var(--text2)}
+.donut-row b{font-size:16px;text-align:right}
+.donut-row-pct{color:var(--text2);font-size:13px;text-align:right}
+.chart-tip{position:fixed;display:none;background:#0b0b0b;color:#fff;font-size:12px;line-height:1.5;padding:6px 10px;border-radius:6px;pointer-events:none;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.chart-tip b{font-size:13px;font-weight:600}
+.scroll-tbl{max-height:400px;overflow-y:auto;overflow-x:auto}
+.scroll-tbl table thead th{position:sticky;top:0;z-index:1}
+
+/* Nút hamburger + backdrop: ẩn hoàn toàn ở desktop, chỉ hiện trong media query mobile bên dưới */
+.tb-left{display:flex;align-items:center;gap:8px}
+#mnu-btn{display:none;align-items:center;justify-content:center;background:transparent;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--text);padding:6px 8px;border-radius:6px}
+#mnu-btn:hover{background:var(--bg)}
+#mnu-btn:active{background:var(--bg)}
+#mnu-backdrop{display:none}
+/* Nút thu gọn/mở sidebar — nằm ngay bên phải chữ "Tạp Hóa D5" trong menu trái */
+#sb-tgl{margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:#8899aa;font-size:18px;line-height:1;cursor:pointer;padding:4px 7px;border-radius:6px}
+#sb-tgl:hover{background:#2a3547;color:#fff}
+
+/* Khối tìm kiếm/lọc gấp mở được (<details>): ở desktop luôn mở, ẩn hẳn nút bấm toggle */
+.sb-toggle{display:none}
+.sb-toggle::-webkit-details-marker{display:none}
+
+/* ══════════ RESPONSIVE ĐIỆN THOẠI (iPhone 11 ~414px và các máy tương tự, <=480px) ══════════ */
+@media (max-width:480px){
+  /* iOS Safari (và vài trình duyệt Android) tự động ZOOM CẢ TRANG khi bấm vào ô input/select/textarea có
+     font-size < 16px — không phải lỗi, là hành vi mặc định của trình duyệt để tránh chữ quá nhỏ khi gõ.
+     App đang để font-size 12-14px cho các ô (cho gọn) nên bị zoom liên tục khi thao tác trên điện thoại.
+     Ép về đúng 16px CHỈ ở mobile (desktop giữ nguyên kích thước gọn cũ) để tắt hẳn hành vi zoom này —
+     dùng !important vì có nhiều rule cụ thể hơn (.fg input, .sb input, .item-table td input...) đang tự set font-size riêng. */
+  input,select,textarea{font-size:16px!important}
+
+  /* Sidebar cố định 215px không dùng được trên điện thoại
+     → ẩn đi, thay bằng nút hamburger (☰) ở topbar; bấm vào mới trượt ra toàn bộ menu */
+  #mnu-btn{display:inline-flex;align-items:center;justify-content:center}
+  #sb-tgl{display:none}
+  #sb{position:fixed;top:0;left:0;bottom:0;width:78vw;max-width:300px;height:100vh;
+      transform:translateX(-100%);transition:transform .25s ease;z-index:200;
+      box-shadow:2px 0 20px rgba(0,0,0,.3);overflow-y:auto}
+  #sb.mnu-open{transform:translateX(0)}
+  #mnu-backdrop.on{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150}
+
+  #main{width:100%;min-height:0}
+  /* Ghim header cố định trên cùng viewport (không phụ thuộc 100vh/thanh địa chỉ co giãn trên di động) —
+     bù lại bằng padding-top cho #content để nội dung không bị header đè lên */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:120;padding:0 14px;height:48px}
+  #topbar h1{font-size:14px}
+  #acts .btn{padding:6px 10px;font-size:12px}
+  #content{padding:12px;padding-top:calc(48px + 12px)}
+
+  /* Khoảng ngày Từ-Đến trên 1 dòng: ẩn bớt nhãn chữ "Từ"/"Đến" (giữ nguyên ở desktop) để dành chỗ cho chính
+     2 ô ngày — vì input date tối thiểu cần ~130-140px mới đủ hiện "mm/dd/yyyy" + icon lịch mà không bị tràn,
+     nhất là sau khi ép font-size lên 16px (để tắt auto-zoom) làm ô ngày cần rộng hơn trước */
+  .date-range label{display:none}
+  .date-range{gap:8px}
+
+  /* Lưới card TO (biểu đồ/bảng/dropdown bên trong — .grid3 dùng ở Tổng quan, .grid2 hiện chưa dùng chỗ nào)
+     → vẫn xếp dọc 1 cột, ép 2 cột sẽ làm bẹp dúm nội dung bên trong không đọc được */
+  .grid3,.grid2{grid-template-columns:1fr}
+  /* Lưới Ô THỐNG KÊ nhỏ (số + nhãn, VD "Tổng sản phẩm"/"Hết hàng" ở Tổng quan, hoặc "Tổng SL"/"Tổng tiền"
+     ở các màn Nhập/Xếp/Kiểm kê/Báo cáo) → xếp 2 cột cho gọn thay vì mỗi ô 1 dòng dài lê thê phải cuộn nhiều */
+  .grid4,.stat-grid3{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{padding:11px 14px}
+  .kpi .val{font-size:19px}
+  .kpi-card{padding:12px;gap:10px}
+  .kpi-ic{width:36px;height:36px;border-radius:9px}
+  .kpi-ic svg{width:16px;height:16px}
+  .kpi-body .val{font-size:19px}
+
+  /* Thanh công cụ tìm kiếm/lọc: mỗi ô full-width, xếp dọc cho dễ chạm */
+  .sb{gap:8px}
+  .sb>*{flex:1 1 100%}
+
+  /* Khối tìm kiếm/lọc (search + số dòng...) gấp lại mặc định, bấm mới mở ra — đỡ chiếm chỗ màn hình nhỏ */
+  .sb-wrap{margin-bottom:14px}
+  .sb-wrap .sb{margin-bottom:0;padding-top:12px}
+  .sb-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;
+    font-size:13px;font-weight:500;color:var(--text);cursor:pointer;list-style:none;box-shadow:var(--shadow)}
+  .sb-toggle::after{content:'▾';color:var(--text2);transition:transform .2s}
+  details:not([open])>.sb-toggle::after{transform:rotate(-90deg)}
+
+  /* Modal: bớt padding, các cặp field 2-3 cột → xếp dọc 1 cột */
+  .mb{padding:16px;width:94vw;border-radius:10px}
+  .fr,.fr3{grid-template-columns:1fr}
+
+  /* ── Mọi bảng danh sách (.m-tbl): chuyển từ bảng ngang sang danh sách dạng card,
+     tránh phải cuộn ngang khó dùng trên điện thoại. Chỉ hiện tối đa 4 trường quan trọng
+     nhất trên mỗi thẻ — trường nào đánh dấu .mobile-hide sẽ ẩn hẳn, chỉ xem đầy đủ ở desktop ── */
+  .m-tbl,.m-tbl thead,.m-tbl tbody,.m-tbl th,.m-tbl td,.m-tbl tr{display:block}
+  .m-tbl thead{display:none}
+  .m-tbl tr{background:#fff;border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:10px 12px}
+  .m-tbl tr:last-child{margin-bottom:0}
+  .m-tbl td{border-bottom:none;padding:5px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;text-align:right}
+  .m-tbl td::before{content:attr(data-label);color:var(--text2);font-weight:500;font-size:11px;text-align:left}
+  .m-tbl td:last-child{justify-content:flex-end;padding-top:8px;margin-top:4px;border-top:1px solid var(--border)}
+  .m-tbl td:last-child::before{content:none}
+  .m-tbl td.mobile-hide{display:none}
+
+  /* Modal Tạo/Sửa phiếu xếp hàng: bảng chọn SP/SL gọn hơn */
+  .item-table th{padding:6px 4px;font-size:10px}
+  .item-table td{padding:4px 3px}
+  .item-table td input,.item-table td select{font-size:13px;padding:7px 6px}
+}

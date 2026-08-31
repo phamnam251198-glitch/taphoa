@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Tổng quan</title>
+<link rel="stylesheet" href="style.css?v=20260830x">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-dash">
+      <div class="grid3">
+        <div class="kpi-card kpi-red" style="cursor:pointer" onclick="openDashList('het')" title="Bấm để xem danh sách"><div class="kpi-ic" id="dash-ic-het"></div><div class="kpi-body"><div class="lb">Hết hàng</div><div class="val" id="d-het">—</div></div></div>
+        <div class="kpi-card kpi-orange" style="cursor:pointer" onclick="openDashList('sap')" title="Bấm để xem danh sách"><div class="kpi-ic" id="dash-ic-sap"></div><div class="kpi-body"><div class="lb">Sắp hết</div><div class="val" id="d-sh">—</div></div></div>
+        <div class="kpi-card kpi-green" style="cursor:pointer" onclick="openDashList('hsd')" title="Bấm để xem danh sách"><div class="kpi-ic" id="dash-ic-hsd"></div><div class="kpi-body"><div class="lb">Sắp hết hạn</div><div class="val" id="d-hsd">—</div></div></div>
+      </div>
+      <div id="d-chart-tip" class="chart-tip"></div>
+      <div class="grid3">
+        <div class="card">
+          <div class="ch"><h2>Tồn kho theo trạng thái</h2><button class="btn btn-g btn-sm" id="d-chart-toggle" onclick="toggleChartView()">📋 Xem bảng</button></div>
+          <div style="padding:16px 18px">
+            <div id="d-chart"><div class="ld"><div class="spin"></div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h2>Hàng cần nhập</h2>
+            <select id="flt-dash" onchange="renderDLow()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;outline:none">
+              <option value="">Tất cả trạng thái</option>
+              <option value="het">Hết hàng</option>
+              <option value="sap">Sắp hết</option>
+            </select>
+          </div>
+          <div id="d-low"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+        <div class="card" id="card-best" hidden>
+          <div class="ch"><h2>🔥 Bestseller (Đã tiêu thụ nhiều nhất)</h2>
+            <select id="dash-best-n" onchange="changeDashBestN(this.value)" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;outline:none">
+              <option value="5">Top 5</option>
+              <option value="10">Top 10</option>
+            </select>
+          </div>
+          <div id="d-best"><div class="ld"><div class="spin"></div></div></div>
+        </div>
+        <div class="card"><div class="ch"><h2>Hàng sắp hết hạn sử dụng</h2></div><div id="d-exp"><div class="ld"><div class="spin"></div></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DANH SÁCH SP THEO TRẠNG THÁI (bấm từ ô thống kê ở Tổng quan: Hết hàng/Hàng sắp hết/Sắp hết hạn) -->
+<div class="mo" id="m-dash-list">
+  <div class="mb mb-sm">
+    <button class="modal-x" onclick="cm('m-dash-list')" aria-label="Đóng">✕</button>
+    <h3 id="dash-list-t" style="padding-right:28px">Danh sách sản phẩm</h3>
+    <div id="dash-list-tbl"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260830x"></script>
+<script>
+// ── JS riêng cho màn Tổng quan ──
+let dashLow=[],dashHet=[],dashExp=[],dashSap=[];
+// Bấm vào ô thống kê Hết hàng/Hàng sắp hết/Sắp hết hạn → popup danh sách SP tương ứng (chỉ Tên + Số lượng)
+function openDashList(kind){
+  const cfg={
+    het:{title:'Hết hàng',data:dashHet,color:'var(--red)'},
+    sap:{title:'Hàng sắp hết',data:dashSap,color:'var(--yellow)'},
+    hsd:{title:'Sắp hết hạn sử dụng',data:dashExp,color:'var(--green)'}
+  }[kind];
+  if(!cfg)return;
+  const tEl=document.getElementById('dash-list-t');
+  tEl.textContent=`${cfg.title} (${cfg.data.length} sản phẩm)`;
+  tEl.style.color=cfg.color||'';
+  const el=document.getElementById('dash-list-tbl');
+  // Cố tình KHÔNG dùng bảng .m-tbl (bảng đó ở mobile tự chuyển mỗi CỘT thành 1 dòng riêng cho card nhiều
+  // trường) — ở đây chỉ có 2 trường Tên/SL nên luôn muốn nằm chung 1 hàng, kể cả trên điện thoại
+  el.innerHTML=cfg.data.length?'<div class="simple-list">'+
+    cfg.data.map(r=>`<div class="simple-row"><span class="n">${esc(r[0])}:</span><span class="v">${fmt(Number(r[1]||0))}</span><span class="u"></span></div>`).join('')+'</div>'
+    :'<div class="empty">✅ Không có sản phẩm nào</div>';
+  om('m-dash-list');
+}
+function renderDLow(){
+  const flt=document.getElementById('flt-dash')?.value||'';
+  const data=sortByMode(flt?dashLow.filter(r=>stTK(r)===flt):dashLow,'status');// luôn xếp khẩn cấp trước
+  document.getElementById('d-low').innerHTML=data.length===0?'<div class="empty">✅ Không có sản phẩm nào</div>':
+    '<div class="scroll-tbl"><table><thead><tr><th>Sản phẩm</th><th>Tồn</th><th>Trạng thái</th></tr></thead><tbody>'+
+    data.map(r=>`<tr class="dl-${stTK(r)}"><td>${r[0]}</td><td>${r[1]} ${r[2]||''}</td><td>${statusBadge(r)}</td></tr>`).join('')+'</tbody></table></div>';
+}
+async function loadDash(){
+  const tk=await apiGet('TonKho');
+  C.TK=tk;
+  dashHet=tk.filter(r=>stTK(r)==='het');
+  document.getElementById('d-het').textContent=dashHet.length;
+  // "Sắp hết" (ô thống kê + popup): CHỈ hàng còn > 0 và ≤ ngưỡng — hàng SL=0 là "Hết hàng", không tính vào đây
+  dashSap=tk.filter(r=>stTK(r)==='sap');
+  // "Hàng cần nhập" (card bên dưới): gộp cả Hết hàng + Sắp hết để còn lọc theo trạng thái
+  dashLow=tk.filter(r=>{const s=stTK(r);return s==='het'||s==='sap';});
+  document.getElementById('d-sh').textContent=dashSap.length;
+  document.getElementById('lbadge').style.display=dashLow.length?'inline':'none';
+  renderDLow();
+  // Hàng sắp hết hạn sử dụng: HSD đã qua hoặc còn ≤ ngưỡng riêng SP (hoặc mặc định) — chỉ tính SP có ghi HSD
+  const ts=td();
+  const daysLeftOf=r=>Math.round((new Date(r[5])-new Date(ts))/86400000);
+  const exp=tk.filter(r=>r[5]&&Number(r[1]||0)>0&&daysLeftOf(r)<=getHsdSap(r)).sort((a,b)=>(a[5]||'').localeCompare(b[5]||''));
+  dashExp=exp;
+  document.getElementById('d-hsd').textContent=exp.length;
+  document.getElementById('d-exp').innerHTML=exp.length===0?`<div class="empty-hero"><div class="eh-ic">${icon('checkcircle',26)}</div><div class="eh-title">Không có hàng sắp hết hạn</div><div class="eh-sub">Tất cả sản phẩm đều còn hạn sử dụng.</div></div>`:
+    '<div class="scroll-tbl"><table><thead><tr><th>Sản phẩm</th><th>HSD</th><th>Trạng thái</th></tr></thead><tbody>'+
+    exp.map(r=>{
+      const daysLeft=daysLeftOf(r);
+      const badge=daysLeft<0?'<span class="bg bg-r">Đã hết hạn</span>':daysLeft<=getHsdGan(r)?`<span class="bg bg-r">Còn ${daysLeft} ngày</span>`:`<span class="bg bg-y">Còn ${daysLeft} ngày</span>`;
+      return`<tr><td>${r[0]}</td><td>${r[5]}</td><td>${badge}</td></tr>`;
+    }).join('')+'</tbody></table></div>';
+  renderDashChart(tk);
+  C.XH=await apiGet('XepHang');
+  C.KK=await apiGet('KiemKe');
+  // Ưu tiên kỳ do người dùng CHỐT ở màn Bestseller (sheet BestKy); chưa lưu → tự lấy 2 mốc đánh dấu gần nhất
+  dashBestPair=(await getSavedBestKy())||mostRecentKKPair();
+  renderDashBest();
+}
+// ── Bestseller (đúng công thức, DÙNG CHUNG với màn Bestseller riêng — xem computeBestsellerPeriod trong
+// app.js) — Đã bán = Tồn đầu kỳ + Xếp hàng trong kỳ − Tồn cuối kỳ. Kỳ = kỳ đã LƯU ở màn Bestseller
+// (BestKy), chưa lưu thì lấy tự động: Cuối kỳ = lần đánh dấu 🏁 gần nhất, Đầu kỳ = lần 📍 gần nhất trước đó.
+let dashBestN=5,dashBestPair=null;
+function changeDashBestN(v){dashBestN=Number(v);renderDashBest();}
+function renderDashBest(){
+  const el=document.getElementById('d-best');if(!el)return;
+  const card=document.getElementById('card-best');
+  const pair=dashBestPair;
+  const top=pair?computeBestsellerPeriod(pair.dau,pair.cuoi).items.slice(0,dashBestN):[];
+  // Không có kỳ / không có SP đủ dữ liệu → ẩn hẳn card, không hiện chú thích gì
+  if(!top.length){if(card)card.hidden=true;el.innerHTML='';return;}
+  if(card)card.hidden=false;
+  el.innerHTML='<div class="simple-list">'+
+    top.map((it,i)=>{
+      const cl=it.daBan<0?'color:#d03b3b':'';
+      return`<div class="simple-row"><span class="n">${i+1}. ${esc(it.ten)}:</span><span class="v" style="${cl}">${fmt(it.daBan)}</span><span class="u">đã tiêu thụ</span></div>`;
+    }).join('')+'</div>';
+}
+
+// ── Biểu đồ tròn "Tồn kho theo trạng thái" (gộp SP theo Hết hàng/Sắp hết/Còn hàng) ──
+let dashChartMode='chart';
+function toggleChartView(){
+  dashChartMode=dashChartMode==='chart'?'table':'chart';
+  document.getElementById('d-chart-toggle').textContent=dashChartMode==='chart'?'📋 Xem bảng':'📊 Xem biểu đồ';
+  renderDashChart(C.TK);
+}
+function renderDashChart(tk){
+  if(dashChartMode==='table')renderDashChartTable(tk);else renderDashDonut(tk);
+}
+function renderDashChartTable(tk){
+  const el=document.getElementById('d-chart');
+  const data=[...tk].sort((a,b)=>Number(b[1]||0)-Number(a[1]||0));
+  if(!data.length){el.innerHTML='<div class="empty">📦 Chưa có sản phẩm</div>';return;}
+  el.innerHTML='<div class="scroll-tbl"><table><thead><tr><th>Sản phẩm</th><th>Tồn</th><th>Trạng thái</th></tr></thead><tbody>'+
+    data.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td>${statusBadge(r)}</td></tr>`).join('')+'</tbody></table></div>';
+}
+function renderDashDonut(tk){
+  const el=document.getElementById('d-chart');
+  const total=tk.length;
+  if(!total){el.innerHTML='<div class="empty">📦 Chưa có sản phẩm</div>';return;}
+  const counts={het:0,sap:0,con:0};
+  tk.forEach(r=>counts[stTK(r)]++);
+  const segs=STATUS_ORDER.map(k=>({label:STATUS_DEF[k].label,color:STATUS_DEF[k].hex,val:counts[k]})).filter(s=>s.val>0);
+
+  // Làm sáng (pct>0 → về trắng) / tối (pct<0 → về đen) 1 màu hex
+  const shade=(hex,pct)=>{
+    const n=parseInt(hex.slice(1),16),r=n>>16&255,g=n>>8&255,b=n&255;
+    const t=pct<0?0:255,p=Math.abs(pct);
+    const mix=c=>Math.round((t-c)*p+c);
+    return'#'+[mix(r),mix(g),mix(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  };
+
+  const size=210,cx=size/2,cy=size/2,R=72,thick=30;
+  const circ=2*Math.PI*R;
+  let acc=0;
+  // Mỗi lát 1 gradient chéo: sáng → màu gốc → tối (tạo chiều sâu 3D)
+  const gradDefs=segs.map((s,i)=>`<linearGradient id="dgrad-${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${shade(s.color,0.34)}"/>
+        <stop offset="55%" stop-color="${s.color}"/>
+        <stop offset="100%" stop-color="${shade(s.color,-0.24)}"/>
+      </linearGradient>`).join('');
+  const arcs=segs.map((s,i)=>{
+    const frac=s.val/total;
+    const dash=frac*circ;
+    const offset=-acc*circ;
+    acc+=frac;
+    return`<circle class="donut-seg" data-i="${i}" cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="url(#dgrad-${i})" stroke-width="${thick}" stroke-dasharray="${Math.max(dash-1,0)} ${circ}" stroke-dashoffset="${offset}" stroke-linecap="butt"></circle>`;
+  }).join('');
+
+  const rIn=R-thick/2, rOut=R+thick/2;
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap">
+    <svg viewBox="0 0 ${size} ${size}" style="width:210px;height:210px;flex-shrink:0;overflow:visible">
+      <defs>
+        ${gradDefs}
+        <radialGradient id="donut-sheen" cx="36%" cy="28%" r="78%">
+          <stop offset="0%" stop-color="#fff" stop-opacity="0.5"/>
+          <stop offset="42%" stop-color="#fff" stop-opacity="0.06"/>
+          <stop offset="78%" stop-color="#000" stop-opacity="0.05"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0.22"/>
+        </radialGradient>
+        <filter id="donut-shadow" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.28"/>
+        </filter>
+      </defs>
+      <g transform="rotate(-90 ${cx} ${cy})" filter="url(#donut-shadow)">${arcs}</g>
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="url(#donut-sheen)" stroke-width="${thick}" style="pointer-events:none"></circle>
+      <circle cx="${cx}" cy="${cy}" r="${rOut-0.75}" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="1.5" style="pointer-events:none"></circle>
+      <circle cx="${cx}" cy="${cy}" r="${rIn+0.75}" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="pointer-events:none"></circle>
+      <text x="${cx}" y="${cy-5}" text-anchor="middle" class="donut-total-num">${total}</text>
+      <text x="${cx}" y="${cy+16}" text-anchor="middle" class="donut-total-lb">sản phẩm</text>
+    </svg>
+    <div class="donut-list" style="margin:auto 0">
+      ${segs.map(s=>`<div class="donut-row"><i class="lg-dot" style="background:${s.color}"></i><span class="donut-row-lb">${s.label}</span><b>${s.val}</b><span class="donut-row-pct">${Math.round(s.val/total*100)}%</span></div>`).join('')}
+    </div>
+  </div>`;
+
+  const tip=document.getElementById('d-chart-tip');
+  el.querySelectorAll('.donut-seg').forEach((c,i)=>{
+    const s=segs[i];
+    const show=e=>{
+      tip.textContent='';
+      const b=document.createElement('b');b.textContent=s.val+' SP ';
+      tip.appendChild(b);
+      tip.appendChild(document.createTextNode('— '+s.label+' ('+Math.round(s.val/total*100)+'%)'));
+      tip.style.display='block';
+      const tx=Math.min(e.clientX+14,window.innerWidth-220);
+      tip.style.left=tx+'px';tip.style.top=(e.clientY+14)+'px';
+      c.style.filter='brightness(1.1)';
+    };
+    const hide=()=>{tip.style.display='none';c.style.filter='';};
+    c.addEventListener('pointermove',show);
+    c.addEventListener('pointerenter',show);
+    c.addEventListener('pointerleave',hide);
+  });
+}
+
+
+bootPage('dash',function(){
+  document.getElementById('acts').innerHTML='';
+  document.getElementById('dash-ic-het').innerHTML=icon('bag',20);
+  document.getElementById('dash-ic-sap').innerHTML=icon('hourglass',20);
+  document.getElementById('dash-ic-hsd').innerHTML=icon('calcheck',20);
+  loadDash();
+});
+</script>
+</body>
+</html>

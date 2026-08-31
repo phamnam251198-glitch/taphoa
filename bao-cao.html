@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Báo cáo theo tháng</title>
+<link rel="stylesheet" href="style.css?v=20260830x">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-bc">
+      <div class="card">
+        <div class="ch"><h2>Bộ lọc thời gian</h2></div>
+        <div style="padding:14px 18px">
+          <div class="fr3">
+            <div class="fg"><label>Từ ngày</label><input type="date" id="bc-tu" onchange="loadBC()"></div>
+            <div class="fg"><label>Đến ngày</label><input type="date" id="bc-den" onchange="loadBC()"></div>
+            <div class="fg"><label>Hoặc chọn nhanh theo tháng</label><input type="month" id="bc-thang" onchange="bcSetMonth()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label>Người nhập</label><select id="bc-user" onchange="loadBC()"><option value="">Tất cả người nhập</option></select></div>
+            <div class="fg"><label>Tháng danh mục</label><select id="bc-dm" onchange="loadBC()"><option value="">— Tính theo ngày nhập —</option></select></div>
+          </div>
+          <div class="mf" style="border-top:none;padding-top:8px">
+            <button class="btn btn-g" onclick="bcShiftMonth(-1)">◀ Tháng trước</button>
+            <button class="btn btn-g" onclick="bcShiftMonth(1)">Tháng sau ▶</button>
+            <button class="btn btn-g" onclick="bcClearFilter()">✕ Xóa lọc</button>
+            <button class="btn btn-p" onclick="openBCChart()">📊 Xem báo cáo</button>
+          </div>
+        </div>
+      </div>
+      <div id="bc-sum"></div>
+      <div class="card"><div class="ch"><h2 id="bc-tbl-title">Tổng tiền nhập theo Tháng danh mục</h2></div><div id="bc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- POPUP CHI TIẾT 1 NGƯỜI NHẬP (bấm 1 dòng trong bảng báo cáo) -->
+<div class="mo" id="m-bc-detail">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-bc-detail')" aria-label="Đóng">✕</button>
+    <h3 id="bc-d-t" style="padding-right:28px">Chi tiết nhập</h3>
+    <div id="bc-d-sum"></div>
+    <div id="bc-d-body"></div>
+  </div>
+</div>
+
+<!-- BIỂU ĐỒ: tiền nhập theo Tháng danh mục, cột tách theo Người nhập -->
+<div class="mo" id="m-bc-chart">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-bc-chart')" aria-label="Đóng">✕</button>
+    <h3 style="padding-right:28px">📊 Tiền nhập theo Tháng danh mục</h3>
+    <div id="bc-chart-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260830x"></script>
+<script>
+// ── JS riêng cho màn Báo cáo theo tháng ──
+// Khoảng ngày của 1 kỳ = cấu hình tùy chỉnh ở Cài đặt → tab "Tháng danh mục" (nếu có), không thì tháng dương lịch
+function bcMonthRange(ym){return dmRange(ym);}
+function bcSetMonth(){
+  const ym=document.getElementById('bc-thang').value;
+  if(!ym)return;
+  const{from,to}=bcMonthRange(ym);
+  document.getElementById('bc-tu').value=from;
+  document.getElementById('bc-den').value=to;
+  const dmSel=document.getElementById('bc-dm');if(dmSel)dmSel.value='';// chọn tháng theo ngày → thoát chế độ "Tháng danh mục"
+  loadBC();
+}
+function bcClearFilter(){
+  ['bc-tu','bc-den','bc-thang','bc-user','bc-dm'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';e.disabled=false;}});
+  loadBC();
+}
+function bcShiftMonth(delta){
+  let ym=document.getElementById('bc-thang').value;
+  if(!ym){const d=new Date();ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  let[y,m]=ym.split('-').map(Number);
+  m+=delta;
+  if(m<1){m=12;y--;}else if(m>12){m=1;y++;}
+  document.getElementById('bc-thang').value=`${y}-${String(m).padStart(2,'0')}`;
+  bcSetMonth();
+}
+async function openBC(){
+  await ensureDmKy();
+  // Không đặt sẵn Từ ngày / Đến ngày / tháng — để trống, người dùng tự chọn
+  document.getElementById('bc-thang').value='';
+  document.getElementById('bc-tu').value='';
+  document.getElementById('bc-den').value='';
+  await ensureUser();
+  document.getElementById('bc-user').innerHTML='<option value="">Tất cả người nhập</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  await loadBC();
+}
+async function loadBC(){
+  document.getElementById('bc-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  await ensureDmKy();
+  const data=await apiGet('NhapHang');C.NH=data;
+  // Đổ danh sách Tháng danh mục (7 tháng mặc định + tháng thực có trong dữ liệu), giữ lựa chọn cũ
+  const dmSel=document.getElementById('bc-dm');
+  if(dmSel){
+    const cur=dmSel.value;
+    dmSel.innerHTML='<option value="">— Tính theo ngày nhập —</option>'+dmFilterMonths(data.map(r=>r[10])).map(m=>`<option value="${m}"${m===cur?' selected':''}>${dmFmt(m)}</option>`).join('');
+  }
+  const from=document.getElementById('bc-tu').value;
+  const to=document.getElementById('bc-den').value;
+  const user=document.getElementById('bc-user')?.value||'';
+  const dm=document.getElementById('bc-dm')?.value||'';
+  const byDm=!!dm;// chọn Tháng danh mục → lọc theo TAG danhMucId đã lưu trên phiếu (cột 10), BỎ QUA khoảng ngày
+  ['bc-tu','bc-den','bc-thang'].forEach(id=>{const e=document.getElementById(id);if(e)e.disabled=byDm;});
+  const filtered=data.filter(r=>{
+    if(user&&(r[6]||'')!==user)return false;
+    if(byDm)return(r[10]||'')===dm;
+    return(!from||(r[4]||'')>=from)&&(!to||(r[4]||'')<=to);
+  });
+  const grandTotal=filtered.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
+  document.getElementById('bc-sum').innerHTML=`<div class="grid3 stat-grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số sản phẩm nhập</div><div class="val">${new Set(filtered.map(r=>r[0])).size}</div></div>
+    <div class="kpi p"><div class="lb">Số người nhập</div><div class="val">${new Set(filtered.map(r=>r[6]||'?')).size}</div></div>
+    <div class="kpi r"><div class="lb">Tổng tiền đã thanh toán</div><div class="val">${fmt(grandTotal)}đ</div></div></div>`;
+  const el=document.getElementById('bc-tbl');
+  const titleEl=document.getElementById('bc-tbl-title');
+  if(titleEl)titleEl.textContent='Tổng tiền nhập theo Tháng danh mục';
+
+  // ── DANH SÁCH THEO THÁNG DANH MỤC — bấm 1 tháng → popup chi tiết tháng đó ──
+  const byM=new Map();
+  filtered.forEach(r=>{const m=r[10]||'(chưa gắn tháng)';if(!byM.has(m))byM.set(m,[]);byM.get(m).push(r);});
+  const mRows=[...byM.entries()].map(([m,items])=>({
+    m, nUser:new Set(items.map(r=>r[6]||'?')).size,
+    soSP:new Set(items.map(r=>r[0])).size,
+    tongSL:items.reduce((s,r)=>s+Number(r[1]||0),0),
+    tongTien:items.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0)
+  })).sort((a,b)=>(b.m||'').localeCompare(a.m||''));
+  if(!mRows.length){el.innerHTML=`<div class="empty">📊 Không có dữ liệu nhập hàng ${(from||to||user||dm)?'khớp bộ lọc':''}</div>`;return;}
+  el.innerHTML=`<table class="m-tbl"><thead><tr><th>Tháng danh mục</th><th>Số người nhập</th><th>Số SP</th><th>Tổng SL</th><th>Tổng tiền nhập</th></tr></thead><tbody>`+
+    mRows.map(x=>`<tr class="row-edit" onclick="openBCMonth('${esc(x.m)}')" title="Bấm để xem chi tiết tháng này"><td data-label="Tháng danh mục"><span class="bg bg-b">${/^\d{4}-\d{2}$/.test(x.m)?esc(dmFmt(x.m)):esc(x.m)}</span></td><td data-label="Số người nhập">${x.nUser}</td><td data-label="Số SP">${x.soSP}</td><td data-label="Tổng SL">${fmt(x.tongSL)}</td><td data-label="Tổng tiền nhập"><b>${fmt(x.tongTien)}đ</b></td></tr>`).join('')+
+    '</tbody></table>';
+}
+// Bấm 1 THÁNG DANH MỤC → popup liệt kê TỪNG dòng nhập của tháng đó (mọi người nhập), mới nhất trước
+function openBCMonth(m){
+  const data=C.NH||[];
+  const user=document.getElementById('bc-user')?.value||'';
+  const lines=data.filter(r=>(r[10]||'(chưa gắn tháng)')===m && (!user||(r[6]||'')===user))
+    .sort((a,b)=>(b[4]||'').localeCompare(a[4]||''));
+  const tongTien=lines.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
+  document.getElementById('bc-d-t').textContent=`Chi tiết nhập — ${/^\d{4}-\d{2}$/.test(m)?dmFmt(m):m}`;
+  document.getElementById('bc-d-sum').innerHTML=`<div class="grid3 stat-grid3" style="margin-bottom:14px">
+    <div class="kpi b"><div class="lb">Số sản phẩm nhập</div><div class="val">${new Set(lines.map(r=>r[0])).size}</div></div>
+    <div class="kpi p"><div class="lb">Số người nhập</div><div class="val">${new Set(lines.map(r=>r[6]||'?')).size}</div></div>
+    <div class="kpi r"><div class="lb">Tổng tiền</div><div class="val">${fmt(tongTien)}đ</div></div></div>`;
+  document.getElementById('bc-d-body').innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Ngày nhập</th><th>Người nhập</th><th>Sản phẩm</th><th>Số lượng</th><th>Giá nhập</th><th>Thành tiền</th></tr></thead><tbody>`+
+    (lines.length?lines.map(it=>{
+      const sl=Number(it[1]||0),gia=Number(it[2]||0);
+      return`<tr><td data-label="Ngày nhập">${esc((it[4]||'').split('-').reverse().join('/'))}</td><td data-label="Người nhập"><span class="bg bg-p">${esc(it[6]||'')}</span></td><td data-label="Sản phẩm">${esc(it[0]||'')}</td><td data-label="Số lượng">${fmt(sl)}</td><td data-label="Giá nhập">${fmt(gia)}đ</td><td data-label="Thành tiền"><b>${fmt(sl*gia)}đ</b></td></tr>`;
+    }).join(''):`<tr><td colspan="6" style="text-align:center;color:var(--text2)">Không có dữ liệu</td></tr>`)+
+    '</tbody></table></div>';
+  om('m-bc-detail');
+}
+
+// ── BIỂU ĐỒ CỘT: trục X = Tháng danh mục, mỗi nhóm 1 cột / 1 người nhập, cao = tổng tiền nhập ──
+function bcAbbr(v){
+  v=Number(v||0);
+  if(v>=1e9)return (v/1e9).toFixed(v%1e9?1:0)+' tỷ';
+  if(v>=1e6)return (v/1e6).toFixed(v%1e6?1:0)+' tr';
+  if(v>=1e3)return Math.round(v/1e3)+'k';
+  return String(v);
+}
+function openBCChart(){
+  const data=C.NH||[];
+  const uSel=document.getElementById('bc-user')?.value||'';
+  const from=document.getElementById('bc-tu').value, to=document.getElementById('bc-den').value;
+  const rows=data.filter(r=>
+    (!uSel||(r[6]||'')===uSel) &&
+    (!from||(r[4]||'')>=from) && (!to||(r[4]||'')<=to)   // tôn trọng "khoảng đã chọn" (Từ / Đến ngày)
+  );
+  // gộp: danhMucId -> người nhập -> tổng tiền
+  const agg={},dmSet=new Set(),uSet=new Set();
+  rows.forEach(r=>{
+    const dm=r[10]||'(chưa gắn tháng)';
+    const u=r[6]||'(Không rõ)';
+    const tien=Number(r[1]||0)*Number(r[2]||0);
+    dmSet.add(dm);uSet.add(u);
+    (agg[dm]=agg[dm]||{})[u]=(agg[dm][u]||0)+tien;
+  });
+  const dmList=[...dmSet].sort((a,b)=>{const na=/^\d{4}-\d{2}$/.test(a),nb=/^\d{4}-\d{2}$/.test(b);if(na&&nb)return a.localeCompare(b);return na?-1:nb?1:a.localeCompare(b);});
+  const userList=[...uSet].sort();
+  const body=document.getElementById('bc-chart-body');
+  if(!dmList.length||!userList.length){body.innerHTML='<div class="empty">📊 Chưa có dữ liệu nhập hàng</div>';om('m-bc-chart');return;}
+
+  const COLORS=['#d03b3b','#3b82f6','#0ca30c','#fab219','#8b5cf6','#0ea5e9','#ec4899','#64748b'];
+  const bw=userList.length>4?18:26, bgap=6, ggap=36, padL=52, padR=18, padT=26, padB=52, H=240;
+  const groupW=userList.length*bw+(userList.length-1)*bgap;
+  const W=padL+padR+dmList.length*groupW+(dmList.length-1)*ggap;
+  let maxV=0;
+  dmList.forEach(dm=>userList.forEach(u=>{maxV=Math.max(maxV,agg[dm][u]||0);}));
+  maxV=maxV||1;
+  const y=v=>padT+H*(1-v/maxV);
+
+  // lưới ngang + nhãn trục
+  let grid='';
+  for(let k=0;k<=4;k++){
+    const gv=maxV*k/4, gy=y(gv);
+    grid+=`<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="#e2e8f0" stroke-width="1"/>`;
+    grid+=`<text x="${padL-8}" y="${gy+3}" text-anchor="end" font-size="10" fill="#94a3b8">${bcAbbr(gv)}</text>`;
+  }
+  // các cột
+  let bars='';
+  dmList.forEach((dm,i)=>{
+    const x0=padL+i*(groupW+ggap);
+    userList.forEach((u,j)=>{
+      const val=agg[dm][u]||0;
+      const bx=x0+j*(bw+bgap), by=y(val), bh=padT+H-by;
+      if(val>0){
+        bars+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="3" fill="${COLORS[j%COLORS.length]}"/>`;
+        bars+=`<text x="${bx+bw/2}" y="${by-4}" text-anchor="middle" font-size="9" fill="#334155" font-weight="600">${bcAbbr(val)}</text>`;
+      }
+    });
+    bars+=`<text x="${x0+groupW/2}" y="${padT+H+16}" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">${esc(dmFmt(dm))}</text>`;
+  });
+
+  const legend=userList.map((u,j)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:0 10px 4px 0"><i style="width:11px;height:11px;border-radius:3px;background:${COLORS[j%COLORS.length]};display:inline-block"></i>${esc(u)}</span>`).join('');
+
+  // Tổng tiền từng người trong khoảng đang xem (cộng tất cả tháng danh mục hiển thị) + tổng chung
+  const uTotal={};let grand=0;
+  dmList.forEach(dm=>userList.forEach(u=>{const v=agg[dm][u]||0;uTotal[u]=(uTotal[u]||0)+v;grand+=v;}));
+  const totalRows=[...userList].sort((a,b)=>(uTotal[b]||0)-(uTotal[a]||0))
+    .map((u,j)=>`<tr><td data-label="Người nhập"><span class="bg bg-p">${esc(u)}</span></td><td data-label="Tổng tiền nhập" style="text-align:right"><b>${fmt(uTotal[u]||0)}đ</b></td></tr>`).join('');
+  const rangeLbl=(from||to)?`${from||'…'} → ${to||'…'}`:'tất cả thời gian';
+
+  body.innerHTML=`
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Chiều cao cột = tổng tiền nhập (số lượng × giá nhập) của mỗi người nhập trong từng tháng danh mục. Khoảng thời gian: <b>${esc(rangeLbl)}</b>.</div>
+    <div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H+padT+padB}" style="min-width:${Math.min(W,900)}px;max-width:100%;height:${H+padT+padB}px">
+      <line x1="${padL}" y1="${padT+H}" x2="${W-padR}" y2="${padT+H}" stroke="#cbd5e1" stroke-width="1"/>
+      ${grid}${bars}
+    </svg></div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap">${legend}</div>
+    <div style="margin-top:14px"><h4 style="font-size:13px;margin:0 0 6px">Tổng tiền nhập theo người (trong khoảng đã chọn)</h4>
+    <table class="m-tbl"><thead><tr><th>Người nhập</th><th style="text-align:right">Tổng tiền nhập</th></tr></thead>
+    <tbody>${totalRows}<tr><td><b>TỔNG CỘNG</b></td><td style="text-align:right"><b style="color:#d03b3b">${fmt(grand)}đ</b></td></tr></tbody></table></div>`;
+  om('m-bc-chart');
+}
+
+
+bootPage('bc',function(){
+  document.getElementById('acts').innerHTML='';
+  openBC();
+});
+</script>
+</body>
+</html>

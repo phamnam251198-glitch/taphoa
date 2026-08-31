@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Đồ gian hàng</title>
+<link rel="stylesheet" href="style.css?v=20260830x">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-ghk">
+      <div class="tabs" id="ghk-tabs"></div>
+      <div class="sb">
+        <input type="text" id="q-ghk" placeholder="Tìm sản phẩm trong gian hàng này..." oninput="rGHKView()">
+      </div>
+      <div id="ghk-pane"><div class="ld"><div class="spin"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ĐỒ GIAN HÀNG -->
+<div class="mo" id="m-ghk">
+  <div class="mb mb-sm">
+    <button class="modal-x" onclick="cm('m-ghk')" aria-label="Đóng">✕</button>
+    <h3 style="padding-right:28px">Sửa đồ gian hàng</h3>
+    <div class="fg"><label>Gian hàng *</label><select id="ghk-gh-sel"></select></div>
+    <div class="fg"><label>Sản phẩm *</label><select id="ghk-sp"></select></div>
+    <div class="fg"><label>Số lượng *</label><input id="ghk-sl" type="number" placeholder="0"></div>
+    <div class="mf">
+      <button class="btn btn-p" onclick="saveGHK()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260830x"></script>
+<script>
+// ── JS riêng cho màn Đồ gian hàng ──
+let ghkActiveTab=null;
+async function loadGHK(){
+  await ensureGH();
+  await ensureTK();// cần để tra Loại hàng của từng sản phẩm khi gộp hiển thị
+  // luôn lấy XepHang mới nhất — đây là nguồn dữ liệu chính để tính số lượng, phải tươi
+  C.XH=await apiGet('XepHang');
+  C.GHK=await apiGet('GianHangKho');
+  rGHKView();
+}
+function goGHKTab(name){ghkActiveTab=name;rGHKView();}
+function rGHKView(){
+  const tabsEl=document.getElementById('ghk-tabs'),paneEl=document.getElementById('ghk-pane');
+  if(!tabsEl||!paneEl)return;
+  if(!C.GH.length){
+    tabsEl.innerHTML='';
+    paneEl.innerHTML='<div class="empty">🏬 Chưa có gian hàng nào — vào Cài đặt → Gian hàng để thêm trước</div>';
+    return;
+  }
+  if(!ghkActiveTab||!C.GH.some(g=>g[0]===ghkActiveTab))ghkActiveTab=C.GH[0][0];
+  // Danh sách sản phẩm của 1 gian hàng = mọi SP từng có phiếu Xếp hàng vào đó, hợp với mọi SP có sửa tay riêng
+  function namesOf(gh){
+    const s=new Set(C.XH.filter(r=>r[2]===gh).map(r=>r[0]));
+    C.GHK.filter(r=>r[1]===gh).forEach(r=>s.add(r[0]));
+    return[...s];
+  }
+  tabsEl.innerHTML=C.GH.map(g=>{
+    const cnt=namesOf(g[0]).length;
+    return`<div class="tab${g[0]===ghkActiveTab?' on':''}" onclick="goGHKTab('${esc(g[0])}')">${esc(g[0])}${cnt?` (${cnt})`:''}</div>`;
+  }).join('');
+  const q=(document.getElementById('q-ghk')?.value||'').toLowerCase();
+  let names=namesOf(ghkActiveTab);
+  if(q)names=names.filter(n=>n.toLowerCase().includes(q));
+  const items=names.map(n=>[n,ghkQty(n,ghkActiveTab)]).sort((a,b)=>a[0].localeCompare(b[0]));
+  const total=items.reduce((s,r)=>s+r[1],0);
+  if(!items.length){
+    paneEl.innerHTML=`<div class="empty">🗄️ "${esc(ghkActiveTab)}" chưa có hàng nào (tự có khi Xếp hàng ra gian hàng này)</div>`;
+    return;
+  }
+  // Gộp theo Loại hàng ngay trong gian hàng đang xem — mỗi loại 1 khối xổ (accordion) riêng
+  const groups=new Map();
+  items.forEach(([ten,sl])=>{
+    const tk=C.TK.find(t=>t[0]===ten);
+    const loai=(tk&&tk[13])||'(Chưa phân loại)';
+    if(!groups.has(loai))groups.set(loai,[]);
+    groups.get(loai).push([ten,sl]);
+  });
+  const loaiNames=sortLoaiNames([...groups.keys()]);
+  const body=loaiNames.map((loai,idx)=>{
+    const its=groups.get(loai);
+    const rows=its.map(([ten,sl])=>
+      `<tr class="row-edit" onclick="rowEdit(event,editGHK,'${esc(ten)}','${esc(ghkActiveTab)}')"><td data-label="Sản phẩm"><b>${ten}</b></td><td data-label="Số lượng"><b>${fmt(sl)}</b></td><td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Sửa</button></td></tr>`
+    ).join('');
+    const tongSL=its.reduce((s,[,sl])=>s+Number(sl||0),0);
+    return`<details class="acc-group ${loaiColorClass(loai,idx)}" open>
+      <summary>🏷️ ${esc(loai)}<span class="acc-cnt">${its.length} SP · Tổng SL: ${fmt(tongSL)}</span></summary>
+      <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th>Sản phẩm</th><th style="width:120px">Số lượng</th><th style="width:90px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </details>`;
+  }).join('');
+  paneEl.innerHTML=`<div class="card"><div class="ch"><h2>${esc(ghkActiveTab)}</h2><span style="font-size:11px;color:var(--text2)">Tổng SL: ${fmt(total)}</span></div></div>${body}`;
+}
+function editGHK(tenSP,gianHang){
+  document.getElementById('ghk-sp').innerHTML=`<option>${tenSP}</option>`;
+  document.getElementById('ghk-gh-sel').innerHTML=`<option>${gianHang}</option>`;
+  document.getElementById('ghk-sp').disabled=true;document.getElementById('ghk-gh-sel').disabled=true;// chỉ sửa số lượng
+  document.getElementById('ghk-sl').value=ghkQty(tenSP,gianHang);
+  om('m-ghk');
+}
+async function saveGHK(){
+  const ten=document.getElementById('ghk-sp').value;
+  const gh=document.getElementById('ghk-gh-sel').value;
+  const target=Number(document.getElementById('ghk-sl').value||0);
+  if(!ten||!gh){toast('Thiếu thông tin sản phẩm/gian hàng','err');return;}
+  if(target<0){toast('Số lượng không được âm','err');return;}
+  // Lưu lại phần CHÊNH LỆCH so với số tính từ lịch sử Xếp hàng — không ghi đè số tuyệt đối,
+  // để sau này có thêm phiếu Xếp hàng mới thì vẫn cộng đúng lên trên nền đã kiểm kê
+  const offset=target-ghkBase(ten,gh);
+  toast('Đang lưu...');
+  const idx=C.GHK.findIndex(r=>r[0]===ten&&r[1]===gh);
+  const row=[ten,gh,offset];
+  await apiPost(idx>=0?{sheet:'GianHangKho',action:'update',row:idx+2,data:row}:{sheet:'GianHangKho',action:'append',row});
+  if(idx>=0)C.GHK[idx]=row;else C.GHK.push(row);
+  logAction('Cập nhật','Đồ gian hàng',`"${ten}" tại "${gh}": chỉnh về SL = ${target}`);
+  toast('Đã cập nhật');cm('m-ghk');rGHKView();
+}
+
+
+bootPage('ghk',function(){
+  document.getElementById('acts').innerHTML='';
+  loadGHK();
+});
+</script>
+</body>
+</html>

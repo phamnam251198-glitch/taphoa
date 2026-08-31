@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Kho lưu trữ hóa đơn</title>
+<link rel="stylesheet" href="style.css?v=20260830x">
+<style>
+/* ── Kho lưu trữ hóa đơn — CSS riêng cho màn này (không đụng style.css dùng chung) ── */
+.hd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.hd-item{border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;
+  display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s}
+.hd-item:hover{box-shadow:0 6px 18px rgba(0,0,0,.12);transform:translateY(-2px)}
+.hd-thumb-wrap{position:relative}
+.hd-thumb{height:140px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.hd-thumb img{width:100%;height:100%;object-fit:cover}
+.hd-thumb .ph{color:#cbd5e1}
+.hd-badge-cnt{position:absolute;top:8px;right:8px;font-size:10px;background:rgba(0,0,0,.6);color:#fff;padding:2px 7px;border-radius:10px}
+.hd-meta{padding:10px 12px;font-size:12px;display:flex;flex-direction:column;gap:4px}
+.hd-meta .hd-ncc{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd-meta .hd-line{display:flex;justify-content:space-between;gap:8px;color:var(--text2)}
+.hd-meta .hd-note{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* vùng bấm/kéo-thả chọn nhiều ảnh cùng lúc */
+.hd-drop{display:flex;align-items:center;gap:12px;padding:16px;border:2px dashed var(--border);border-radius:10px;
+  background:#f8fafc;cursor:pointer;transition:border-color .15s,background .15s}
+.hd-drop:hover{border-color:var(--blue);background:#f0f9ff}
+.hd-drop.drag{border-color:var(--blue);background:#e0f2fe}
+.hd-drop-ic{font-size:26px;flex-shrink:0}
+.hd-drop-txt{font-size:12px;color:var(--text2);line-height:1.5}
+.hd-drop-txt b{color:var(--text)}
+/* dải ảnh xem trước trong modal Thêm hóa đơn */
+.hd-prev{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.hd-prev .p{position:relative;width:88px;height:88px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.hd-prev .p img{width:100%;height:100%;object-fit:cover}
+.hd-prev .p button{position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:50%;
+  background:rgba(0,0,0,.6);color:#fff;font-size:11px;line-height:1;padding:0;cursor:pointer}
+.hd-prev .addmore{display:flex;align-items:center;justify-content:center;width:88px;height:88px;border:1px dashed var(--border);
+  border-radius:8px;font-size:24px;color:var(--text2);cursor:pointer;background:#f8fafc}
+.hd-prev .addmore:hover{border-color:var(--blue);color:var(--blue)}
+/* danh sách chính: nhóm theo người nhập */
+.hd-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;padding-bottom:6px}
+.hd-person{border:1px solid #e2e6ee;border-radius:12px;padding:16px;cursor:pointer;background:#fff;
+  display:flex;flex-direction:column;gap:6px;
+  box-shadow:0 5px 0 #d5dbe6, 0 10px 18px rgba(15,23,42,.12);
+  transition:box-shadow .12s ease, transform .12s ease}
+.hd-person:hover{transform:translateY(-3px);box-shadow:0 8px 0 #d5dbe6, 0 16px 26px rgba(15,23,42,.16)}
+.hd-person:active{transform:translateY(2px);box-shadow:0 2px 0 #d5dbe6, 0 6px 12px rgba(15,23,42,.12)}
+.hd-person .nm{font-weight:600;font-size:14px;display:flex;align-items:center;gap:9px}
+.hd-person .nm .av{width:30px;height:30px;border-radius:50%;background:#ede9fe;color:#5b21b6;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px}
+.hd-person .st{font-size:12px;color:var(--text2)}
+.hd-person .st b{color:var(--text)}
+/* modal Thêm/Sửa phải nổi trên popup danh sách theo người (khi bấm ✏️ Sửa từ trong popup đó) */
+#m-hd-add{z-index:150}
+/* trong popup 1 người nhập: mỗi hóa đơn là 1 khối, hiện thẳng lưới ảnh thu nhỏ */
+.hd-inv{border:1px solid #e2e6ee;border-radius:11px;padding:12px 14px;margin-bottom:14px;background:#fff;
+  box-shadow:0 3px 0 #dbe0ea, 0 8px 16px rgba(15,23,42,.09)}
+.hd-inv-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.hd-inv-t{font-size:13px;line-height:1.5}
+.hd-view-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.hd-th{position:relative;padding:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:#f1f5f9;aspect-ratio:1/1}
+.hd-th img{width:100%;height:100%;object-fit:cover;display:block}
+.hd-th:hover{border-color:var(--blue)}
+.hd-th-x{position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;border-radius:50%;
+  background:rgba(0,0,0,.62);color:#fff;font-size:11px;line-height:1;padding:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s}
+.hd-th:hover .hd-th-x{opacity:1}
+.hd-th-x:hover{background:#d03b3b}
+@media (max-width:480px){.hd-th-x{opacity:1}}
+/* lightbox xem từng ảnh, có nút ‹ › */
+.hd-lb.on{display:flex}
+.hd-lb{z-index:200;background:rgba(0,0,0,.92);flex-direction:column}
+#hd-lb-img{max-width:92vw;max-height:82vh;object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.5);
+  transform-origin:center center;will-change:transform;touch-action:none;user-select:none;-webkit-user-drag:none}
+.hd-lb-hint{position:fixed;bottom:38px;left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:11px}
+.hd-lb-x{position:fixed;top:14px;right:16px;width:40px;height:40px;border:none;border-radius:50%;
+  background:rgba(255,255,255,.16);color:#fff;font-size:17px;cursor:pointer}
+.hd-lb-nav{position:fixed;top:50%;transform:translateY(-50%);width:46px;height:64px;border:none;border-radius:8px;
+  background:rgba(255,255,255,.16);color:#fff;font-size:30px;line-height:1;cursor:pointer}
+.hd-lb-nav.prev{left:12px}
+.hd-lb-nav.next{right:12px}
+.hd-lb-x:hover,.hd-lb-nav:hover{background:rgba(255,255,255,.3)}
+.hd-lb-count{position:fixed;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-size:14px;letter-spacing:.5px}
+@media (max-width:480px){.hd-lb-nav{width:38px;height:54px;font-size:24px}}
+</style>
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-hd">
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+      <div class="sb">
+        <input type="text" id="q-hd" placeholder="Tìm nhà cung cấp, ghi chú, người nhập..." oninput="fHD()">
+        <div class="date-range">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+          <input type="date" id="from-hd" onchange="fHD()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+          <input type="date" id="to-hd" onchange="fHD()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        </div>
+        <select id="user-hd" onchange="fHD()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none"><option value="">Tất cả người nhập</option></select>
+        <select id="dm-hd" onchange="fHD()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none"><option value="">Tất cả các tháng</option></select>
+        <button class="btn btn-g" onclick="document.getElementById('q-hd').value='';document.getElementById('from-hd').value='';document.getElementById('to-hd').value='';document.getElementById('user-hd').value='';document.getElementById('dm-hd').value='';fHD()">✕ Xóa lọc</button>
+      </div>
+      </details>
+      <div class="card">
+        <div id="hd-gallery" style="padding:16px 18px"><div class="ld"><div class="spin"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL THÊM / SỬA HÓA ĐƠN (dùng chung — hdEditId=null là thêm mới, khác null là sửa) -->
+<div class="mo" id="m-hd-add">
+  <div class="mb">
+    <button class="modal-x" onclick="cm('m-hd-add')" aria-label="Đóng">✕</button>
+    <h3 id="hd-add-title" style="padding-right:28px">🧾 Thêm hóa đơn</h3>
+    <div class="grid2" style="margin-bottom:0">
+      <div class="fg"><label>Ngày hóa đơn *</label><input type="date" id="hd-ngay"></div>
+      <div class="fg"><label>Số tiền (đ)</label><input type="number" id="hd-tien" placeholder="0"></div>
+    </div>
+    <div class="grid2" style="margin-bottom:0">
+      <div class="fg"><label>Nhà cung cấp</label><input id="hd-ncc" autocomplete="off" placeholder="Gõ tên nhà cung cấp..."></div>
+      <div class="fg"><label>Người nhập</label><select id="hd-user"><option value="">-- Chọn --</option></select></div>
+    </div>
+    <div class="fg">
+      <label>Tháng danh mục *</label>
+      <select id="hd-dm-sel" style="max-width:200px"><option value="">-- Chọn tháng --</option></select>
+    </div>
+    <div class="fg"><label>Ghi chú</label><input id="hd-gc" placeholder="Ghi chú thêm..."></div>
+    <div class="fg">
+      <label>Ảnh hóa đơn * — có thể chọn / kéo thả nhiều ảnh cùng lúc</label>
+      <label class="hd-drop" id="hd-drop" for="hd-file">
+        <span class="hd-drop-ic">📷</span>
+        <span class="hd-drop-txt"><b>Bấm để chọn ảnh</b> hoặc kéo thả ảnh vào đây<br><small>Chọn được nhiều ảnh một lần — bấm lại để thêm nữa</small></span>
+      </label>
+      <input type="file" accept="image/*" multiple id="hd-file" onchange="hdFilesPicked(event)" hidden>
+    </div>
+    <div class="hd-prev" id="hd-prev"></div>
+    <div id="hd-prev-tools" style="margin:0 0 10px"></div>
+    <div id="hd-add-status" style="font-size:12px;color:var(--text2);margin:4px 0"></div>
+    <div class="mf">
+      <button class="btn btn-s" id="hd-save-btn" onclick="saveHD()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DANH SÁCH HÓA ĐƠN CỦA 1 NGƯỜI NHẬP (bấm từ 1 thẻ người nhập ở danh sách chính) -->
+<div class="mo" id="m-hd-people">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-hd-people')" aria-label="Đóng">✕</button>
+    <h3 id="hd-p-t" style="padding-right:28px">Hóa đơn của ...</h3>
+    <div id="hd-p-sum" style="font-size:12px;color:var(--text2);margin-bottom:12px"></div>
+    <div id="hd-p-body"></div>
+  </div>
+</div>
+
+<!-- LIGHTBOX: xem từng ảnh hóa đơn — cuộn chuột phóng to, kéo để di chuyển, ‹ › đổi ảnh, nền tối/Esc để đóng -->
+<div class="mo hd-lb" id="m-hd-lb" onclick="if(event.target===this)cm('m-hd-lb')">
+  <button class="hd-lb-x" onclick="cm('m-hd-lb')" aria-label="Đóng">✕</button>
+  <button class="hd-lb-nav prev" onclick="lbStep(-1)" aria-label="Ảnh trước">‹</button>
+  <img id="hd-lb-img" alt="Ảnh hóa đơn" title="Cuộn chuột để phóng to · kéo để di chuyển · bấm đúp để đổi · phím 0 về cỡ gốc">
+  <button class="hd-lb-nav next" onclick="lbStep(1)" aria-label="Ảnh sau">›</button>
+  <div class="hd-lb-count" id="hd-lb-count"></div>
+  <div class="hd-lb-hint">Cuộn chuột để phóng to · kéo để di chuyển</div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=20260830x"></script>
+<script>
+// ── JS riêng cho màn Kho lưu trữ hóa đơn ──
+// Lưu trữ: sheet "HoaDon" 1 dòng = [id, ngay, ncc, soTien, ghiChu, nguoiLuu, thoiGianLuu, soAnh, thumb, nguoiNhap, danhMucId]
+//   - nguoiLuu (idx 5): tài khoản đăng nhập đã bấm lưu (tự động). nguoiNhap (idx 9): nhân viên đi nhập hàng, tự chọn.
+//   - danhMucId (idx 10): "tháng danh mục" lưu THẲNG chuỗi "YYYY-MM" (dropdown tự sinh sẵn, xem app.js: dmFmt/dmMonths/dmFillSelect). BẮT BUỘC chọn khi tạo mới.
+//   - thumb: ảnh thu nhỏ ~220px nhúng thẳng trong dòng để màn danh sách hiện nhanh, không phải tải ảnh gốc.
+//   - Ảnh GỐC (đã nén, tối đa 1600px) lưu riêng ở nhánh RTDB "HoaDonAnh/<id>" = mảng data-URL, chỉ tải khi bấm xem.
+let HD=[];            // các dòng sheet HoaDon (đã sort theo _idx như apiGet trả về)
+let hdFiles=[];       // data-URL ảnh đã nén, đang chờ lưu ở modal Thêm (nhiều ảnh)
+let hdMeta=[];        // song song hdFiles: {name,size} của file gốc — để bỏ qua ảnh chọn trùng khi thêm nhiều đợt
+
+// Thu nhỏ ảnh trước khi lưu (ảnh chụp điện thoại rất lớn) — giống hàm cùng tên ở nhap-hang.html
+function resizeImageDataUrl(dataUrl,maxDim,quality){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxDim||h>maxDim){
+        if(w>h){h=Math.round(h*maxDim/w);w=maxDim;}
+        else{w=Math.round(w*maxDim/h);h=maxDim;}
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=()=>resolve(dataUrl);
+    img.src=dataUrl;
+  });
+}
+function readFileAsDataURL(file){
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
+}
+function fmtDateVN(s){if(!s)return'';const[y,m,d]=s.split('-');return(d&&m&&y)?`${d}/${m}/${y}`:s;}
+
+// ── DANH SÁCH ──
+async function loadHD(){
+  document.getElementById('hd-gallery').innerHTML='<div class="ld"><div class="spin"></div></div>';
+  await ensureNCC();// cho ô gõ-tìm Nhà cung cấp ở modal Thêm
+  await ensureUser();// cho dropdown "Người nhập" (modal Thêm + bộ lọc)
+  HD=await apiGet('HoaDon');
+  await dmHealSheet('HoaDon',HD,10,1);// dọn danhMucId cũ dạng "DM..." → "YYYY-MM" theo ngày hóa đơn
+  C.HD=HD;
+  // Đổ danh sách Người nhập vào bộ lọc — giữ nguyên lựa chọn hiện tại nếu vẫn còn
+  const uSel=document.getElementById('user-hd'),uCur=uSel.value;
+  uSel.innerHTML='<option value="">Tất cả người nhập</option>'+C.USER.map(u=>`<option${u[0]===uCur?' selected':''}>${esc(u[0])}</option>`).join('');
+  // Bộ lọc tháng: 7 tháng mặc định + mọi tháng có trong dữ liệu (mới nhất lên đầu), giữ lựa chọn cũ
+  const dSel=document.getElementById('dm-hd'),dCur=dSel.value;
+  dSel.innerHTML='<option value="">Tất cả các tháng</option>'+dmFilterMonths(HD.map(r=>r[10])).map(m=>`<option value="${m}"${m===dCur?' selected':''}>${dmFmt(m)}</option>`).join('');
+  fHD();
+}
+function fHD(){
+  const q=(document.getElementById('q-hd').value||'').toLowerCase().trim();
+  const from=document.getElementById('from-hd').value;
+  const to=document.getElementById('to-hd').value;
+  const user=document.getElementById('user-hd').value;
+  const dm=document.getElementById('dm-hd').value;
+  let list=HD.filter(r=>{
+    const ngay=(r[1]||'').slice(0,10);
+    if(from&&ngay<from)return false;
+    if(to&&ngay>to)return false;
+    if(user&&(r[9]||'')!==user)return false;
+    if(dm&&(r[10]||'')!==dm)return false;
+    if(q){
+      const hay=((r[2]||'')+' '+(r[4]||'')+' '+(r[9]||'')+' '+(r[5]||'')+' '+dmLabel(r[10])).toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+  // mới nhất (theo ngày hóa đơn, rồi theo lúc lưu) lên đầu
+  list.sort((a,b)=>(b[1]||'').localeCompare(a[1]||'')||(b[6]||'').localeCompare(a[6]||''));
+  rHD(list);
+}
+let hdGroupList=[];// [{m, items:[row...], tong, anh, users}] — gộp hóa đơn theo THÁNG DANH MỤC (cột 10)
+// Danh sách chính = các thẻ THÁNG DANH MỤC; bấm 1 thẻ → openHDMonth()
+function rHD(list){
+  const el=document.getElementById('hd-gallery');
+  if(!list.length){
+    hdGroupList=[];
+    el.innerHTML='<div class="empty">🧾 Không có hóa đơn nào phù hợp — đổi bộ lọc hoặc bấm "＋ Thêm hóa đơn"</div>';
+    return;
+  }
+  const gm=new Map();
+  list.forEach(r=>{
+    const k=(r[10]||'').trim()||'(chưa gắn tháng)';
+    if(!gm.has(k))gm.set(k,[]);
+    gm.get(k).push(r);
+  });
+  hdGroupList=[...gm.entries()].map(([m,items])=>({
+    m,items,
+    tong:items.reduce((s,r)=>s+Number(r[3]||0),0),
+    // Quy ước: MỖI ẢNH = 1 hóa đơn → "số hóa đơn" = tổng số ảnh (cột soAnh)
+    anh:items.reduce((s,r)=>s+Number(r[7]||1),0),
+    users:new Set(items.map(r=>(r[9]||'').trim()).filter(Boolean)).size
+  })).sort((a,b)=>(b.m||'').localeCompare(a.m||''));
+  el.innerHTML='<div class="hd-people">'+hdGroupList.map((g,i)=>`
+    <div class="hd-person" onclick="openHDMonth(${i})">
+      <div class="nm"><span class="av">📅</span>${/^\d{4}-\d{2}$/.test(g.m)?esc(dmFmt(g.m)):esc(g.m)}</div>
+      <div class="st"><b>${g.anh}</b> hóa đơn · ${g.users} người nhập · ${g.tong?fmt(g.tong)+'đ':'—'}</div>
+    </div>`).join('')+'</div>';
+}
+// Popup 1 THÁNG: hiện THẲNG toàn bộ ảnh của mọi hóa đơn trong tháng (nhóm theo từng hóa đơn, kèm nút xóa).
+// Bấm 1 ảnh → lightbox ‹ › duyệt các ảnh CỦA CHÍNH hóa đơn đó.
+let hdPersonImgs={};// { maHoaDon: [url...] } cho lightbox
+async function hdRenderInvList(items,title,sumHtml){
+  document.getElementById('hd-p-t').textContent=title;
+  document.getElementById('hd-p-sum').innerHTML=sumHtml;
+  const body=document.getElementById('hd-p-body');
+  body.innerHTML='<div class="ld"><div class="spin"></div></div>';
+  om('m-hd-people');
+  try{
+    await initFirebase();
+    const parts=await Promise.all(items.map(async r=>{
+      const snap=await db.ref(dbPath('HoaDonAnh')+'/'+r[0]).once('value');
+      const v=snap.val();
+      const urls=v?(Array.isArray(v)?v.filter(Boolean):Object.values(v)):[];
+      return{r,urls};
+    }));
+    hdPersonImgs={};
+    parts.forEach(p=>{hdPersonImgs[p.r[0]]=p.urls;});
+    body.innerHTML=parts.map(({r,urls})=>{
+      const id=r[0],ngay=(r[1]||'').slice(0,10),ncc=r[2]||'(Không ghi NCC)',tien=Number(r[3]||0),gc=r[4]||'',who=r[9]||'';
+      return`<div class="hd-inv">
+        <div class="hd-inv-h">
+          <div class="hd-inv-t" style="cursor:pointer" title="Bấm để sửa hóa đơn" onclick="openEditHD('${esc(id)}')">${who?`<span class="bg bg-p">${esc(who)}</span> `:''}${fmtDateVN(ngay)} · ${esc(ncc)} · <b>${tien?fmt(tien)+'đ':'—'}</b>${gc?` · <span style="color:var(--text2)">${esc(gc)}</span>`:''}</div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-g btn-sm" onclick="openEditHD('${esc(id)}')">Sửa</button>
+            <button class="btn btn-d btn-sm" onclick="delHD('${esc(id)}')">Xóa</button>
+          </div>
+        </div>
+        <div class="hd-view-imgs">${
+          urls.length
+          ? urls.map((u,k)=>`<div class="hd-th" onclick="openLbFor('${esc(id)}',${k})"><img src="${u}" loading="lazy" alt="Ảnh ${k+1}"><button type="button" class="hd-th-x" title="Xóa ảnh này" onclick="event.stopPropagation();delHDImage('${esc(id)}',${k})">✕</button></div>`).join('')
+          : '<div class="empty" style="padding:12px">Không có ảnh</div>'
+        }</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    console.error(e);
+    body.innerHTML='<div class="empty">❌ Lỗi tải ảnh — đóng rồi mở lại</div>';
+  }
+}
+function openHDMonth(i){
+  const g=hdGroupList[i];if(!g)return;
+  hdRenderInvList(g.items,
+    /^\d{4}-\d{2}$/.test(g.m)?dmFmt(g.m):g.m,
+    `<b>${g.anh}</b> hóa đơn · ${g.users} người nhập · tổng <b>${g.tong?fmt(g.tong)+'đ':'—'}</b>`);
+}
+function openLbFor(invoiceId,start){
+  hdViewUrls=hdPersonImgs[invoiceId]||[];
+  openLb(start||0);
+}
+
+// ── THÊM / SỬA ──
+let hdEditId=null;// null = thêm mới; khác null = đang sửa hóa đơn có mã này
+let hdEditImgsLoaded=true;// ở chế độ sửa: đã tải xong ảnh cũ chưa (tải lỗi → KHÔNG ghi đè ảnh khi lưu)
+function hdFillUserSelect(sel){
+  document.getElementById('hd-user').innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
+  if(sel&&C.USER.some(u=>u[0]===sel))document.getElementById('hd-user').value=sel;
+}
+function hdFillDmSelect(sel){
+  dmFillSelect(document.getElementById('hd-dm-sel'),sel);
+}
+function openAddHD(){
+  hdEditId=null;
+  document.getElementById('hd-add-title').textContent='🧾 Thêm hóa đơn';
+  document.getElementById('hd-save-btn').textContent='Lưu';
+  document.getElementById('hd-ngay').value=td();
+  document.getElementById('hd-ncc').value='';
+  document.getElementById('hd-tien').value='';
+  document.getElementById('hd-gc').value='';
+  document.getElementById('hd-file').value='';
+  hdFillUserSelect(currentUserName());// tự chọn sẵn người đang đăng nhập
+  hdFillDmSelect(dmNow());// mặc định tháng hiện tại
+  document.getElementById('hd-add-status').textContent='';
+  document.getElementById('hd-save-btn').disabled=false;
+  hdFiles=[];hdMeta=[];
+  renderHDPrev();
+  om('m-hd-add');
+}
+// Mở modal ở chế độ SỬA: nạp sẵn thông tin + ảnh hiện có của hóa đơn (ảnh cũ hiện trong dải preview,
+// vẫn xóa/thêm được như lúc tạo mới). Lưu sẽ ghi đè lại toàn bộ ảnh theo dải preview.
+async function openEditHD(id){
+  const rec=HD.find(r=>r[0]===id);
+  if(!rec)return;
+  hdEditId=id;
+  document.getElementById('hd-add-title').textContent='✏️ Sửa hóa đơn';
+  document.getElementById('hd-save-btn').textContent='Lưu';
+  document.getElementById('hd-ngay').value=(rec[1]||'').slice(0,10)||td();
+  document.getElementById('hd-ncc').value=rec[2]||'';
+  document.getElementById('hd-tien').value=Number(rec[3]||0)||'';
+  document.getElementById('hd-gc').value=rec[4]||'';
+  document.getElementById('hd-file').value='';
+  hdFillUserSelect(rec[9]||'');
+  hdFillDmSelect(rec[10]||'');
+  hdFiles=[];hdMeta=[];hdEditImgsLoaded=false;
+  document.getElementById('hd-save-btn').disabled=true;
+  document.getElementById('hd-add-status').textContent='⏳ Đang tải ảnh hiện có...';
+  renderHDPrev();
+  om('m-hd-add');
+  try{
+    await initFirebase();
+    const snap=await db.ref(dbPath('HoaDonAnh')+'/'+id).once('value');
+    const v=snap.val();
+    const urls=v?(Array.isArray(v)?v.filter(Boolean):Object.values(v)):[];
+    hdFiles=urls.slice();
+    hdMeta=urls.map((_,i)=>({name:'__cu__'+i,size:-1-i}));// chỗ giữ chỗ để ingestFiles không coi ảnh mới là trùng
+    hdEditImgsLoaded=true;
+    document.getElementById('hd-add-status').textContent=hdFiles.length?`Có sẵn ${hdFiles.length} ảnh — xóa/thêm tuỳ ý`:'Hóa đơn này chưa có ảnh';
+  }catch(e){
+    console.error(e);
+    hdEditImgsLoaded=false;
+    document.getElementById('hd-add-status').textContent='❌ Không tải được ảnh cũ — vẫn sửa được thông tin, ảnh sẽ giữ nguyên nếu không đụng vào';
+  }
+  document.getElementById('hd-save-btn').disabled=false;
+  renderHDPrev();
+}
+// Nhận ảnh từ CẢ ô chọn file (chọn nhiều 1 lần) LẪN kéo-thả — cộng dồn qua nhiều đợt, bỏ ảnh chọn trùng.
+let hdIngesting=false;
+async function ingestFiles(fileList){
+  const files=[...(fileList||[])].filter(f=>f.type&&f.type.startsWith('image/'));
+  const st=document.getElementById('hd-add-status');
+  if(!files.length){if(fileList&&fileList.length)st.textContent='⚠️ Chỉ nhận tệp ảnh';return;}
+  if(hdIngesting){st.textContent='⏳ Đang xử lý đợt ảnh trước, thử lại sau giây lát...';return;}
+  hdIngesting=true;
+  document.getElementById('hd-save-btn').disabled=true;
+  let added=0,skipped=0;
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    if(hdMeta.some(m=>m.name===f.name&&m.size===f.size)){skipped++;continue;}
+    st.textContent=`⏳ Đang xử lý ảnh ${i+1}/${files.length}...`;
+    try{
+      const raw=await readFileAsDataURL(f);
+      hdFiles.push(await resizeImageDataUrl(raw,1600,0.8));
+      hdMeta.push({name:f.name,size:f.size});
+      added++;
+      renderHDPrev();
+    }catch(e){console.error(e);skipped++;}
+  }
+  hdIngesting=false;
+  document.getElementById('hd-save-btn').disabled=false;
+  st.textContent=hdFiles.length
+    ?`✓ ${hdFiles.length} ảnh sẵn sàng`+(skipped?` — đã bỏ qua ${skipped} ảnh trùng/lỗi`:added?'':' (không có ảnh mới)') : '';
+  renderHDPrev();
+}
+function hdFilesPicked(ev){
+  ingestFiles(ev.target.files);
+  ev.target.value='';// reset để chọn lại đúng ảnh đó / chọn thêm đợt nữa cũng kích hoạt onchange
+}
+function renderHDPrev(){
+  document.getElementById('hd-prev').innerHTML=hdFiles.map((u,i)=>
+    `<div class="p"><img src="${u}" alt=""><button type="button" onclick="removeHDPrev(${i})">✕</button></div>`).join('')
+    +(hdFiles.length?`<div class="addmore" onclick="document.getElementById('hd-file').click()" title="Thêm ảnh nữa">＋</div>`:'');
+  document.getElementById('hd-prev-tools').innerHTML=hdFiles.length>1
+    ?`<button type="button" class="btn btn-g btn-sm" onclick="clearHDPrev()">✕ Xóa hết ${hdFiles.length} ảnh</button>`:'';
+}
+function removeHDPrev(i){
+  hdFiles.splice(i,1);hdMeta.splice(i,1);
+  renderHDPrev();
+  document.getElementById('hd-add-status').textContent=hdFiles.length?`✓ ${hdFiles.length} ảnh sẵn sàng`:'';
+}
+function clearHDPrev(){
+  hdFiles=[];hdMeta=[];
+  renderHDPrev();
+  document.getElementById('hd-add-status').textContent='';
+}
+async function saveHD(){
+  if(hdIngesting){toast('Đợi xử lý ảnh xong đã','err');return;}
+  const editing=!!hdEditId;
+  const canTouchImgs=!editing||hdEditImgsLoaded;// sửa mà chưa tải được ảnh cũ → giữ nguyên ảnh, chỉ đổi thông tin
+  if(!editing&&!hdFiles.length){toast('Chọn ít nhất 1 ảnh hóa đơn','err');return;}
+  const dmId=document.getElementById('hd-dm-sel').value;
+  if(!editing&&!dmId){toast('Chọn tháng danh mục','err');return;}
+  const btn=document.getElementById('hd-save-btn');
+  const st=document.getElementById('hd-add-status');
+  btn.disabled=true;st.textContent='⏳ Đang lưu...';
+  try{
+    await initFirebase();
+    const ngay=document.getElementById('hd-ngay').value||td();
+    const ncc=document.getElementById('hd-ncc').value.trim();
+    const tien=Number(document.getElementById('hd-tien').value||0);
+    const gc=document.getElementById('hd-gc').value.trim();
+    const nguoiNhap=document.getElementById('hd-user').value;
+
+    if(editing){
+      const idx=HD.findIndex(r=>r[0]===hdEditId);
+      if(idx<0)throw new Error('Không tìm thấy hóa đơn để sửa');
+      const old=HD[idx];
+      let soAnh=Number(old[7]||0),thumb=old[8]||'';
+      if(canTouchImgs){
+        await db.ref(dbPath('HoaDonAnh')+'/'+hdEditId).set(hdFiles);
+        soAnh=hdFiles.length;
+        thumb=hdFiles.length?await resizeImageDataUrl(hdFiles[0],220,0.5):'';
+      }
+      // giữ nguyên nguoiLuu (old[5]) & thời gian tạo (old[6]); chỉ đổi các trường thông tin + ảnh
+      const row=[hdEditId,ngay,ncc,tien,gc,old[5]||'',old[6]||'',soAnh,thumb,nguoiNhap,dmId];
+      await apiPost({sheet:'HoaDon',action:'update',row:idx+2,data:row});
+      HD[idx]=row;
+      logAction('Cập nhật','Hóa đơn',`${ncc||'(không NCC)'} — ${ngay}${tien?' — '+fmt(tien)+'đ':''}${nguoiNhap?' — người nhập: '+nguoiNhap:''}${dmId?' — '+dmLabel(dmId):''} — ${soAnh} ảnh`);
+      toast('Đã lưu thay đổi');
+      cm('m-hd-add');
+      cm('m-hd-lb');
+      await loadHD();
+      const gi=hdGroupList.findIndex(g=>g.m===((dmId||'').trim()||'(chưa gắn tháng)'));
+      if(gi>=0)openHDMonth(gi);
+    } else {
+      const id='HD'+Date.now();
+      const thumb=await resizeImageDataUrl(hdFiles[0],220,0.5);
+      await db.ref(dbPath('HoaDonAnh')+'/'+id).set(hdFiles);// ảnh gốc ở nhánh riêng
+      await apiPost({sheet:'HoaDon',action:'append',row:[id,ngay,ncc,tien,gc,currentUserName(),new Date().toISOString(),hdFiles.length,thumb,nguoiNhap,dmId]});
+      logAction('Tạo mới','Hóa đơn',`${ncc||'(không NCC)'} — ${ngay}${tien?' — '+fmt(tien)+'đ':''}${nguoiNhap?' — người nhập: '+nguoiNhap:''}${dmId?' — '+dmLabel(dmId):''} — ${hdFiles.length} ảnh`);
+      toast('Đã lưu hóa đơn');
+      cm('m-hd-add');
+      loadHD();
+    }
+  }catch(e){
+    console.error(e);
+    st.textContent='❌ '+(e.message||'Lỗi lưu, thử lại');
+    toast('Lỗi khi lưu hóa đơn','err');
+    btn.disabled=false;
+  }
+}
+
+// ── LIGHTBOX xem từng ảnh — CUỘN CHUỘT để phóng to/thu nhỏ, KÉO để di chuyển khi đang zoom, BẤM ĐÚP để đổi ──
+let hdViewUrls=[],hdLbIdx=0;              // ảnh đang duyệt + vị trí hiện tại
+let hdLbScale=1,hdLbX=0,hdLbY=0;         // mức zoom + độ dịch ảnh (px)
+let hdLbDrag=null;                        // {sx,sy,ox,oy} khi đang kéo ảnh
+const HD_LB_MIN=1,HD_LB_MAX=6;
+function hdLbApply(){
+  const img=document.getElementById('hd-lb-img');
+  if(!img)return;
+  img.style.transform=`translate(${hdLbX}px,${hdLbY}px) scale(${hdLbScale})`;
+  img.style.cursor=hdLbScale>1?(hdLbDrag?'grabbing':'grab'):'default';
+}
+function hdLbResetZoom(){hdLbScale=1;hdLbX=0;hdLbY=0;hdLbDrag=null;hdLbApply();}
+// Cập nhật bộ đếm (kèm % khi đang zoom) + ẩn nút ‹ › lúc phóng to cho đỡ vướng
+function lbUpdateHud(){
+  const cnt=document.getElementById('hd-lb-count');
+  const base=hdViewUrls.length>1?`${hdLbIdx+1} / ${hdViewUrls.length}`:'';
+  if(cnt)cnt.textContent=hdLbScale>1?(base?base+'  ·  ':'')+Math.round(hdLbScale*100)+'%':base;
+  const show=(hdViewUrls.length>1&&hdLbScale===1)?'':'none';
+  const p=document.querySelector('#m-hd-lb .prev'),n=document.querySelector('#m-hd-lb .next');
+  if(p)p.style.display=show;
+  if(n)n.style.display=show;
+  const hint=document.querySelector('#m-hd-lb .hd-lb-hint');
+  if(hint)hint.style.display=hdLbScale>1?'none':'';
+}
+function openLb(i){
+  if(!hdViewUrls.length)return;
+  hdLbIdx=((i%hdViewUrls.length)+hdViewUrls.length)%hdViewUrls.length;
+  renderLb();
+  om('m-hd-lb');
+}
+function lbStep(d){
+  if(!hdViewUrls.length)return;
+  hdLbIdx=((hdLbIdx+d)%hdViewUrls.length+hdViewUrls.length)%hdViewUrls.length;
+  renderLb();
+}
+function renderLb(){
+  hdLbResetZoom();
+  document.getElementById('hd-lb-img').src=hdViewUrls[hdLbIdx]||'';
+  lbUpdateHud();
+}
+// Zoom quanh vị trí con trỏ: giữ điểm dưới con trỏ đứng yên  → t1 = d − (s1/s0)·(d − t0)
+function hdLbZoomAt(clientX,clientY,factor){
+  const img=document.getElementById('hd-lb-img');
+  const r=img.getBoundingClientRect();
+  const dx=clientX-(r.left+r.width/2), dy=clientY-(r.top+r.height/2);
+  const s0=hdLbScale;
+  let s1=Math.min(HD_LB_MAX,Math.max(HD_LB_MIN,s0*factor));
+  if(s1===s0)return;
+  if(s1<=HD_LB_MIN+0.001){hdLbResetZoom();lbUpdateHud();return;}
+  hdLbX=dx-(s1/s0)*(dx-hdLbX);
+  hdLbY=dy-(s1/s0)*(dy-hdLbY);
+  hdLbScale=s1;
+  hdLbApply();lbUpdateHud();
+}
+(function setupLbZoom(){
+  const box=document.getElementById('m-hd-lb');
+  const img=document.getElementById('hd-lb-img');
+  if(!box||!img)return;
+  box.addEventListener('wheel',e=>{
+    if(!box.classList.contains('on'))return;
+    e.preventDefault();
+    hdLbZoomAt(e.clientX,e.clientY,e.deltaY<0?1.18:1/1.18);
+  },{passive:false});
+  img.addEventListener('pointerdown',e=>{
+    if(hdLbScale<=1)return;
+    e.preventDefault();
+    hdLbDrag={sx:e.clientX,sy:e.clientY,ox:hdLbX,oy:hdLbY};
+    if(img.setPointerCapture)img.setPointerCapture(e.pointerId);
+    hdLbApply();
+  });
+  img.addEventListener('pointermove',e=>{
+    if(!hdLbDrag)return;
+    hdLbX=hdLbDrag.ox+(e.clientX-hdLbDrag.sx);
+    hdLbY=hdLbDrag.oy+(e.clientY-hdLbDrag.sy);
+    hdLbApply();
+  });
+  const endDrag=()=>{if(hdLbDrag){hdLbDrag=null;hdLbApply();}};
+  img.addEventListener('pointerup',endDrag);
+  img.addEventListener('pointercancel',endDrag);
+  img.addEventListener('dblclick',e=>{
+    e.preventDefault();
+    if(hdLbScale>1){hdLbResetZoom();lbUpdateHud();}
+    else hdLbZoomAt(e.clientX,e.clientY,2.5);
+  });
+})();
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('m-hd-lb').classList.contains('on'))return;
+  if(e.key==='Escape')cm('m-hd-lb');
+  else if(e.key==='0'||e.key===' '){e.preventDefault();hdLbResetZoom();lbUpdateHud();}
+  else if(hdLbScale===1&&e.key==='ArrowLeft')lbStep(-1);
+  else if(hdLbScale===1&&e.key==='ArrowRight')lbStep(1);
+});
+// Xóa ĐÚNG 1 ẢNH trong 1 hóa đơn (icon ✕ trên từng ảnh ở popup người nhập) — luôn hỏi xác nhận trước.
+// KHÔNG bao giờ đụng tới các ảnh khác / cả hóa đơn; muốn xóa cả hóa đơn thì dùng nút "Xóa" ở đầu khối.
+async function delHDImage(id,k){
+  const urls=hdPersonImgs[id]||[];
+  if(k<0||k>=urls.length)return;
+  if(!confirm('Bạn muốn xóa hóa đơn đã chọn chứ ?'))return;
+  const idx=HD.findIndex(r=>r[0]===id);
+  const rec=idx>=0?HD[idx]:null;
+  const next=urls.filter((_,i)=>i!==k);
+  try{
+    await initFirebase();
+    await db.ref(dbPath('HoaDonAnh')+'/'+id).set(next);
+    if(idx>=0){
+      const row=[...HD[idx]];
+      row[7]=next.length;// cột soAnh
+      if(k===0)row[8]=next.length?await resizeImageDataUrl(next[0],220,0.5):'';// ảnh đầu là nguồn thumbnail → dựng lại / xóa nếu hết ảnh
+      await apiPost({sheet:'HoaDon',action:'update',row:idx+2,data:row});
+      HD[idx]=row;
+    }
+    logAction('Cập nhật','Hóa đơn',`Xóa 1 ảnh${rec?` — ${rec[2]||'(không NCC)'} ${(rec[1]||'').slice(0,10)}`:''} (còn ${next.length} ảnh)`);
+    toast('Đã xóa ảnh');
+    cm('m-hd-lb');
+    await loadHD();
+    const gi=rec?hdGroupList.findIndex(g=>g.m===((rec[10]||'').trim()||'(chưa gắn tháng)')):-1;
+    if(gi>=0)openHDMonth(gi);else cm('m-hd-people');
+  }catch(e){
+    console.error(e);
+    toast('Lỗi khi xóa ảnh','err');
+  }
+}
+async function delHD(id,skipConfirm){
+  if(!id)return;
+  if(!skipConfirm&&!confirm('Xóa hóa đơn này? Ảnh đã lưu sẽ bị xóa vĩnh viễn.'))return;
+  const idx=HD.findIndex(r=>r[0]===id);
+  if(idx<0)return;
+  const rec=HD[idx];
+  const key=((rec[10]||'').trim())||'(chưa gắn tháng)';
+  try{
+    await initFirebase();
+    await apiPost({sheet:'HoaDon',action:'delete',row:idx+2});// row = index + 2 (bù dòng header), như mọi sheet khác
+    await db.ref(dbPath('HoaDonAnh')+'/'+id).remove();
+    logAction('Xóa','Hóa đơn',`${rec[2]||'(không NCC)'} — ${(rec[1]||'').slice(0,10)}`);
+    toast('Đã xóa hóa đơn');
+    cm('m-hd-lb');
+    await loadHD();// dựng lại danh sách + hdGroupList từ dữ liệu mới
+    const gi=hdGroupList.findIndex(g=>g.m===key);
+    if(gi>=0)openHDMonth(gi);// tháng đó vẫn còn hóa đơn → mở lại popup của tháng
+    else cm('m-hd-people');// hết hóa đơn → đóng popup
+  }catch(e){
+    console.error(e);
+    toast('Lỗi khi xóa hóa đơn','err');
+  }
+}
+
+// Kéo-thả nhiều ảnh vào vùng chọn (modal Thêm) — gắn 1 lần vì modal nằm sẵn trong DOM
+function setupHDDropzone(){
+  const dz=document.getElementById('hd-drop');
+  if(!dz||dz.dataset.bound)return;
+  dz.dataset.bound='1';
+  ['dragenter','dragover'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();e.stopPropagation();dz.classList.add('drag');}));
+  ['dragleave','dragend'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();e.stopPropagation();dz.classList.remove('drag');}));
+  dz.addEventListener('drop',e=>{
+    e.preventDefault();e.stopPropagation();
+    dz.classList.remove('drag');
+    if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)ingestFiles(e.dataTransfer.files);
+  });
+  // Thả trượt ra ngoài vùng → đừng để trình duyệt mở thẳng file, rơi mất trang đang nhập
+  ['dragover','drop'].forEach(t=>window.addEventListener(t,e=>{
+    if(document.getElementById('m-hd-add').classList.contains('on')&&e.target!==dz&&!dz.contains(e.target))e.preventDefault();
+  }));
+}
+
+// ── INIT ──
+bootPage('hd',function(){
+  document.getElementById('acts').innerHTML=`<button class="btn btn-s" onclick="openAddHD()">＋ Thêm hóa đơn</button>`;
+  document.getElementById('from-hd').value=dNago(30);// mặc định: 30 ngày gần nhất
+  attachSearchList(document.getElementById('hd-ncc'),()=>C.NCC.map(r=>r[0]));
+  setupHDDropzone();
+  loadHD();
+});
+</script>
+</body>
+</html>

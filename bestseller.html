@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tạp Hóa — Bestseller</title>
+<link rel="stylesheet" href="style.css?v=20260830x">
+</head>
+<body>
+
+<!-- Đăng nhập / sidebar / topbar được render bằng JS trong app.js (renderLogin/renderShell) — dùng
+     chung cho mọi trang, sửa menu chỉ cần sửa 1 chỗ trong app.js, không phải sửa lại từng file -->
+<div id="login-mount"></div>
+<div id="mnu-backdrop" onclick="closeMenu()"></div>
+<div id="sb" style="display:none"></div>
+<div id="main" style="display:none">
+  <div id="topbar"></div>
+  <div id="content">
+
+    <div class="sec on" id="s-best">
+      <div class="card">
+        <div class="ch"><h2>Chọn cặp mốc để tính</h2></div>
+        <div style="padding:14px 18px">
+          <div class="fr">
+            <div class="fg"><label>📍 Mốc Đầu kỳ</label><select id="best-dau" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
+            <div class="fg"><label>🏁 Mốc Cuối kỳ</label><select id="best-cuoi" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
+          </div>
+          <div id="best-info" style="font-size:12px;color:var(--text2)"></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+            <button class="btn btn-p btn-sm" onclick="saveBestKyFromUI()">Lưu</button>
+            <button class="btn btn-g btn-sm" onclick="clearBestKyFromUI()">✕ Bỏ kỳ đã lưu</button>
+            <span id="best-saved" style="font-size:12px;color:var(--text2)"></span>
+          </div>
+        </div>
+      </div>
+      <div id="best-tbl"></div>
+    </div>
+  </div>
+</div>
+
+
+<div id="toast"></div>
+<script src="app.js?v=20260830x"></script>
+<script>
+// ── JS riêng cho màn Bestseller ── (bAddDays/kkStockAsOf/xhAddedInRange/computeBestsellerPeriod/
+// mostRecentKKPair giờ dùng CHUNG với card Bestseller ở Tổng quan, đã chuyển sang app.js)
+function bDaysBetween(a,b){
+  const[y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number);
+  return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/86400000);
+}
+async function loadBestseller(){
+  await ensureTK();
+  C.KK=await apiGet('KiemKe');
+  C.XH=await apiGet('XepHang');
+  const saved=await getSavedBestKy();
+  fillBestMocOptions(saved);
+  showSavedBestKy(saved);
+  renderBestPeriod();
+}
+// Chốt cặp mốc đang chọn thành "kỳ mặc định" (sheet BestKy) — màn Tổng quan sẽ tính card Bestseller theo kỳ này
+async function saveBestKyFromUI(){
+  const dau=document.getElementById('best-dau').value,cuoi=document.getElementById('best-cuoi').value;
+  if(!dau||!cuoi){toast('Chọn cả 2 mốc Đầu kỳ / Cuối kỳ trước khi lưu','err');return;}
+  if(dau>cuoi){toast('Mốc Đầu kỳ không được SAU mốc Cuối kỳ (cùng ngày thì được)','err');return;}
+  await saveBestKy(dau,cuoi);
+  toast('Đã lưu kỳ — màn Tổng quan sẽ dùng kỳ này');
+  showSavedBestKy({dau,cuoi});
+}
+async function clearBestKyFromUI(){
+  await clearBestKy();
+  toast('Đã bỏ kỳ đã lưu — Tổng quan quay lại tự lấy 2 mốc gần nhất');
+  showSavedBestKy(null);
+}
+function showSavedBestKy(k){
+  document.getElementById('best-saved').textContent=k
+    ?`Kỳ đang lưu cho Tổng quan: ${k.dau} → ${k.cuoi}`
+    :'Chưa lưu kỳ nào — Tổng quan đang tự lấy 2 mốc đánh dấu gần nhất.';
+}
+// Mỗi dropdown CHỈ hiện các ngày Kiểm kê Gian hàng đã đánh dấu ĐÚNG mốc đó: ô Đầu kỳ chỉ có ngày đánh dấu
+// 📍 Đầu kỳ, ô Cuối kỳ chỉ có ngày đánh dấu 🏁 Cuối kỳ (đánh dấu ở ô "Đánh dấu mốc kỳ" trong modal Kiểm kê).
+// Lần đầu vào trang (chưa chọn gì): ưu tiên chọn lại đúng KỲ ĐÃ LƯU (nếu có & còn hợp lệ), không thì tự chọn
+// Cuối kỳ = lần 🏁 gần nhất, Đầu kỳ = lần 📍 gần nhất TRƯỚC đó.
+function fillBestMocOptions(saved){
+  const dauSel=document.getElementById('best-dau'),cuoiSel=document.getElementById('best-cuoi');
+  const curDau=dauSel.value,curCuoi=cuoiSel.value;
+  const ghKK=C.KK.filter(r=>r[8]);// chỉ các dòng Kiểm kê Gian hàng
+  const spCountOn=d=>new Set(ghKK.filter(r=>r[0]===d).map(r=>r[1]||r[2])).size;// số SP được đếm trong ngày mốc đó
+  const datesByMoc=moc=>[...new Set(ghKK.filter(r=>r[9]===moc).map(r=>r[0]))].sort((a,b)=>b.localeCompare(a));// mới nhất trước
+  const dauDates=datesByMoc('dau'),cuoiDates=datesByMoc('cuoi');
+  // Kèm SỐ SP đã đếm mỗi ngày mốc — để không chọn nhầm ngày chỉ kiểm kê lẻ 1-2 SP (SP còn lại sẽ bị loại)
+  const opts=(list,sel)=>'<option value="">-- Chọn --</option>'+list.map(d=>`<option value="${d}"${d===sel?' selected':''}>${d} — ${spCountOn(d)} SP đã đếm</option>`).join('');
+  dauSel.innerHTML=opts(dauDates,curDau);
+  cuoiSel.innerHTML=opts(cuoiDates,curCuoi);
+  if(!curDau&&!curCuoi){
+    if(saved&&dauDates.includes(saved.dau)&&cuoiDates.includes(saved.cuoi)){
+      dauSel.value=saved.dau;cuoiSel.value=saved.cuoi;
+    }else{
+      const c=cuoiDates[0]||'';
+      if(c)cuoiSel.value=c;
+      const d=dauDates.find(x=>!c||x<=c);
+      if(d)dauSel.value=d;
+    }
+  }
+}
+function rBestList(computed,warnMsg){
+  const el=document.getElementById('best-tbl');
+  if(!computed){el.innerHTML=`<div class="card"><div class="empty">⚠️ ${esc(warnMsg)}</div></div>`;return;}
+  const{items,missing,tongSP}=computed;
+  let html='';
+  if(missing>0)html+=`<div class="alert" style="display:flex">⚠️ ${missing}/${tongSP} sản phẩm bị loại: tính đến ngày Cuối kỳ đã chọn, các SP này chưa từng được Kiểm kê Gian hàng lần nào nên không có mốc tồn để tính.</div>`;
+  if(!items.length){html+='<div class="card"><div class="empty">📭 Chưa đủ dữ liệu để xếp hạng Bestseller kỳ này</div></div>';el.innerHTML=html;return;}
+  html+=`<div class="card"><div class="ch"><h2>🏆 Xếp hạng theo SL đã tiêu thụ</h2></div>
+    <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Tồn đầu kỳ</th><th>Đã xếp</th><th>Tồn cuối kỳ</th><th>Đã tiêu thụ</th></tr></thead><tbody>`+
+    items.map((it,i)=>{
+      const cl=it.daBan<0?'color:#d03b3b':'';
+      return`<tr><td>${i+1}</td><td><b>${esc(it.ten)}</b></td><td>${fmt(it.dauKy)}<br><small style="color:var(--text2)">${it.dauDate}</small></td><td>${fmt(it.them)}</td><td>${fmt(it.cuoiKy)}<br><small style="color:var(--text2)">${it.cuoiDate}</small></td><td style="font-weight:700;${cl}">${fmt(it.daBan)}</td></tr>`;
+    }).join('')+'</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+function renderBestPeriod(){
+  const dau=document.getElementById('best-dau').value,cuoi=document.getElementById('best-cuoi').value;
+  const infoEl=document.getElementById('best-info');
+  if(!dau||!cuoi){
+    const chuaDu=document.getElementById('best-dau').options.length<2||document.getElementById('best-cuoi').options.length<2;
+    infoEl.textContent=chuaDu
+      ?'Cần đánh dấu ít nhất 1 lần Kiểm kê Gian hàng là 📍 Đầu kỳ và 1 lần là 🏁 Cuối kỳ (ô "Đánh dấu mốc kỳ" trong modal Kiểm kê) mới tính được Bestseller.'
+      :'Chọn cả 2 mốc Đầu kỳ và Cuối kỳ để xem xếp hạng.';
+    rBestList(null,chuaDu?'Chưa có đủ mốc đã đánh dấu: cần ≥1 lần 📍 Đầu kỳ và ≥1 lần 🏁 Cuối kỳ.':'Chưa chọn đủ 2 mốc Đầu kỳ / Cuối kỳ.');
+    return;
+  }
+  if(dau>cuoi){
+    infoEl.textContent='';
+    rBestList(null,`Mốc Đầu kỳ (${dau}) không được SAU mốc Cuối kỳ (${cuoi}) — chọn lại.`);
+    return;
+  }
+  infoEl.textContent=`Kỳ từ ${dau} đến ${cuoi} (${bDaysBetween(dau,cuoi)} ngày).`;
+  rBestList(computeBestsellerPeriod(dau,cuoi));
+}
+
+// (dùng để đối chiếu/thanh toán lại cho người đã tạm ứng tiền mua hàng)
+
+bootPage('best',function(){
+  document.getElementById('acts').innerHTML='';
+  loadBestseller();
+});
+</script>
+</body>
+</html>
