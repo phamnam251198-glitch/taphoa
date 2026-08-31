@@ -49,10 +49,9 @@ function bDaysBetween(a,b){
   return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/86400000);
 }
 async function loadBestseller(){
-  await ensureTK();
-  C.KK=await apiGet('KiemKe');
-  C.XH=await apiGet('XepHang');
-  const saved=await getSavedBestKy();
+  // 4 lượt đọc độc lập → tải song song
+  let saved;
+  [,C.KK,C.XH,saved]=await Promise.all([ensureTK(),apiGet('KiemKe'),apiGet('XepHang'),getSavedBestKy()]);
   fillBestMocOptions(saved);
   showSavedBestKy(saved);
   renderBestPeriod();

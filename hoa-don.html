@@ -186,7 +186,7 @@ let HD=[];            // các dòng sheet HoaDon (đã sort theo _idx như apiGe
 let hdFiles=[];       // data-URL ảnh đã nén, đang chờ lưu ở modal Thêm (nhiều ảnh)
 let hdMeta=[];        // song song hdFiles: {name,size} của file gốc — để bỏ qua ảnh chọn trùng khi thêm nhiều đợt
 
-// Thu nhỏ ảnh trước khi lưu (ảnh chụp điện thoại rất lớn) — giống hàm cùng tên ở nhap-hang.html
+// Thu nhỏ ảnh trước khi lưu (ảnh chụp điện thoại rất lớn) trước khi nén JPEG
 function resizeImageDataUrl(dataUrl,maxDim,quality){
   return new Promise(resolve=>{
     const img=new Image();

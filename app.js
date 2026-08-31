@@ -185,8 +185,9 @@ async function apiPost(data){
 // apiGetRaw dùng để check initialized
 function fmt(n){return Number(n||0).toLocaleString('vi-VN');}
 function td(){return new Date().toISOString().slice(0,10);}
-// Ngày cách hôm nay n ngày (YYYY-MM-DD) — dùng đặt mặc định ô "Từ ngày" = 30 ngày gần nhất ở các màn danh sách
-function dNago(n){const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);}
+// Ngày cách hôm nay n ngày (YYYY-MM-DD) — dùng đặt mặc định ô "Từ ngày" = 30 ngày gần nhất ở các màn danh sách.
+// Dựng chuỗi theo giờ ĐỊA PHƯƠNG (không qua toISOString/UTC) để ở VN (UTC+7) sáng sớm không bị lùi 1 ngày.
+function dNago(n){const d=new Date();d.setDate(d.getDate()-n);const z=x=>String(x).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
 
 // ── XÁC ĐỊNH NGƯỜI ĐANG ĐĂNG NHẬP ── map email tài khoản Firebase Auth đang dùng ↔ bản ghi "Người dùng"
 // để tự động biết "ai đang thao tác" thay vì bắt chọn tay mỗi lần

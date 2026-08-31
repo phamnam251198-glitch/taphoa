@@ -47,11 +47,10 @@
 // ── JS riêng cho màn Đồ gian hàng ──
 let ghkActiveTab=null;
 async function loadGHK(){
-  await ensureGH();
-  await ensureTK();// cần để tra Loại hàng của từng sản phẩm khi gộp hiển thị
-  // luôn lấy XepHang mới nhất — đây là nguồn dữ liệu chính để tính số lượng, phải tươi
-  C.XH=await apiGet('XepHang');
-  C.GHK=await apiGet('GianHangKho');
+  // 4 lượt đọc độc lập → tải song song. XepHang/GianHangKho luôn lấy tươi (nguồn chính để tính SL).
+  let xh,ghk;
+  [,,xh,ghk]=await Promise.all([ensureGH(),ensureTK(),apiGet('XepHang'),apiGet('GianHangKho')]);
+  C.XH=xh;C.GHK=ghk;
   rGHKView();
 }
 function goGHKTab(name){ghkActiveTab=name;rGHKView();}

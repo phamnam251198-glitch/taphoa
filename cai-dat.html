@@ -705,7 +705,7 @@ async function delRow(sheet,row,label){
 // ── apiGetRaw: lấy toàn bộ kể cả header, dùng để check sheet trống thật sự ──
 async function loadCaiDat(){
   ['set-saphet','set-hsdsap','set-hsdgan'].forEach(id=>document.getElementById(id).value='');
-  await loadSettings();
+  // app.js đã gọi loadSettings() sau khi đăng nhập trước khi chạy bootPage → SETTINGS đã sẵn sàng, không đọc lại
   document.getElementById('set-saphet').value=SETTINGS.sapHet;
   document.getElementById('set-hsdsap').value=SETTINGS.hsdSap;
   document.getElementById('set-hsdgan').value=SETTINGS.hsdGan;

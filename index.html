@@ -122,10 +122,11 @@ async function loadDash(){
       return`<tr><td>${r[0]}</td><td>${r[5]}</td><td>${badge}</td></tr>`;
     }).join('')+'</tbody></table></div>';
   renderDashChart(tk);
-  C.XH=await apiGet('XepHang');
-  C.KK=await apiGet('KiemKe');
+  // 3 lượt đọc độc lập → tải song song (XepHang / KiemKe / kỳ Bestseller đã lưu)
+  let savedBK;
+  [C.XH,C.KK,savedBK]=await Promise.all([apiGet('XepHang'),apiGet('KiemKe'),getSavedBestKy()]);
   // Ưu tiên kỳ do người dùng CHỐT ở màn Bestseller (sheet BestKy); chưa lưu → tự lấy 2 mốc đánh dấu gần nhất
-  dashBestPair=(await getSavedBestKy())||mostRecentKKPair();
+  dashBestPair=savedBK||mostRecentKKPair();
   renderDashBest();
 }
 // ── Bestseller (đúng công thức, DÙNG CHUNG với màn Bestseller riêng — xem computeBestsellerPeriod trong

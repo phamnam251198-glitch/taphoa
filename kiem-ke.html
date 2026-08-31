@@ -97,11 +97,11 @@ async function openKKNew(){
   document.getElementById('kk-moc').value='';
   const userSel=document.getElementById('kk-user');
   userSel.innerHTML='<option value="">-- Chọn --</option>'+C.USER.map(u=>`<option>${esc(u[0])}</option>`).join('');
-  await ensureGH();
-  await ensureTK();
+  // 4 lượt đọc độc lập → tải song song. XepHang/GianHangKho tươi để tính đúng số hiện có ở gian hàng (ghkBase/ghkQty)
+  let xh,ghk;
+  [,,xh,ghk]=await Promise.all([ensureGH(),ensureTK(),apiGet('XepHang'),apiGet('GianHangKho')]);
+  C.XH=xh;C.GHK=ghk;
   dmFillSelect(document.getElementById('kk-dm'),dmNow());// mặc định tháng hiện tại
-  C.XH=await apiGet('XepHang');// tươi, để tính đúng số hiện có ở từng gian hàng (ghkBase/ghkQty)
-  C.GHK=await apiGet('GianHangKho');
   const targetSel=document.getElementById('kk-target');
   targetSel.innerHTML='<option value="">📦 Kho tổng (Tồn kho)</option>'+C.GH.map(g=>`<option value="${esc(g[0])}">🏬 ${esc(g[0])}</option>`).join('');
   document.getElementById('kk-q').value='';
@@ -311,7 +311,7 @@ async function delSelKK(){
   if(!idxs.length){toast('Không tìm thấy dòng nào','err');selKK.clear();fKK();return;}
   confirmDel(`Xóa ${keys.size} phiếu kiểm kê đã chọn (${idxs.length} dòng)? Với mỗi SP: không có giao dịch nào khác sau ngày đó → tự hoàn tác lại số liệu; SP đã có giao dịch sau đó → chỉ xóa lịch sử, giữ nguyên số hiện tại.`,async()=>{
     toast('Đang xóa...');
-    C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+    [C.NH,C.XH,C.GHK,C.TK]=await Promise.all([apiGet('NhapHang'),apiGet('XepHang'),apiGet('GianHangKho'),apiGet('TonKho')]);
     let soHoanTac=0;
     for(const idx of idxs){
       const r=C.KK[idx];if(!r)continue;
@@ -385,7 +385,7 @@ async function delKKRow(row){
   const r=C.KK[row-2];if(!r)return;
   const ngay=r[0],ten=r[2];
   toast('Đang kiểm tra dữ liệu liên quan...');
-  C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+  [C.NH,C.XH,C.GHK,C.TK]=await Promise.all([apiGet('NhapHang'),apiGet('XepHang'),apiGet('GianHangKho'),apiGet('TonKho')]);
   const hasLater=kkHasLaterActivity(r,row-2);
   const msg=hasLater
     ?`Xóa dòng kiểm kê "${ten}" (ngày ${ngay})? Đã có giao dịch khác sau ngày này cho SP này nên KHÔNG THỂ tự hoàn tác an toàn — chỉ xóa lịch sử, giữ nguyên số liệu hiện tại.`
@@ -410,7 +410,7 @@ async function delKKDay(){
   const mocTxt=mc==='dau'?' [Đầu kỳ]':mc==='cuoi'?' [Cuối kỳ]':'';
   confirmDel(`Xóa toàn bộ lịch sử kiểm kê ${kkDayCurrent.gianHang?`"${kkDayCurrent.gianHang}"`:'Kho tổng'} ngày ${kkDayCurrent.ngay}${mocTxt} (${idxs.length} dòng)? Với mỗi SP: nếu KHÔNG có giao dịch nào khác xảy ra sau ngày này thì tự hoàn tác lại đúng số liệu trước khi kiểm kê; SP nào đã có giao dịch sau đó thì chỉ xóa lịch sử, giữ nguyên số hiện tại (không đoán mò).`,async()=>{
     toast('Đang xóa...');
-    C.NH=await apiGet('NhapHang');C.XH=await apiGet('XepHang');C.GHK=await apiGet('GianHangKho');C.TK=await apiGet('TonKho');
+    [C.NH,C.XH,C.GHK,C.TK]=await Promise.all([apiGet('NhapHang'),apiGet('XepHang'),apiGet('GianHangKho'),apiGet('TonKho')]);
     let soHoanTac=0;
     for(const idx of idxs){
       const r=C.KK[idx];if(!r)continue;
