@@ -324,8 +324,8 @@ async function delSelNCC(){
   if(!selNCC.size){toast('Chưa chọn NCC nào','err');return;}
   confirmDel(`Xóa ${selNCC.size} nhà cung cấp đã chọn?`,async()=>{
     toast('Đang xóa '+selNCC.size+' NCC...');
-    const idxs=[...selNCC].sort((a,b)=>b-a);
-    for(const idx of idxs)await apiPost({sheet:'NhaCungCap',action:'delete',row:idx+2});
+    const idxs=[...selNCC];
+    await apiDeleteRows('NhaCungCap',idxs);
     selNCC.clear();
     toast('Đã xóa '+idxs.length+' NCC!');setTimeout(loadNCC,800);
   });
@@ -395,8 +395,8 @@ async function delSelGH(){
   if(!selGH.size){toast('Chưa chọn gian hàng nào','err');return;}
   confirmDel(`Xóa ${selGH.size} gian hàng đã chọn?`,async()=>{
     toast('Đang xóa '+selGH.size+' gian hàng...');
-    const idxs=[...selGH].sort((a,b)=>b-a);
-    for(const idx of idxs)await apiPost({sheet:'GianHang',action:'delete',row:idx+2});
+    const idxs=[...selGH];
+    await apiDeleteRows('GianHang',idxs);
     selGH.clear();
     toast('Đã xóa '+idxs.length+' gian hàng!');setTimeout(loadGH,800);
   });
@@ -475,8 +475,8 @@ async function delSelLoai(){
   if(!selLoai.size){toast('Chưa chọn loại hàng nào','err');return;}
   confirmDel(`Xóa ${selLoai.size} loại hàng đã chọn?`,async()=>{
     toast('Đang xóa '+selLoai.size+' loại hàng...');
-    const idxs=[...selLoai].sort((a,b)=>b-a);
-    for(const idx of idxs)await apiPost({sheet:'LoaiHang',action:'delete',row:idx+2});
+    const idxs=[...selLoai];
+    await apiDeleteRows('LoaiHang',idxs);
     selLoai.clear();
     toast('Đã xóa '+idxs.length+' loại hàng!');setTimeout(loadLoai,800);
   });
@@ -594,8 +594,8 @@ async function delSelUser(){
   if(!selUser.size){toast('Chưa chọn người dùng nào','err');return;}
   confirmDel(`Xóa ${selUser.size} người dùng đã chọn?`,async()=>{
     toast('Đang xóa '+selUser.size+' người dùng...');
-    const idxs=[...selUser].sort((a,b)=>b-a);
-    for(const idx of idxs)await apiPost({sheet:'User',action:'delete',row:idx+2});
+    const idxs=[...selUser];
+    await apiDeleteRows('User',idxs);
     selUser.clear();
     toast('Đã xóa '+idxs.length+' người dùng!');setTimeout(loadUser,800);
   });

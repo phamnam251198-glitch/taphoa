@@ -182,6 +182,28 @@ async function apiPost(data){
   finally{busyDone();}
 }
 
+// Xóa NHIỀU dòng của 1 sheet trong 1 lượt: đọc sheet ĐÚNG 1 LẦN, ánh xạ mọi index → _key rồi gọi remove()
+// SONG SONG. Thay cho vòng `for(...)await apiPost({action:'delete'})` (mỗi lần lại đọc lại cả sheet →
+// chậm tuyến tính). Nhận MẢNG INDEX 0-based (đúng quy ước row = index + 2). An toàn khi chạy song song vì
+// xóa theo _key CỐ ĐỊNH, không theo vị trí — thứ tự không quan trọng. CHỈ dùng cho vòng xóa thuần (không có
+// thao tác ghi phụ thuộc xen giữa — VD điều chỉnh tồn kho — những chỗ đó phải giữ tuần tự).
+async function apiDeleteRows(sheet,indices){
+  const idxs=[...new Set((indices||[]).filter(i=>i>=0))];
+  if(!idxs.length)return true;
+  await initFirebase();
+  busyShow();
+  try{
+    const ref=db.ref(dbPath(sheet));
+    const snap=await ref.once('value');
+    const items=snap.val();
+    if(!items)return false;
+    const keys=Object.keys(items).sort((a,b)=>(items[a]._idx||0)-(items[b]._idx||0));
+    await Promise.all(idxs.map(i=>{const k=keys[i];return k?ref.child(k).remove():Promise.resolve();}));
+    return true;
+  }catch(e){console.error(e);return false;}
+  finally{busyDone();}
+}
+
 // apiGetRaw dùng để check initialized
 function fmt(n){return Number(n||0).toLocaleString('vi-VN');}
 function td(){return new Date().toISOString().slice(0,10);}

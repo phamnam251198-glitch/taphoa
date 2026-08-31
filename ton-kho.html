@@ -228,11 +228,8 @@ async function delSelTK(){
   if(!names.length){toast('Chưa chọn sản phẩm nào','err');return;}
   confirmDel(`Xóa ${names.length} sản phẩm đã chọn?`,async()=>{
     toast('Đang xóa '+names.length+' sản phẩm...');
-    // xóa từ index lớn → nhỏ để tránh lệch vị trí các dòng còn lại
-    const idxs=names.map(n=>C.TK.findIndex(r=>r[0]===n)).filter(i=>i>=0).sort((a,b)=>b-a);
-    for(const i of idxs){
-      await apiPost({sheet:'TonKho',action:'delete',row:i+2});
-    }
+    const idxs=names.map(n=>C.TK.findIndex(r=>r[0]===n)).filter(i=>i>=0);
+    await apiDeleteRows('TonKho',idxs);// đọc TonKho 1 lần, xóa mọi dòng đã chọn song song
     logAction('Xóa','Tồn kho',`Xóa hàng loạt ${idxs.length} sản phẩm: ${names.join(', ')}`);
     selTK.clear();
     toast('Đã xóa '+idxs.length+' sản phẩm!');setTimeout(loadTK,800);
