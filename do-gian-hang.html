@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Đồ gian hàng</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
 </head>
 <body>
 
@@ -21,6 +21,7 @@
       <div class="tabs" id="ghk-tabs"></div>
       <div class="sb">
         <input type="text" id="q-ghk" placeholder="Tìm sản phẩm trong gian hàng này..." oninput="rGHKView()">
+        <select id="dm-ghk" onchange="rGHKView()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none"><option value="">Tất cả tháng danh mục</option></select>
       </div>
       <div id="ghk-pane"><div class="ld"><div class="spin"></div></div></div>
     </div>
@@ -42,7 +43,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Đồ gian hàng ──
 let ghkActiveTab=null;
@@ -51,6 +52,13 @@ async function loadGHK(){
   let xh,ghk;
   [,,xh,ghk]=await Promise.all([ensureGH(),ensureTK(),apiGet('XepHang'),apiGet('GianHangKho')]);
   C.XH=xh;C.GHK=ghk;
+  await ensureDmKy();
+  const dmSel=document.getElementById('dm-ghk');
+  if(dmSel){
+    const cur=dmSel.value;
+    dmSel.innerHTML='<option value="">Tất cả tháng danh mục</option>'+
+      dmFilterMonths(C.XH.map(r=>r[6])).map(m=>`<option value="${m}"${m===cur?' selected':''}>${dmFmt(m)}</option>`).join('');
+  }
   rGHKView();
 }
 function goGHKTab(name){ghkActiveTab=name;rGHKView();}
@@ -74,8 +82,13 @@ function rGHKView(){
     return`<div class="tab${g[0]===ghkActiveTab?' on':''}" onclick="goGHKTab('${esc(g[0])}')">${esc(g[0])}${cnt?` (${cnt})`:''}</div>`;
   }).join('');
   const q=(document.getElementById('q-ghk')?.value||'').toLowerCase();
+  const dm=document.getElementById('dm-ghk')?.value||'';
   let names=namesOf(ghkActiveTab);
   if(q)names=names.filter(n=>n.toLowerCase().includes(q));
+  if(dm){// lọc theo Tháng danh mục: chỉ SP có phiếu Xếp hàng vào gian này gắn tháng đó (SL vẫn là SL hiện có)
+    const inMonth=new Set(C.XH.filter(r=>r[2]===ghkActiveTab&&(r[6]||'')===dm).map(r=>r[0]));
+    names=names.filter(n=>inMonth.has(n));
+  }
   const items=names.map(n=>[n,ghkQty(n,ghkActiveTab)]).sort((a,b)=>a[0].localeCompare(b[0]));
   const total=items.reduce((s,r)=>s+r[1],0);
   if(!items.length){
@@ -94,15 +107,21 @@ function rGHKView(){
   const body=loaiNames.map((loai,idx)=>{
     const its=groups.get(loai);
     const rows=its.map(([ten,sl])=>
-      `<tr class="row-edit" onclick="rowEdit(event,editGHK,'${esc(ten)}','${esc(ghkActiveTab)}')"><td data-label="Sản phẩm"><b>${ten}</b></td><td data-label="Số lượng"><b>${fmt(sl)}</b></td><td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Sửa</button></td></tr>`
+      `<tr class="row-edit" onclick="rowEdit(event,editGHK,'${esc(ten)}','${esc(ghkActiveTab)}')"><td data-label="Sản phẩm"><b>${ten}</b></td><td data-label="Số lượng"><b>${fmt(sl)}</b></td><td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Sửa</button><button class="btn btn-d btn-sm" onclick="event.stopPropagation();delGHK('${esc(ten)}','${esc(ghkActiveTab)}')">Xóa</button></td></tr>`
     ).join('');
     const tongSL=its.reduce((s,[,sl])=>s+Number(sl||0),0);
     return`<details class="acc-group ${loaiColorClass(loai,idx)}" open>
       <summary>🏷️ ${esc(loai)}<span class="acc-cnt">${its.length} SP · Tổng SL: ${fmt(tongSL)}</span></summary>
-      <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th>Sản phẩm</th><th style="width:120px">Số lượng</th><th style="width:90px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th>Sản phẩm</th><th style="width:110px">Số lượng</th><th style="width:130px"></th></tr></thead><tbody>${rows}</tbody></table></div>
     </details>`;
   }).join('');
-  paneEl.innerHTML=`<div class="card"><div class="ch"><h2>${esc(ghkActiveTab)}</h2><span style="font-size:11px;color:var(--text2)">Tổng SL: ${fmt(total)}</span></div></div>${body}`;
+  paneEl.innerHTML=`<div class="card"><div class="ch">
+    <h2>${esc(ghkActiveTab)}</h2>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:11px;color:var(--text2)">Tổng SL: ${fmt(total)}</span>
+      <button class="btn btn-d btn-sm" onclick="delAllGHK('${esc(ghkActiveTab)}')">🗑 Xóa tất cả</button>
+    </div>
+  </div></div>${body}`;
 }
 function editGHK(tenSP,gianHang){
   document.getElementById('ghk-sp').innerHTML=`<option>${tenSP}</option>`;
@@ -127,6 +146,61 @@ async function saveGHK(){
   if(idx>=0)C.GHK[idx]=row;else C.GHK.push(row);
   logAction('Cập nhật','Đồ gian hàng',`"${ten}" tại "${gh}": chỉnh về SL = ${target}`);
   toast('Đã cập nhật');cm('m-ghk');rGHKView();
+}
+
+// Xóa 1 SP khỏi 1 gian hàng.
+//  - SP CHỈ có dòng chỉnh tay (không có phiếu Xếp hàng vào gian này) → xóa hẳn dòng GianHangKho, SP biến mất.
+//  - SP ĐÃ có phiếu Xếp hàng vào gian này → không xóa hẳn được (danh sách tính từ lịch sử Xếp hàng),
+//    chỉ đặt số lượng về 0 (offset = −tổng đã xếp). Muốn bỏ hẳn: xóa các phiếu Xếp hàng liên quan.
+async function delGHK(ten,gh){
+  const base=ghkBase(ten,gh);
+  const idx=C.GHK.findIndex(r=>r[0]===ten&&r[1]===gh);
+  if(base>0){
+    confirmDel(`"${ten}" đã có phiếu Xếp hàng vào "${gh}" (${fmt(base)}). Không xóa hẳn được — sẽ đặt số lượng ở gian hàng này về 0.\n\nMuốn bỏ hẳn thì xóa các phiếu Xếp hàng liên quan ở màn Xếp hàng.`,async()=>{
+      toast('Đang xử lý...');
+      const row=[ten,gh,-base];
+      await apiPost(idx>=0?{sheet:'GianHangKho',action:'update',row:idx+2,data:row}:{sheet:'GianHangKho',action:'append',row});
+      if(idx>=0)C.GHK[idx]=row;else C.GHK.push(row);
+      logAction('Cập nhật','Đồ gian hàng',`"${ten}" tại "${gh}": đặt SL về 0`);
+      toast('Đã đặt về 0');setTimeout(loadGHK,600);
+    });
+    return;
+  }
+  if(idx<0){toast('Không tìm thấy dòng để xóa','err');return;}
+  confirmDel(`Xóa "${ten}" khỏi gian hàng "${gh}"?`,async()=>{
+    toast('Đang xóa...');
+    await apiPost({sheet:'GianHangKho',action:'delete',row:idx+2});
+    logAction('Xóa','Đồ gian hàng',`"${ten}" khỏi "${gh}"`);
+    toast('Đã xóa');setTimeout(loadGHK,600);
+  });
+}
+
+// Xóa TẤT CẢ đồ trong 1 gian hàng: SP có phiếu Xếp hàng → đưa SL về 0; SP chỉ chỉnh tay → xóa hẳn dòng.
+async function delAllGHK(gh){
+  const names=[...new Set([
+    ...C.XH.filter(r=>r[2]===gh).map(r=>r[0]),
+    ...C.GHK.filter(r=>r[1]===gh).map(r=>r[0]),
+  ])];
+  if(!names.length){toast('Gian hàng này chưa có gì','err');return;}
+  const nBase=names.filter(n=>ghkBase(n,gh)>0).length;
+  confirmDel(`Xóa TẤT CẢ đồ trong gian hàng "${gh}" (${names.length} SP)?\n\n${nBase} SP có phiếu Xếp hàng → chỉ đưa số lượng về 0 (giữ nguyên lịch sử Xếp hàng). ${names.length-nBase} SP còn lại xóa hẳn khỏi danh sách.`,async()=>{
+    toast(`Đang xử lý ${names.length} SP...`);
+    C.GHK=await apiGet('GianHangKho');// đọc tươi để index chính xác
+    for(const ten of names){
+      const base=ghkBase(ten,gh);
+      const idx=C.GHK.findIndex(r=>r[0]===ten&&r[1]===gh);
+      if(base>0){
+        const row=[ten,gh,-base];
+        await apiPost(idx>=0?{sheet:'GianHangKho',action:'update',row:idx+2,data:row}:{sheet:'GianHangKho',action:'append',row});
+        if(idx>=0)C.GHK[idx]=row;else C.GHK.push(row);
+      }else if(idx>=0){
+        await apiPost({sheet:'GianHangKho',action:'delete',row:idx+2});
+        C.GHK.splice(idx,1);
+      }
+    }
+    logAction('Xóa','Đồ gian hàng',`Xóa tất cả đồ trong "${gh}" (${names.length} SP)`);
+    toast('Đã xóa tất cả');setTimeout(loadGHK,700);
+  });
 }
 
 

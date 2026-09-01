@@ -2,9 +2,23 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Bestseller</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
+<style>
+@media (max-width:480px){
+  /* Bảng xếp hạng ở dạng card trên điện thoại: ô cuối ("Đã tiêu thụ") vẫn hiện nhãn + nổi bật ở chân card */
+  #best-tbl .m-tbl td:last-child{justify-content:space-between}
+  #best-tbl .m-tbl td:last-child::before{content:attr(data-label);color:var(--text2);font-weight:500;font-size:11px;text-align:left}
+  #best-tbl .m-tbl td[data-label="Sản phẩm"]{font-size:15px}
+  /* Ô "#" (thứ hạng): dồn ký hiệu # và số sát nhau thành "#1" thay vì đẩy 2 đầu */
+  #best-tbl .m-tbl td[data-label="#"]{justify-content:flex-start;gap:1px;font-weight:700;font-size:14px}
+  /* Điện thoại: ẩn các dòng chú thích màu xám + tiêu đề card lọc (đã có ở nút gấp/mở) cho gọn */
+  #best-info,#best-saved{display:none}
+  #s-best>.sb-wrap .card>.ch{display:none}
+  #s-best>.sb-wrap .card>div{padding-top:12px}
+}
+</style>
 </head>
 <body>
 
@@ -18,9 +32,13 @@
   <div id="content">
 
     <div class="sec on" id="s-best">
-      <div class="card">
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Chọn cặp mốc để tính</summary>
+      <div class="card" style="margin-top:0">
         <div class="ch"><h2>Chọn cặp mốc để tính</h2></div>
         <div style="padding:14px 18px">
+          <div class="fg"><label>Tháng danh mục (chọn nhanh — dùng khoảng ngày cấu hình ở Cài đặt)</label>
+            <select id="best-dm" onchange="bestByDm()"><option value="">— Tự chọn mốc kỳ bên dưới —</option></select></div>
           <div class="fr">
             <div class="fg"><label>📍 Mốc Đầu kỳ</label><select id="best-dau" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
             <div class="fg"><label>🏁 Mốc Cuối kỳ</label><select id="best-cuoi" onchange="renderBestPeriod()"><option value="">-- Chọn --</option></select></div>
@@ -33,6 +51,7 @@
           </div>
         </div>
       </div>
+      </details>
       <div id="best-tbl"></div>
     </div>
   </div>
@@ -40,7 +59,7 @@
 
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Bestseller ── (bAddDays/kkStockAsOf/xhAddedInRange/computeBestsellerPeriod/
 // mostRecentKKPair giờ dùng CHUNG với card Bestseller ở Tổng quan, đã chuyển sang app.js)
@@ -52,9 +71,31 @@ async function loadBestseller(){
   // 4 lượt đọc độc lập → tải song song
   let saved;
   [,C.KK,C.XH,saved]=await Promise.all([ensureTK(),apiGet('KiemKe'),apiGet('XepHang'),getSavedBestKy()]);
+  await ensureDmKy();
   fillBestMocOptions(saved);
+  // đổ dropdown "Tháng danh mục (chọn nhanh)"
+  const dmSel=document.getElementById('best-dm');
+  if(dmSel){
+    const cur=dmSel.value;
+    dmSel.innerHTML='<option value="">— Tự chọn mốc kỳ bên dưới —</option>'+
+      dmFilterMonths([...C.KK.filter(r=>r[8]).map(r=>r[10]),...C.XH.map(r=>r[6])])
+        .map(m=>`<option value="${m}"${m===cur?' selected':''}>${dmFmt(m)}</option>`).join('');
+  }
   showSavedBestKy(saved);
   renderBestPeriod();
+}
+// Chọn nhanh theo Tháng danh mục: lấy khoảng ngày cấu hình → tính xếp hạng như Bestseller (dùng engine
+// computeRevenuePeriod, KHÔNG cần đánh mốc 📍/🏁). Bỏ chọn → quay lại chế độ 2 mốc kỳ.
+function bestByDm(){
+  const ym=document.getElementById('best-dm').value;
+  const dauSel=document.getElementById('best-dau'),cuoiSel=document.getElementById('best-cuoi');
+  const saveBtn=document.querySelector('#s-best button[onclick="saveBestKyFromUI()"]');
+  if(saveBtn){saveBtn.disabled=!!ym;saveBtn.title=ym?'Chế độ xem theo Tháng danh mục — muốn lưu kỳ cho Tổng quan thì dùng 2 mốc kỳ':'';}
+  if(!ym){dauSel.disabled=cuoiSel.disabled=false;renderBestPeriod();return;}
+  dauSel.disabled=cuoiSel.disabled=true;dauSel.value='';cuoiSel.value='';
+  const r=computeRevenuePeriod(ym);
+  document.getElementById('best-info').textContent=`Kỳ ${dmFmt(ym)} · so 2 lần kiểm kê gian hàng cuối cùng của 2 tháng danh mục · ${r.items.length} SP đủ dữ liệu${r.missing?` · ${r.missing} SP bị loại (thiếu kiểm kê gian hàng)`:''}.`;
+  rBestList({items:r.items.slice().sort((a,b)=>b.daBan-a.daBan),missing:r.missing,tongSP:r.tongSP});
 }
 // Chốt cặp mốc đang chọn thành "kỳ mặc định" (sheet BestKy) — màn Tổng quan sẽ tính card Bestseller theo kỳ này
 async function saveBestKyFromUI(){
@@ -72,7 +113,7 @@ async function clearBestKyFromUI(){
 }
 function showSavedBestKy(k){
   document.getElementById('best-saved').textContent=k
-    ?`Kỳ đang lưu cho Tổng quan: ${k.dau} → ${k.cuoi}`
+    ?`Kỳ đang lưu cho Tổng quan: ${dVN(k.dau)} → ${dVN(k.cuoi)}`
     :'Chưa lưu kỳ nào — Tổng quan đang tự lấy 2 mốc đánh dấu gần nhất.';
 }
 // Mỗi dropdown CHỈ hiện các ngày Kiểm kê Gian hàng đã đánh dấu ĐÚNG mốc đó: ô Đầu kỳ chỉ có ngày đánh dấu
@@ -87,7 +128,7 @@ function fillBestMocOptions(saved){
   const datesByMoc=moc=>[...new Set(ghKK.filter(r=>r[9]===moc).map(r=>r[0]))].sort((a,b)=>b.localeCompare(a));// mới nhất trước
   const dauDates=datesByMoc('dau'),cuoiDates=datesByMoc('cuoi');
   // Kèm SỐ SP đã đếm mỗi ngày mốc — để không chọn nhầm ngày chỉ kiểm kê lẻ 1-2 SP (SP còn lại sẽ bị loại)
-  const opts=(list,sel)=>'<option value="">-- Chọn --</option>'+list.map(d=>`<option value="${d}"${d===sel?' selected':''}>${d} — ${spCountOn(d)} SP đã đếm</option>`).join('');
+  const opts=(list,sel)=>'<option value="">-- Chọn --</option>'+list.map(d=>`<option value="${d}"${d===sel?" selected":""}>${dVN(d)} — ${spCountOn(d)} SP đã đếm</option>`).join('');
   dauSel.innerHTML=opts(dauDates,curDau);
   cuoiSel.innerHTML=opts(cuoiDates,curCuoi);
   if(!curDau&&!curCuoi){
@@ -112,11 +153,12 @@ function rBestList(computed,warnMsg){
     <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Tồn đầu kỳ</th><th>Đã xếp</th><th>Tồn cuối kỳ</th><th>Đã tiêu thụ</th></tr></thead><tbody>`+
     items.map((it,i)=>{
       const cl=it.daBan<0?'color:#d03b3b':'';
-      return`<tr><td>${i+1}</td><td><b>${esc(it.ten)}</b></td><td>${fmt(it.dauKy)}<br><small style="color:var(--text2)">${it.dauDate}</small></td><td>${fmt(it.them)}</td><td>${fmt(it.cuoiKy)}<br><small style="color:var(--text2)">${it.cuoiDate}</small></td><td style="font-weight:700;${cl}">${fmt(it.daBan)}</td></tr>`;
+      return`<tr><td data-label="#">${i+1}</td><td data-label="Sản phẩm"><b>${esc(it.ten)}</b></td><td data-label="Tồn đầu kỳ">${fmt(it.dauKy)}<br><small style="color:var(--text2)">${dVN(it.dauDate)}</small></td><td data-label="Đã xếp">${fmt(it.them)}</td><td data-label="Tồn cuối kỳ">${fmt(it.cuoiKy)}<br><small style="color:var(--text2)">${dVN(it.cuoiDate)}</small></td><td data-label="Đã tiêu thụ" style="font-weight:700;${cl}">${fmt(it.daBan)}</td></tr>`;
     }).join('')+'</tbody></table></div></div>';
   el.innerHTML=html;
 }
 function renderBestPeriod(){
+  if(document.getElementById('best-dm')?.value){bestByDm();return;}// đang xem theo Tháng danh mục
   const dau=document.getElementById('best-dau').value,cuoi=document.getElementById('best-cuoi').value;
   const infoEl=document.getElementById('best-info');
   if(!dau||!cuoi){
@@ -129,10 +171,10 @@ function renderBestPeriod(){
   }
   if(dau>cuoi){
     infoEl.textContent='';
-    rBestList(null,`Mốc Đầu kỳ (${dau}) không được SAU mốc Cuối kỳ (${cuoi}) — chọn lại.`);
+    rBestList(null,`Mốc Đầu kỳ (${dVN(dau)}) không được SAU mốc Cuối kỳ (${dVN(cuoi)}) — chọn lại.`);
     return;
   }
-  infoEl.textContent=`Kỳ từ ${dau} đến ${cuoi} (${bDaysBetween(dau,cuoi)} ngày).`;
+  infoEl.textContent=`Kỳ từ ${dVN(dau)} đến ${dVN(cuoi)} (${bDaysBetween(dau,cuoi)} ngày).`;
   rBestList(computeBestsellerPeriod(dau,cuoi));
 }
 

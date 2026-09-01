@@ -206,10 +206,15 @@ async function apiDeleteRows(sheet,indices){
 
 // apiGetRaw dùng để check initialized
 function fmt(n){return Number(n||0).toLocaleString('vi-VN');}
-function td(){return new Date().toISOString().slice(0,10);}
-// Ngày cách hôm nay n ngày (YYYY-MM-DD) — dùng đặt mặc định ô "Từ ngày" = 30 ngày gần nhất ở các màn danh sách.
-// Dựng chuỗi theo giờ ĐỊA PHƯƠNG (không qua toISOString/UTC) để ở VN (UTC+7) sáng sớm không bị lùi 1 ngày.
+// Ngày cách hôm nay n ngày (YYYY-MM-DD). Dựng chuỗi theo giờ ĐỊA PHƯƠNG (KHÔNG qua toISOString/UTC) để ở
+// VN (UTC+7) sáng sớm không bị lùi 1 ngày. Dùng cho ô "Từ ngày" mặc định, ngày mặc định phiếu Nhập/Xếp/
+// Kiểm kê, mốc so "hôm nay" khi tính số ngày còn lại tới HSD...
 function dNago(n){const d=new Date();d.setDate(d.getDate()-n);const z=x=>String(x).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
+// Hôm nay (YYYY-MM-DD) theo giờ địa phương
+function td(){return dNago(0);}
+// Hiển thị ngày dạng dd/mm/yyyy: "2026-09-01" → "01/09/2026". Nhận cả chuỗi có kèm giờ.
+// Rỗng / không đúng dạng YYYY-MM-DD → trả lại nguyên văn.
+function dVN(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s==null?'':s));return m?`${m[3]}/${m[2]}/${m[1]}`:String(s==null?'':s);}
 
 // ── XÁC ĐỊNH NGƯỜI ĐANG ĐĂNG NHẬP ── map email tài khoản Firebase Auth đang dùng ↔ bản ghi "Người dùng"
 // để tự động biết "ai đang thao tác" thay vì bắt chọn tay mỗi lần
@@ -263,6 +268,18 @@ async function autoPruneOldLogs(){
 // sessionStorage theo "chữ ký" tình trạng: tải lại trang cùng phiên mà tình trạng y như cũ thì không tự
 // bung lại (vẫn còn chấm ở chuông), tình trạng đổi thì bung.
 let __saData=null;// {het,sap,hsd,daysLeft,sig} — kết quả lần quét gần nhất, để nút chuông mở lại panel
+let __saDocClick=null;// handler bắt "bấm ra ngoài panel" — giữ tham chiếu để gỡ đúng listener khi đóng
+// Gỡ panel khỏi DOM + gỡ luôn listener bấm-ra-ngoài
+function saRemove(){
+  const el=document.getElementById('stock-alert');
+  if(el)el.remove();
+  if(__saDocClick){document.removeEventListener('click',__saDocClick,true);__saDocClick=null;}
+}
+// Đóng panel do người dùng chủ động (✕ / bấm ra ngoài / bấm lại chuông) → nhớ ẩn theo chữ ký tình trạng
+function saDismiss(sig){
+  saRemove();
+  if(sig){try{sessionStorage.setItem('stockAlertHidden',sig);}catch(e){}}
+}
 async function checkStockAlerts(){
   if(__pageKey!=='dash')return;// chuông thông báo chỉ chạy ở màn Tổng quan
   try{
@@ -272,14 +289,13 @@ async function checkStockAlerts(){
     const ts=td();
     const daysLeft=r=>Math.round((new Date(r[5])-new Date(ts))/86400000);
     const hsd=C.TK.filter(isHsdAlert).sort((a,b)=>(a[5]||'').localeCompare(b[5]||''));
-    const el=document.getElementById('stock-alert');
-    if(!het.length&&!sap.length&&!hsd.length){__saData=null;updateNotifBadge();if(el)el.remove();return;}
+    if(!het.length&&!sap.length&&!hsd.length){__saData=null;updateNotifBadge();saRemove();return;}
     const sig=[...het.map(r=>'h:'+(r[9]||r[0])),...sap.map(r=>'s:'+(r[9]||r[0])),
                ...hsd.map(r=>'e:'+(r[9]||r[0])+':'+r[5])].join('|');
     __saData={het,sap,hsd,daysLeft,sig};
     updateNotifBadge();
     let hidden='';try{hidden=sessionStorage.getItem('stockAlertHidden')||'';}catch(e){}
-    if(hidden===sig){if(el)el.remove();return;}// không tự bung, nhưng chuông vẫn còn chấm
+    if(hidden===sig){saRemove();return;}// không tự bung, nhưng chuông vẫn còn chấm
     renderStockAlert(het,sap,hsd,daysLeft,sig);
   }catch(e){console.error(e);}
 }
@@ -296,20 +312,15 @@ function updateNotifBadge(){
 }
 // Bấm nút chuông: đang mở panel → đóng (và nhớ ẩn theo chữ ký); đang đóng → mở lại nếu còn cảnh báo
 function toggleStockAlert(){
-  const el=document.getElementById('stock-alert');
-  if(el){
-    if(__saData){try{sessionStorage.setItem('stockAlertHidden',__saData.sig);}catch(e){}}
-    el.remove();return;
-  }
+  if(document.getElementById('stock-alert')){saDismiss(__saData&&__saData.sig);return;}
   if(__saData){
     try{sessionStorage.removeItem('stockAlertHidden');}catch(e){}
     renderStockAlert(__saData.het,__saData.sap,__saData.hsd,__saData.daysLeft,__saData.sig);
   }else toast('Không có thông báo mới');
 }
 function renderStockAlert(het,sap,hsd,daysLeft,sig){
-  let el=document.getElementById('stock-alert');
-  if(el)el.remove();
-  el=document.createElement('div');
+  saRemove();
+  const el=document.createElement('div');
   el.id='stock-alert';
   if(!het.length)el.style.borderTopColor='var(--yellow)';// không có hàng hết hẳn → viền vàng thay vì đỏ
   const CAP=10;
@@ -324,17 +335,54 @@ function renderStockAlert(het,sap,hsd,daysLeft,sig){
     ${sec(sap,'sap','⚠️ Sắp hết','sa-h-y')}
     ${sec(hsd,'hsd','⏰ Sắp hết hạn','sa-h-y')}`;
   document.body.appendChild(el);
-  el.querySelector('.sa-x').onclick=e=>{
-    e.stopPropagation();
-    try{sessionStorage.setItem('stockAlertHidden',sig);}catch(e){}
-    el.remove();
-  };
+  el.querySelector('.sa-x').onclick=e=>{e.stopPropagation();saDismiss(sig);};
   el.querySelectorAll('.sa-sec').forEach(b=>b.onclick=()=>{location.href=PAGE_MAP.tk+'?alert='+b.dataset.alert;});
+  // Bấm ra ngoài panel (và không phải nút chuông) → đóng, nhớ ẩn theo chữ ký. Đăng ký hoãn 1 nhịp để
+  // KHÔNG bắt trúng chính cú bấm chuông vừa mở panel này.
+  __saDocClick=e=>{if(!e.target.closest('#stock-alert')&&!e.target.closest('#notif-bell'))saDismiss(sig);};
+  setTimeout(()=>{if(__saDocClick)document.addEventListener('click',__saDocClick,true);},0);
 }
 
 function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',2500);}
-function om(id){document.getElementById(id).classList.add('on');}
+function om(id){const el=document.getElementById(id);el.classList.add('on');decorateDateInputs(el);}
 function cm(id){document.getElementById(id).classList.remove('on');}
+
+// ── HIỂN THỊ NGÀY KIỂU VN TRONG Ô CHỌN NGÀY ─────────────────────────────────────────────────────────
+// iOS Safari vẽ <input type="date"> thành "ngày 1 thg 9, 2026" (không đổi được bằng CSS). Ở đây bọc mỗi ô:
+// 1 ô text readonly hiện "1/9/2026" (type=month → "Tháng 9/2026") nằm trên, ô date/month thật trong suốt
+// nằm đè lên lo phần MỞ LỊCH. Gọi tự động khi mở modal (om) + khi DOM đổi (MutationObserver bên dưới).
+function decorateDateInputs(root){
+  (root||document).querySelectorAll('input[type="date"],input[type="month"]').forEach(inp=>{
+    if(!inp.dataset.dwrapped){
+      inp.dataset.dwrapped='1';
+      const wrap=document.createElement('span');wrap.className='dwrap';
+      // Chuyển bề rộng cố định (nếu ô ngày gốc có style width:XXpx, VD cột "Hạn SD" hẹp) sang cho wrapper
+      // để ô hiển thị không bị co dúm; ô date thật bên trong luôn phủ 100% wrapper.
+      if(inp.style.width)wrap.style.width=inp.style.width;
+      if(inp.style.minWidth)wrap.style.minWidth=inp.style.minWidth;
+      inp.parentNode.insertBefore(wrap,inp);wrap.appendChild(inp);
+      inp.style.width='';inp.style.minWidth='';
+      const disp=document.createElement('input');
+      disp.type='text';disp.className='ddisp';disp.readOnly=true;disp.tabIndex=-1;
+      disp.setAttribute('aria-hidden','true');disp.placeholder=inp.type==='month'?'Tháng —':'dd/mm/yyyy';
+      wrap.appendChild(disp);
+      const fmt=inp.type==='month'?(v=>dmFmt(v)):(v=>dVN(v));
+      inp._dsync=()=>{disp.value=inp.value?fmt(inp.value):'';disp.disabled=inp.disabled;};
+      inp.addEventListener('input',inp._dsync);
+      inp.addEventListener('change',inp._dsync);
+      // Bấm vào BẤT KỲ đâu trên ô là bung lịch luôn (không phải nhắm đúng icon lịch). showPicker chỉ chạy
+      // được từ thao tác người dùng — bọc try/catch cho trình duyệt cũ / iOS Safari (iOS vốn tự bung sẵn).
+      inp.addEventListener('click',()=>{try{inp.showPicker&&inp.showPicker();}catch(e){}});
+    }
+    inp._dsync();
+  });
+}
+let _dObsT=null;
+document.addEventListener('DOMContentLoaded',()=>{
+  decorateDateInputs();
+  new MutationObserver(()=>{clearTimeout(_dObsT);_dObsT=setTimeout(()=>decorateDateInputs(),60);})
+    .observe(document.body,{childList:true,subtree:true});
+});
 // Bấm ra vùng nền tối (ngoài hộp .mb) → đóng popup. Dùng mousedown+mouseup CÙNG trên nền để tránh
 // đóng nhầm khi bôi đen chữ trong popup rồi thả chuột ra ngoài.
 document.addEventListener('mousedown',e=>{document._moDown=e.target;},true);
@@ -344,6 +392,26 @@ document.addEventListener('mouseup',e=>{
     t.classList.remove('on');
   }
 },true);
+// ── CHẶN PHÓNG TO MÀN HÌNH bằng cử chỉ 2 ngón trên điện thoại ─────────────────────────────────────
+// iOS Safari BỎ QUA user-scalable=no trong meta viewport → phải chặn thêm bằng JS. Gắn ở CẢ document
+// LẪN window vì có bản iOS chỉ nhận ở window.
+//  - 'gesturestart/change/end': cử chỉ pinch của WebKit (iOS)
+//  - 'touchstart' >1 ngón: chặn pinch ngay khi vừa đặt ngón thứ 2
+//  - 'touchmove' >1 ngón hoặc e.scale != 1: pinch đang diễn ra (Android/iOS)
+// double-tap-to-zoom đã bị chặn bởi CSS touch-action:pan-x pan-y ở html — KHÔNG chặn bằng touchend để
+// khỏi nuốt mất click khi bấm nhanh 2 lần vào 1 nút.
+(function blockPinchZoom(){
+  const stop=e=>{ if(e.cancelable)e.preventDefault(); };
+  ['gesturestart','gesturechange','gestureend'].forEach(t=>{
+    document.addEventListener(t,stop,{passive:false});
+    window.addEventListener(t,stop,{passive:false});
+  });
+  document.addEventListener('touchstart',e=>{ if(e.touches&&e.touches.length>1)stop(e); },{passive:false});
+  document.addEventListener('touchmove',e=>{
+    if((e.touches&&e.touches.length>1)||(typeof e.scale==='number'&&e.scale!==1))stop(e);
+  },{passive:false});
+})();
+
 // Cập nhật hiện/ẩn nút "Xóa đã chọn" + số lượng đang chọn — dùng chung cho mọi bảng có checkbox chọn nhiều
 function updateSelUI(btnId,cntId,size){
   document.getElementById(cntId).textContent=size;
@@ -477,6 +545,8 @@ function attachSearchList(input,getItems){
     picking=false;
     menu.style.display='none';// đảm bảo menu đóng sau khi các handler 'input' chạy xong
   }
+  input._acOpen=render;// cho code ngoài chủ động mở menu gợi ý (VD focus ngay sau khi vừa tạo dòng mới —
+  // đôi khi .focus() không kịp bắn sự kiện 'focus' đúng lúc, gọi thẳng hàm này thì chắc chắn mở được)
   input.addEventListener('focus',render);
   input.addEventListener('input',render);
   input.addEventListener('blur',()=>setTimeout(()=>{menu.style.display='none';},150));
@@ -737,6 +807,34 @@ function kkStockAsOf(maSP,tenSP,date,moc){
   const d=rows.reduce((m,r)=>(r[0]||'')>m?(r[0]||''):m,'');
   return{stock:rows.filter(r=>(r[0]||'')===d).reduce((s,r)=>s+Number(r[4]||0),0),date:d};
 }
+// Tháng danh mục "hiệu lực" của 1 dòng Kiểm kê: ưu tiên tag đã gắn (r[10]); chưa gắn thì suy từ ngày.
+function kkDmTag(r){return(r&&r[10])?String(r[10]):dmForDate(r&&r[0]||'');}
+// Lần Kiểm kê Gian hàng CUỐI CÙNG (ngày lớn nhất) của 1 SP TRONG 1 tháng danh mục ym — gộp mọi gian hàng
+// của đúng ngày đó. `capDate` (tùy chọn): chỉ xét các lần kiểm kê có ngày ≤ capDate (để xem doanh thu
+// TÍNH ĐẾN 1 mốc kiểm kê cụ thể trong kỳ). Trả {stock,date}|null. Không phân biệt mốc 📍/🏁.
+function kkLastOfDm(maSP,tenSP,ym,capDate){
+  const rows=C.KK.filter(r=>r[8]&&kkDmTag(r)===ym&&(!capDate||(r[0]||'')<=capDate)&&(maSP?r[1]===maSP:r[2]===tenSP));
+  if(!rows.length)return null;
+  const d=rows.reduce((m,r)=>(r[0]||'')>m?(r[0]||''):m,'');
+  return{stock:rows.filter(r=>(r[0]||'')===d).reduce((s,r)=>s+Number(r[4]||0),0),date:d};
+}
+// Danh sách NGÀY có Kiểm kê Gian hàng thuộc tháng danh mục ym (tăng dần) — để đổ dropdown "mốc kiểm kê".
+function kkDatesOfDm(ym){
+  return[...new Set(C.KK.filter(r=>r[8]&&kkDmTag(r)===ym).map(r=>r[0]).filter(Boolean))].sort();
+}
+// Lần Kiểm kê Gian hàng ĐẦU TIÊN (ngày nhỏ nhất) của 1 SP trong tháng danh mục ym — gộp mọi gian hàng của
+// đúng ngày đó. Dùng làm mốc đầu kỳ "ước tính" khi SP chưa hề có kiểm kê ở kỳ trước. Trả {stock,date}|null.
+function kkFirstOfDm(maSP,tenSP,ym){
+  const rows=C.KK.filter(r=>r[8]&&kkDmTag(r)===ym&&(maSP?r[1]===maSP:r[2]===tenSP));
+  if(!rows.length)return null;
+  const d=rows.reduce((m,r)=>(!m||(r[0]||'')<m)?(r[0]||''):m,'');
+  return{stock:rows.filter(r=>(r[0]||'')===d).reduce((s,r)=>s+Number(r[4]||0),0),date:d};
+}
+// Tháng danh mục có Kiểm kê Gian hàng của SP này, ĐỨNG NGAY TRƯỚC ym (mới nhất trong các kỳ < ym). null nếu chưa có.
+function kkPrevDm(maSP,tenSP,ym){
+  const tags=[...new Set(C.KK.filter(r=>r[8]&&(maSP?r[1]===maSP:r[2]===tenSP)).map(kkDmTag).filter(t=>t&&t<ym))].sort();
+  return tags.length?tags[tags.length-1]:null;
+}
 // Tổng SL đã Xếp hàng ra CÁC gian hàng của 1 sản phẩm, tính từ SAU ngày đầu kỳ đến HẾT ngày cuối kỳ
 function xhAddedInRange(maSP,tenSP,fromExclusive,toInclusive){
   // Cùng ngày (Đầu kỳ === Cuối kỳ) → tính luôn phần xếp ngày đó; khác ngày → chỉ tính từ SAU ngày đầu kỳ
@@ -763,6 +861,55 @@ function computeBestsellerPeriod(from,to){
   items.sort((a,b)=>b.daBan-a.daBan);
   return{items,missing,tongSP:C.TK.length};
 }
+
+// ══ DOANH THU ƯỚC TÍNH cho 1 THÁNG DANH MỤC `ym` ("YYYY-MM") — KHÔNG cần đánh mốc 📍/🏁 ══
+// Dùng cho màn Doanh thu và chọn nhanh ở Bestseller. Mỗi SP lấy ĐÚNG 2 lần Kiểm kê Gian hàng CUỐI CÙNG
+// của 2 tháng danh mục khác nhau:
+//   Tồn cuối kỳ = lần Kiểm kê Gian hàng cuối cùng thuộc tháng danh mục `ym`
+//   Tồn đầu kỳ  = lần Kiểm kê Gian hàng cuối cùng của tháng danh mục LIỀN TRƯỚC có kiểm kê (kkPrevDm)
+//   Đã bán   = Tồn đầu + (đã Xếp hàng giữa 2 ngày kiểm kê đó) − Tồn cuối
+//   Doanh thu = Đã bán × Giá bán  |  Giá vốn = Đã bán × Giá nhập  |  Lợi nhuận = DT − Giá vốn
+// Nếu SP CHƯA có kiểm kê ở bất kỳ kỳ trước nào mà kỳ này có ≥2 ngày kiểm kê → lấy tạm lần kiểm kê ĐẦU
+// TIÊN trong kỳ làm mốc đầu (dauUoc=true) — con số chỉ tính từ ngày đó, có thể thấp hơn cả kỳ.
+// Bỏ SP nếu thiếu kiểm kê ở `ym`, hoặc không lấy được mốc đầu, hoặc 2 ngày kiểm kê trùng/ngược.
+// `capDate` (tùy chọn): xem doanh thu TÍNH ĐẾN 1 mốc kiểm kê cụ thể trong kỳ — mốc cuối kỳ = lần kiểm kê
+// cuối cùng của `ym` có ngày ≤ capDate (không truyền = lấy mốc cuối cùng của kỳ).
+// Giá bán/giá nhập lấy giá HIỆN TẠI trong Tồn kho (app không lưu lịch sử giá).
+function computeRevenuePeriod(ym,capDate){
+  const items=[],missItems=[];let missing=0;
+  // SP "thuộc luồng gian hàng" = từng có Xếp hàng HOẶC Kiểm kê Gian hàng (bất kỳ kỳ nào). SP chỉ nằm ở Kho
+  // tổng, chưa từng lên kệ gian hàng (hoặc đã bị gỡ khỏi kiểm kê) → KHÔNG liệt kê là "chưa kiểm kê".
+  const ghSP=new Set();
+  C.XH.forEach(r=>{if(r[5])ghSP.add('m:'+r[5]);if(r[0])ghSP.add('n:'+r[0]);});
+  C.KK.forEach(r=>{if(r[8]){if(r[1])ghSP.add('m:'+r[1]);if(r[2])ghSP.add('n:'+r[2]);}});
+  const isGhSP=(ma,ten)=>ghSP.has('m:'+ma)||ghSP.has('n:'+ten);
+  C.TK.forEach(sp=>{
+    const ten=sp[0],ma=sp[9]||'';
+    const giaBan=Number(sp[4]||0),giaNhap=Number(sp[3]||0);
+    const cuoi=kkLastOfDm(ma,ten,ym,capDate);
+    if(!cuoi){if(isGhSP(ma,ten)){missing++;missItems.push({ten,ma,giaBan,giaNhap,reason:'chưa kiểm kê kỳ này'});}return;}
+    const prevYm=kkPrevDm(ma,ten,ym);
+    let dau=prevYm?kkLastOfDm(ma,ten,prevYm):null,dauUoc=false;
+    // SP chưa hề có kiểm kê ở kỳ trước → lấy tạm lần kiểm kê ĐẦU TIÊN trong kỳ này làm mốc đầu
+    // (cần ≥2 ngày kiểm kê khác nhau trong kỳ). Con số khi đó chỉ tính từ ngày kiểm kê đầu đó trở đi.
+    if(!dau){
+      const f=kkFirstOfDm(ma,ten,ym);
+      if(f&&f.date<cuoi.date){dau=f;dauUoc=true;}
+    }
+    if(!dau||dau.date>=cuoi.date){missing++;missItems.push({ten,ma,giaBan,giaNhap,reason:'thiếu mốc đầu kỳ'});return;}
+    const them=xhAddedInRange(ma,ten,dau.date,cuoi.date);
+    const daBan=dau.stock+them-cuoi.stock;
+    items.push({ten,ma,daBan,giaBan,giaNhap,dauKy:dau.stock,them,cuoiKy:cuoi.stock,
+      doanhThu:daBan*giaBan,giaVon:daBan*giaNhap,loiNhuan:daBan*(giaBan-giaNhap),
+      dauDate:dau.date,cuoiDate:cuoi.date,dauDm:dauUoc?ym:prevYm,dauUoc});
+  });
+  items.sort((a,b)=>b.doanhThu-a.doanhThu);
+  missItems.sort((a,b)=>(a.ten||'').localeCompare(b.ten||''));
+  const soUoc=items.filter(it=>it.dauUoc).length;
+  const tong=items.reduce((s,it)=>({dt:s.dt+it.doanhThu,von:s.von+it.giaVon,ln:s.ln+it.loiNhuan,sl:s.sl+it.daBan}),{dt:0,von:0,ln:0,sl:0});
+  return{items,missItems,missing,soUoc,tongSP:C.TK.length,...tong};
+}
+
 // Cặp Đầu kỳ/Cuối kỳ mặc định: Cuối kỳ = lần Kiểm kê Gian hàng đánh dấu 🏁 gần nhất, Đầu kỳ = lần đánh dấu
 // 📍 gần nhất TRƯỚC đó (khớp với dropdown ở màn Bestseller). Trả về null nếu chưa đủ 2 mốc đã đánh dấu hợp lệ.
 function mostRecentKKPair(){
@@ -810,6 +957,7 @@ const ICONS={
   receipt:'<path d="M5 3v18l2-1.5L9 21l2-1.5L13 21l2-1.5L17 21l2-1.5V3l-2 1.5L15 3l-2 1.5L11 3 9 4.5 7 3z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/>',
   checkcircle:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/>',
   bell:'<path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/>',
+  trendup:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
 };
 function icon(name,size){
   size=size||18;
@@ -820,8 +968,8 @@ function icon(name,size){
 // app.js chỉ còn giữ logic DÙNG CHUNG; phần JS đặc thù từng màn nằm ngay trong <script> của file .html đó.
 // Sidebar/topbar/màn đăng nhập được RENDER Ở ĐÂY (dùng chung) để sau này đổi menu chỉ cần sửa 1 chỗ,
 // không phải sửa lại từng file trong 10 file màn hình.
-const PAGE_MAP={dash:'index.html',tk:'ton-kho.html',nh:'nhap-hang.html',hd:'hoa-don.html',xh:'xep-hang.html',ghk:'do-gian-hang.html',kk:'kiem-ke.html',best:'bestseller.html',bc:'bao-cao.html',log:'nhat-ky.html',setting:'cai-dat.html'};
-const PAGE_TITLES={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',hd:'Kho lưu trữ hóa đơn',xh:'Xếp hàng',ghk:'Đồ gian hàng',kk:'Kiểm kê',best:'Bestseller',bc:'Báo cáo theo tháng',log:'Nhật ký hoạt động',setting:'Cài đặt'};
+const PAGE_MAP={dash:'index.html',tk:'ton-kho.html',nh:'nhap-hang.html',hd:'hoa-don.html',xh:'xep-hang.html',ghk:'do-gian-hang.html',kk:'kiem-ke.html',best:'bestseller.html',bc:'bao-cao.html',dt:'doanh-thu.html',log:'nhat-ky.html',setting:'cai-dat.html'};
+const PAGE_TITLES={dash:'Tổng quan',tk:'Tồn kho',nh:'Nhập hàng',hd:'Kho lưu trữ hóa đơn',xh:'Xếp hàng',ghk:'Đồ gian hàng',kk:'Kiểm kê',best:'Bestseller',bc:'Báo cáo theo tháng',dt:'Doanh thu',log:'Nhật ký hoạt động',setting:'Cài đặt'};
 function renderLogin(){
   const test=TAPHOA_ENV==='test';
   document.getElementById('login-mount').innerHTML=`
@@ -864,6 +1012,7 @@ function renderShell(activePage){
       <a href="${PAGE_MAP.kk}"${on('kk')} id="n-kk">${icon('clipboard')}<span>Kiểm kê</span></a>
       <a href="${PAGE_MAP.best}"${on('best')} id="n-best">${icon('trophy')}<span>Bestseller</span></a>
       <a href="${PAGE_MAP.bc}"${on('bc')} id="n-bc">${icon('bars')}<span>Báo cáo</span></a>
+      <a href="${PAGE_MAP.dt}"${on('dt')} id="n-dt">${icon('trendup')}<span>Doanh thu</span></a>
       <a href="${PAGE_MAP.log}"${on('log')} id="n-log">${icon('doc')}<span>Nhật ký</span></a>
       <a href="${PAGE_MAP.setting}"${on('setting')} id="n-setting">${icon('gear')}<span>Cài đặt</span></a>
     </nav>
@@ -877,10 +1026,17 @@ function renderShell(activePage){
   document.getElementById('topbar').innerHTML=`
     <div class="tb-left"><button id="mnu-btn" onclick="toggleMenu()" aria-label="Thu gọn / mở menu" title="Thu gọn / mở menu">☰</button><h1 id="ptitle">${PAGE_TITLES[activePage]||''}</h1>${TAPHOA_ENV==='test'?`<button onclick="if(confirm('Thoát chế độ TEST, quay lại dữ liệu THẬT?')){localStorage.setItem('taphoaEnv','prod');try{sessionStorage.removeItem('taphoaTestAuth')}catch(e){};location.href='${PAGE_MAP.dash}';}" title="Bấm để quay lại dữ liệu thật" style="margin-left:10px;background:#d03b3b;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;letter-spacing:.5px;cursor:pointer">● CHẾ ĐỘ TEST</button>`:''}</div>
     <div class="tb-right">
-      ${activePage==='dash'?`<button id="notif-bell" class="tb-bell" onclick="toggleStockAlert()" aria-label="Thông báo" title="Thông báo">${icon('bell',20)}<span class="notif-badge" id="notif-badge" hidden></span></button>`:''}
+      ${activePage==='dash'?`<span id="notif-user" class="tb-user"></span><button id="notif-bell" class="tb-bell" onclick="toggleStockAlert()" aria-label="Thông báo" title="Thông báo">${icon('bell',20)}<span class="notif-badge" id="notif-badge" hidden></span></button>`:''}
       <div id="acts"></div>
     </div>`;
   applySbState();
+  fillTopbarUser();
+}
+// Tên người đang đăng nhập hiện bên trái nút chuông (chỉ ở màn Tổng quan). Gọi lại sau khi C.USER tải xong
+// để đổi từ email trần sang tên thân thiện. Ẩn trên màn điện thoại (xem .tb-user trong style.css).
+function fillTopbarUser(){
+  const el=document.getElementById('notif-user');
+  if(el)el.textContent=currentUserName()||'';
 }
 // Mỗi file .html tự gọi bootPage('kk', function(){ loadKK(); }) ở cuối <script> của nó — 'kk' để biết
 // tô sáng đúng mục trong sidebar + đặt tiêu đề, còn hàm callback là bước tải dữ liệu riêng của màn đó,
@@ -901,7 +1057,8 @@ async function ensureLoai(){if(!C.LOAI.length)C.LOAI=await apiGet('LoaiHang');}
 // ── THÁNG DANH MỤC (dùng chung Nhập hàng / Xếp hàng / Kiểm kê / Kho hóa đơn) ───────────────────────
 // KHÔNG lưu ở sheet riêng: dropdown tự sinh sẵn tháng hiện tại ±3 tháng. Giá trị lưu vào CỘT CUỐI của
 // mỗi dòng là chuỗi "YYYY-MM" luôn. Các màn tạo mới BẮT BUỘC chọn 1 tháng.
-function dmFmt(ym){const m=/^(\d{4})-(\d{2})$/.exec(ym||'');return m?`Tháng ${+m[2]}/${m[1]}`:(ym||'');}
+// "2026-09" → "09/2026" (bỏ chữ "Tháng", dạng mm/yyyy đồng bộ với ngày dd/mm/yyyy)
+function dmFmt(ym){const m=/^(\d{4})-(\d{2})$/.exec(ym||'');return m?`${m[2]}/${m[1]}`:(ym||'');}
 function dmLabel(ym){return dmFmt(ym);}
 function dmNow(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 // Danh sách "YYYY-MM" có sẵn: 3 tháng tương lai → tháng này → 3 tháng quá khứ (mới nhất lên đầu)
@@ -982,11 +1139,10 @@ function dmForDate(dateStr){
   }
   return d.slice(0,7);
 }
-// Nhãn kỳ kèm khoảng ngày hiệu lực, VD: "Tháng 8/2026 (05/08/2026 → 04/09/2026)"
+// Nhãn kỳ kèm khoảng ngày hiệu lực, VD: "Tháng 8/2026 (5/8/2026 → 4/9/2026)"
 function dmFmtRange(ym){
   const r=dmRange(ym);
-  const vn=s=>s.split('-').reverse().join('/');
-  return `${dmFmt(ym)} (${vn(r.from)} → ${vn(r.to)})`;
+  return `${dmFmt(ym)} (${dVN(r.from)} → ${dVN(r.to)})`;
 }
 
 // ── INIT ── chạy trên MỌI trang: hiện màn "đang tải" trung tính ngay (không đợi Firebase tải xong), rồi
@@ -1008,7 +1164,9 @@ function dmFmtRange(ym){
       await loadSettings();
       const syncEl=document.getElementById('sync');
       if(syncEl)syncEl.innerHTML=`<span class="sync-dot ok"></span>Đã đồng bộ<small id="user-email-display">${esc(sess.name||sess.email)} · TEST</small>`;
+      fillTopbarUser();// C.USER đã có → đổi tên trên topbar từ email sang tên thân thiện
       if(__pageInit)__pageInit();
+      decorateDateInputs();// bọc lại các ô ngày (sau khi __pageInit set giá tri mặc định)
       autoPruneOldLogs();
       checkStockAlerts();// panel cảnh báo hết hàng / sắp hết hạn ở góc màn hình
     }else{
@@ -1043,7 +1201,9 @@ function dmFmtRange(ym){
       // trang (trước đây chỉ mỗi Tổng quan tự cập nhật dòng này, các trang khác luôn kẹt ở "Đang kết nối...")
       const syncEl=document.getElementById('sync');
       if(syncEl)syncEl.innerHTML=`<span class="sync-dot ok"></span>Đã đồng bộ<small id="user-email-display">${curRec?`${curRec[0]} · ${user.email}`:user.email}</small>`;
+      fillTopbarUser();// C.USER đã có → đổi tên trên topbar từ email sang tên thân thiện
       if(__pageInit)__pageInit();
+      decorateDateInputs();// bọc lại các ô ngày (sau khi __pageInit set giá tri mặc định)
       autoPruneOldLogs();// chạy ngầm, không chặn/chờ — dọn Nhật ký cũ hơn 30 ngày (tối đa 1 lần/ngày, xem hàm)
       checkStockAlerts();// panel cảnh báo hết hàng / sắp hết hạn ở góc màn hình (chạy ngầm)
     } else {

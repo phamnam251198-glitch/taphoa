@@ -2,9 +2,27 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Báo cáo theo tháng</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
+<style>
+/* Bộ lọc màn Báo cáo:
+   - HÀNG 1: toàn bộ ô lọc (khoảng ngày, chọn tháng, người nhập, tháng danh mục, Xóa lọc, Xem báo cáo)
+   - HÀNG 2: 2 nút "◀ Tháng trước" / "Tháng sau ▶"
+   Desktop: hàng 1 nằm gọn 1 dòng; điện thoại: tự xuống dòng. */
+.bc-filter{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.bc-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bc-r1>*{flex:0 1 auto}
+.bc-r1 .date-range{flex:0 1 auto}
+.bc-r2>.btn{flex:0 0 auto}
+.bc-r input,.bc-r select{padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none}
+@media (max-width:480px){
+  .bc-r1>*,.bc-r1 .dwrap,.bc-r1 select{flex:1 1 100%}
+  .bc-r1 .date-range{flex:1 1 100%}
+  .bc-r2>.btn{flex:1 1 46%}
+  .bc-r2>.btn-p{flex:1 1 100%}
+}
+</style>
 </head>
 <body>
 
@@ -18,26 +36,30 @@
   <div id="content">
 
     <div class="sec on" id="s-bc">
-      <div class="card">
-        <div class="ch"><h2>Bộ lọc thời gian</h2></div>
-        <div style="padding:14px 18px">
-          <div class="fr3">
-            <div class="fg"><label>Từ ngày</label><input type="date" id="bc-tu" onchange="loadBC()"></div>
-            <div class="fg"><label>Đến ngày</label><input type="date" id="bc-den" onchange="loadBC()"></div>
-            <div class="fg"><label>Hoặc chọn nhanh theo tháng</label><input type="month" id="bc-thang" onchange="bcSetMonth()"></div>
+      <details class="sb-wrap">
+      <summary class="sb-toggle">🔍 Tìm kiếm &amp; lọc</summary>
+      <div class="bc-filter">
+        <!-- HÀNG 1: toàn bộ ô lọc -->
+        <div class="bc-r bc-r1">
+          <div class="date-range">
+            <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+            <input type="date" id="bc-tu" onchange="loadBC()">
+            <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+            <input type="date" id="bc-den" onchange="loadBC()">
           </div>
-          <div class="fr3">
-            <div class="fg"><label>Người nhập</label><select id="bc-user" onchange="loadBC()"><option value="">Tất cả người nhập</option></select></div>
-            <div class="fg"><label>Tháng danh mục</label><select id="bc-dm" onchange="loadBC()"><option value="">— Tính theo ngày nhập —</option></select></div>
-          </div>
-          <div class="mf" style="border-top:none;padding-top:8px">
-            <button class="btn btn-g" onclick="bcShiftMonth(-1)">◀ Tháng trước</button>
-            <button class="btn btn-g" onclick="bcShiftMonth(1)">Tháng sau ▶</button>
-            <button class="btn btn-g" onclick="bcClearFilter()">✕ Xóa lọc</button>
-            <button class="btn btn-p" onclick="openBCChart()">📊 Xem báo cáo</button>
-          </div>
+          <input type="month" id="bc-thang" onchange="bcSetMonth()" title="Chọn nhanh theo tháng">
+          <select id="bc-user" onchange="loadBC()"><option value="">Tất cả người nhập</option></select>
+          <select id="bc-dm" onchange="loadBC()"><option value="">Tháng danh mục</option></select>
+          <button class="btn btn-g" onclick="bcClearFilter()">✕ Xóa lọc</button>
+        </div>
+        <!-- HÀNG 2: bước tháng + xem báo cáo -->
+        <div class="bc-r bc-r2">
+          <button class="btn btn-g" onclick="bcShiftMonth(-1)">◀ Tháng trước</button>
+          <button class="btn btn-g" onclick="bcShiftMonth(1)">Tháng sau ▶</button>
+          <button class="btn btn-p" onclick="openBCChart()">📊 Xem báo cáo</button>
         </div>
       </div>
+      </details>
       <div id="bc-sum"></div>
       <div class="card"><div class="ch"><h2 id="bc-tbl-title">Tổng tiền nhập theo Tháng danh mục</h2></div><div id="bc-tbl"><div class="ld"><div class="spin"></div></div></div></div>
     </div>
@@ -65,7 +87,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Báo cáo theo tháng ──
 // Khoảng ngày của 1 kỳ = cấu hình tùy chỉnh ở Cài đặt → tab "Tháng danh mục" (nếu có), không thì tháng dương lịch
@@ -110,7 +132,7 @@ async function loadBC(){
   const dmSel=document.getElementById('bc-dm');
   if(dmSel){
     const cur=dmSel.value;
-    dmSel.innerHTML='<option value="">— Tính theo ngày nhập —</option>'+dmFilterMonths(data.map(r=>r[10])).map(m=>`<option value="${m}"${m===cur?' selected':''}>${dmFmt(m)}</option>`).join('');
+    dmSel.innerHTML='<option value="">Tháng danh mục</option>'+dmFilterMonths(data.map(r=>r[10])).map(m=>`<option value="${m}"${m===cur?' selected':''}>${dmFmt(m)}</option>`).join('');
   }
   const from=document.getElementById('bc-tu').value;
   const to=document.getElementById('bc-den').value;
@@ -118,6 +140,7 @@ async function loadBC(){
   const dm=document.getElementById('bc-dm')?.value||'';
   const byDm=!!dm;// chọn Tháng danh mục → lọc theo TAG danhMucId đã lưu trên phiếu (cột 10), BỎ QUA khoảng ngày
   ['bc-tu','bc-den','bc-thang'].forEach(id=>{const e=document.getElementById(id);if(e)e.disabled=byDm;});
+  decorateDateInputs(document.getElementById('s-bc'));// đồng bộ lại ô hiện ngày kiểu VN sau khi đổi/khóa filter
   const filtered=data.filter(r=>{
     if(user&&(r[6]||'')!==user)return false;
     if(byDm)return(r[10]||'')===dm;
@@ -161,7 +184,7 @@ function openBCMonth(m){
   document.getElementById('bc-d-body').innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Ngày nhập</th><th>Người nhập</th><th>Sản phẩm</th><th>Số lượng</th><th>Giá nhập</th><th>Thành tiền</th></tr></thead><tbody>`+
     (lines.length?lines.map(it=>{
       const sl=Number(it[1]||0),gia=Number(it[2]||0);
-      return`<tr><td data-label="Ngày nhập">${esc((it[4]||'').split('-').reverse().join('/'))}</td><td data-label="Người nhập"><span class="bg bg-p">${esc(it[6]||'')}</span></td><td data-label="Sản phẩm">${esc(it[0]||'')}</td><td data-label="Số lượng">${fmt(sl)}</td><td data-label="Giá nhập">${fmt(gia)}đ</td><td data-label="Thành tiền"><b>${fmt(sl*gia)}đ</b></td></tr>`;
+      return`<tr><td data-label="Ngày nhập">${esc(dVN(it[4]))}</td><td data-label="Người nhập"><span class="bg bg-p">${esc(it[6]||'')}</span></td><td data-label="Sản phẩm">${esc(it[0]||'')}</td><td data-label="Số lượng">${fmt(sl)}</td><td data-label="Giá nhập">${fmt(gia)}đ</td><td data-label="Thành tiền"><b>${fmt(sl*gia)}đ</b></td></tr>`;
     }).join(''):`<tr><td colspan="6" style="text-align:center;color:var(--text2)">Không có dữ liệu</td></tr>`)+
     '</tbody></table></div>';
   om('m-bc-detail');

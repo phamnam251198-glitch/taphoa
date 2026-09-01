@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Tồn kho</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
 </head>
 <body>
 
@@ -68,14 +68,13 @@
       <div class="fg"><label>Giá nhập (đ)</label><input id="sp-gn" type="number" placeholder="0"></div>
       <div class="fg"><label>Giá bán (đ)</label><input id="sp-gb" type="number" placeholder="0"></div>
     </div>
-    <div class="fg"><label>Hạn sử dụng</label><input id="sp-hsd" type="date"></div>
     <div class="fr">
+      <div class="fg"><label>Hạn sử dụng</label><input id="sp-hsd" type="date"></div>
       <div class="fg"><label>Ngưỡng "Sắp hết" riêng</label><input id="sp-ng" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
-      <div class="fg"><label>Sắp hết hạn trong (ngày) riêng</label><input id="sp-hsdsap" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
     </div>
     <div class="fr">
+      <div class="fg"><label>Sắp hết hạn trong (ngày) riêng</label><input id="sp-hsdsap" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
       <div class="fg"><label>Gấp nếu còn ≤ (ngày) riêng</label><input id="sp-hsdgan" type="number" placeholder="Để trống = dùng mặc định ở Cài đặt"></div>
-      <div class="fg"></div>
     </div>
     <div class="fr">
       <div class="fg"><label>Nhà cung cấp</label><input id="sp-ncc" placeholder="Tên NCC" autocomplete="off"></div>
@@ -88,7 +87,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Tồn kho ──
 let selTK=new Set();
@@ -108,6 +107,13 @@ async function loadTK(){
   selTK.clear();updateTKSelUI();
   tkPageByLoai={};// tải mới hẳn thì reset về trang 1 cho mọi khối Loại hàng
   const data=await apiGet('TonKho');C.TK=data;
+  // Tự chữa dữ liệu: SL tồn không bao giờ được âm (xảy ra do vài thao tác cũ chưa chặn) → kéo về 0 & lưu lại
+  for(let i=0;i<data.length;i++){
+    if(Number(data[i][1]||0)<0){
+      const row=[...data[i]];row[1]=0;data[i]=row;C.TK[i]=row;
+      apiPost({sheet:'TonKho',action:'update',row:i+2,data:row}).catch(()=>{});
+    }
+  }
   const low=data.filter(r=>Number(r[1]||0)<=getSapHet(r));
   const al=document.getElementById('la');
   if(low.length){al.style.display='flex';document.getElementById('la-txt').textContent=low.length+' SP sắp hết: '+low.slice(0,4).map(r=>r[0]).join(', ')+(low.length>4?'...':'');}
@@ -177,7 +183,7 @@ function rTK(data){
         const gi=C.TK.indexOf(r);// vị trí thật trong C.TK, tránh lệch dòng khi đang lọc/sắp xếp
         const sl=Number(r[1]||0),gn=Number(r[3]||0);
         const chk=selTK.has(r[0])?'checked':'';
-        return`<tr class="row-edit" onclick="rowEdit(event,editSP,${gi+2})"><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${(page-1)*LIST_PAGE_SIZE+i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]||''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
+        return`<tr class="row-edit" onclick="rowEdit(event,editSP,${gi+2})"><td data-label=""><input type="checkbox" class="tk-chk" data-name="${esc(r[0])}" ${chk} onchange="toggleTKChk(this)"></td><td class="mobile-hide" data-label="STT">${(page-1)*LIST_PAGE_SIZE+i+1}</td><td class="mobile-hide" data-label="Mã SP">${r[9]?`<span class="bg bg-b">${r[9]}</span>`:''}</td><td data-label="Tên SP"><b>${r[0]}</b></td><td data-label="Tồn"><b>${sl}</b></td><td data-label="Giá nhập">${gn?fmt(gn)+'đ':''}</td><td class="mobile-hide" data-label="Hạn sử dụng">${r[5]?dVN(r[5]):''}</td><td data-label="Trạng thái">${statusBadge(r)}</td>
         <td data-label="" style="display:flex;gap:4px"><button class="btn btn-g btn-sm" onclick="editSP(${gi+2})">Sửa</button><button class="btn btn-d btn-sm" onclick="delSP(${gi+2})">Xóa</button></td></tr>`;
       }).join('');
       const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
@@ -288,7 +294,7 @@ async function saveSP(){
   if(!ma&&!er)ma=genNextMaSP();// SP mới mà chưa gõ mã → tự sinh, để luôn có khóa liên kết ổn định (không phụ thuộc tên nữa)
   if(!ma){toast('Thiếu Mã SP — không được để trống (sẽ làm hỏng liên kết với phiếu Nhập/Xếp hàng)','err');return;}
   if(C.TK.some((t,i)=>t[9]===ma&&String(i+2)!==er)){toast(`Mã SP "${ma}" đã được dùng cho sản phẩm khác`,'err');return;}
-  const row=[ten,document.getElementById('sp-sl').value||0,document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
+  const row=[ten,Math.max(0,Number(document.getElementById('sp-sl').value)||0),document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
   toast('Đang lưu...');
   await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
   logAction(er?'Cập nhật':'Tạo mới','Tồn kho',`Sản phẩm "${ten}", SL: ${row[1]}`);

@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Xếp hàng</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
 </head>
 <body>
 
@@ -52,12 +52,14 @@
   <div class="mb">
     <button class="modal-x" onclick="cm('m-xh')" aria-label="Đóng">✕</button>
     <h3 style="padding-right:28px">Tạo phiếu xếp hàng</h3>
-    <div class="fr3">
+    <div class="fr">
       <div class="fg"><label>Gian hàng *</label><select id="xh-gh"><option value="">-- Chọn --</option></select></div>
       <div class="fg"><label>Ngày xếp hàng</label><input id="xh-ngay" type="date"></div>
-      <div class="fg"><label>Ghi chú</label><input id="xh-gc" placeholder="Ghi chú thêm..."></div>
     </div>
-    <div class="fg"><label>Tháng danh mục *</label><select id="xh-dm" style="max-width:200px"><option value="">-- Chọn tháng --</option></select></div>
+    <div class="fr">
+      <div class="fg"><label>Ghi chú</label><input id="xh-gc" placeholder="Ghi chú thêm..."></div>
+      <div class="fg"><label>Tháng danh mục *</label><select id="xh-dm"><option value="">-- Chọn tháng --</option></select></div>
+    </div>
     <label style="font-size:11px;color:var(--text2);font-weight:500;display:block;margin-bottom:6px">Danh sách hàng xếp *</label>
     <table class="item-table">
       <thead><tr><th>Sản phẩm</th><th>Tồn kho</th><th>Số lượng</th><th></th></tr></thead>
@@ -78,14 +80,17 @@
   <div class="mb mb-lg">
     <button class="modal-x" onclick="cm('m-xh-day')" aria-label="Đóng">✕</button>
     <h3 id="xh-day-t" style="padding-right:28px">Phiếu xếp hàng ngày ...</h3>
-    <div class="fr3">
+    <div class="fr">
       <div class="fg"><label>Gian hàng</label><input id="xhd-h-gh" autocomplete="off" placeholder="(để trống: giữ nguyên)"></div>
       <div class="fg"><label>Ngày xếp hàng</label><input type="date" id="xhd-h-ngay"></div>
-      <div class="fg"><label>Ghi chú</label><input id="xhd-h-gc" placeholder="(để trống: giữ nguyên)"></div>
     </div>
-    <div class="fr3">
-      <div class="fg"><label>Tháng danh mục</label><select id="xhd-h-dm" style="max-width:200px"><option value="">— giữ nguyên từng dòng —</option></select></div>
+    <div class="fr">
+      <div class="fg"><label>Ghi chú</label><input id="xhd-h-gc" placeholder="(để trống: giữ nguyên)"></div>
+      <div class="fg"><label>Tháng danh mục</label><select id="xhd-h-dm"><option value="">— giữ nguyên từng dòng —</option></select></div>
+    </div>
+    <div class="fr">
       <div class="fg"><label>Tìm nhanh trong phiếu</label><input type="text" id="xh-day-q" placeholder="🔍 lọc theo tên SP..." oninput="renderXHDayDetail()"></div>
+      <div class="fg"></div>
     </div>
     <label style="font-size:11px;color:var(--text2);font-weight:500;display:block;margin:4px 0 6px">Danh sách hàng xếp trong ngày *</label>
     <div id="xh-day-tbl"></div>
@@ -110,7 +115,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Xếp hàng ──
 let xhRowCount=0;
@@ -276,7 +281,7 @@ function openXHMonth(m){
     <div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="xh-selall" onchange="toggleAllXH(this)"></th><th>Ngày xếp</th><th>Số SP</th><th>Tổng SL</th><th class="mobile-hide">Gian hàng</th></tr></thead><tbody>`+
     days.map(g=>{
       const chk=selXH.has(g.ngay)?'checked':'';
-      return`<tr style="cursor:pointer" onclick="cm('m-xh-month');openXHDay('${esc(g.ngay)}')"><td data-label="" onclick="event.stopPropagation()"><input type="checkbox" class="xh-chk" data-ngay="${esc(g.ngay)}" ${chk} onchange="toggleXHChk(this)"></td><td data-label="Ngày xếp"><b>${esc(g.ngay)}</b></td><td data-label="Số SP">${g.soSP}</td><td data-label="Tổng SL">${fmt(g.tongSL)}</td><td class="mobile-hide" data-label="Gian hàng">${g.gianHang.map(n=>`<span class="bg bg-p">${esc(n)}</span>`).join(' ')}</td></tr>`;
+      return`<tr style="cursor:pointer" onclick="cm('m-xh-month');openXHDay('${esc(g.ngay)}')"><td data-label="" onclick="event.stopPropagation()"><input type="checkbox" class="xh-chk" data-ngay="${esc(g.ngay)}" ${chk} onchange="toggleXHChk(this)"></td><td data-label="Ngày xếp"><b>${esc(dVN(g.ngay))}</b></td><td data-label="Số SP">${g.soSP}</td><td data-label="Tổng SL">${fmt(g.tongSL)}</td><td class="mobile-hide" data-label="Gian hàng">${g.gianHang.map(n=>`<span class="bg bg-p">${esc(n)}</span>`).join(' ')}</td></tr>`;
     }).join('')+'</tbody></table></div>';
   updateSelUI('xh-month-delsel','xh-month-selcnt',selXH.size);
   updateXHSelAllTri();
@@ -423,7 +428,7 @@ function renderXHDayDetail(){
   if(!wrap)return;
   cleanupSearchLists(wrap);// dọn menu gợi ý cũ trước khi ghi đè innerHTML bên dưới
   const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
-  document.getElementById('xh-day-t').textContent='Phiếu xếp hàng ngày '+(xhDayCurrent||'');
+  document.getElementById('xh-day-t').textContent='Phiếu xếp hàng ngày '+dVN(xhDayCurrent||'');
   const tongSL=items.reduce((s,r)=>s+Number(r[1]||0),0);
   const soGH=new Set(items.map(r=>r[2]).filter(Boolean)).size;
   const totalBar=document.getElementById('xh-day-total');
@@ -483,7 +488,7 @@ async function saveXHCreateCore(spIdx,sl,gh,ngay,gc,dm){
 async function delXHDay(){
   const idxs=C.XH.map((r,i)=>i).filter(i=>(C.XH[i][3]||'(chưa có ngày)')===xhDayCurrent).sort((a,b)=>b-a);
   if(!idxs.length){toast('Không có phiếu nào để xóa','err');return;}
-  confirmDel(`Xóa toàn bộ phiếu xếp ngày ${xhDayCurrent} (${idxs.length} dòng)? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
+  confirmDel(`Xóa toàn bộ phiếu xếp ngày ${dVN(xhDayCurrent)} (${idxs.length} dòng)? Tồn kho sẽ được hoàn lại tương ứng.`,async()=>{
     toast('Đang xóa '+idxs.length+' dòng...');
     const delNames=[];
     for(const idx of idxs){
@@ -498,8 +503,8 @@ async function delXHDay(){
         C.TK[spIdx][1]=newSL;
       }
     }
-    logAction('Xóa','Xếp hàng',`Xóa cả phiếu ngày ${xhDayCurrent} (${delNames.length} dòng): ${delNames.join(', ')}`);
-    toast('Đã xóa phiếu xếp ngày '+xhDayCurrent+'!');
+    logAction('Xóa','Xếp hàng',`Xóa cả phiếu ngày ${dVN(xhDayCurrent)} (${delNames.length} dòng): ${delNames.join(', ')}`);
+    toast('Đã xóa phiếu xếp ngày '+dVN(xhDayCurrent)+'!');
     cm('m-xh-day');
     setTimeout(loadXH,800);
   });
@@ -535,7 +540,7 @@ async function saveXHDayAll(){
     if(!res.ok){toast(`Dòng mới: ${res.msg}`,'err');return;}
     created.push(`${C.TK[spIdx][0]} x${sl}`);
   }
-  if(created.length)logAction('Tạo mới','Xếp hàng',`Thêm vào ngày ${xhDayCurrent}: ${created.join(', ')}`);
+  if(created.length)logAction('Tạo mới','Xếp hàng',`Thêm vào ngày ${dVN(xhDayCurrent)}: ${created.join(', ')}`);
   toast('Đã lưu tất cả thay đổi!');
   cm('m-xh-day');
   setTimeout(loadXH,800);

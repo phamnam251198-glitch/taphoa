@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Tổng quan</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
   <div id="content">
 
     <div class="sec on" id="s-dash">
-      <div class="grid3">
+      <div class="grid3 dash-kpis">
         <div class="kpi-card kpi-red" style="cursor:pointer" onclick="openDashList('het')" title="Bấm để xem danh sách"><div class="kpi-ic" id="dash-ic-het"></div><div class="kpi-body"><div class="lb">Hết hàng</div><div class="val" id="d-het">—</div></div></div>
         <div class="kpi-card kpi-orange" style="cursor:pointer" onclick="openDashList('sap')" title="Bấm để xem danh sách"><div class="kpi-ic" id="dash-ic-sap"></div><div class="kpi-body"><div class="lb">Sắp hết</div><div class="val" id="d-sh">—</div></div></div>
         <div class="kpi-card kpi-green" style="cursor:pointer" onclick="openDashList('hsd')" title="Bấm để xem danh sách"><div class="kpi-ic" id="dash-ic-hsd"></div><div class="kpi-body"><div class="lb">Sắp hết hạn</div><div class="val" id="d-hsd">—</div></div></div>
@@ -66,7 +66,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Tổng quan ──
 let dashLow=[],dashHet=[],dashExp=[],dashSap=[];
@@ -118,7 +118,7 @@ async function loadDash(){
     exp.map(r=>{
       const daysLeft=daysLeftOf(r);
       const badge=daysLeft<0?'<span class="bg bg-r">Đã hết hạn</span>':daysLeft<=getHsdGan(r)?`<span class="bg bg-r">Còn ${daysLeft} ngày</span>`:`<span class="bg bg-y">Còn ${daysLeft} ngày</span>`;
-      return`<tr><td>${r[0]}</td><td>${r[5]}</td><td>${badge}</td></tr>`;
+      return`<tr><td>${r[0]}</td><td>${dVN(r[5])}</td><td>${badge}</td></tr>`;
     }).join('')+'</tbody></table></div>';
   renderDashChart(tk);
   // 3 lượt đọc độc lập → tải song song (XepHang / KiemKe / kỳ Bestseller đã lưu)

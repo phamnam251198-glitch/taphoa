@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Cài đặt</title>
-<link rel="stylesheet" href="style.css?v=20260831g">
+<link rel="stylesheet" href="style.css?v=20260901bg">
 </head>
 <body>
 
@@ -211,7 +211,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260831g"></script>
+<script src="app.js?v=20260901bg"></script>
 <script>
 // ── JS riêng cho màn Cài đặt ──
 function goSetTab(name){
@@ -746,9 +746,8 @@ async function loadDmKyTab(){
     months.map(ym=>{
       const c=DM_KY[ym]||{};
       const cal=dmCalRange(ym);
-      const vn=s=>s.split('-').reverse().join('/');
       const custom=!!(c.tu&&c.den);
-      const hint=custom?'':` <span style="color:var(--text2);font-size:11px">(mặc định ${vn(cal.from)} → ${vn(cal.to)})</span>`;
+      const hint=custom?'':` <span style="color:var(--text2);font-size:11px">(mặc định ${dVN(cal.from)} → ${dVN(cal.to)})</span>`;
       return `<tr>
         <td data-label="Kỳ"><b>${dmFmt(ym)}</b>${hint}</td>
         <td data-label="Từ ngày"><input type="date" id="dmky-tu-${ym}" value="${c.tu||''}"></td>

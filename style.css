@@ -1,4 +1,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
+/* Chặn phóng to màn hình bằng cử chỉ (pinch / double-tap) — vẫn cuộn ngang/dọc bình thường.
+   Kèm meta viewport maximum-scale=1 + chặn 'gesturestart' trong app.js (iOS bỏ qua user-scalable=no). */
+html,body{touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 :root{--bg:#f0f2f5;--sidebar:#1e2736;--white:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;--radius:10px;--shadow:0 3px 10px rgba(15,23,42,0.09),0 1px 2px rgba(15,23,42,0.06)}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px}
 
@@ -155,7 +158,9 @@ tr.row-edit:hover td{background:#eef4ff}
 .btn-g{background:#f8fafc;color:var(--text2);border:1px solid var(--border);--btn-deep:#cbd5e1}.btn-g:hover{background:#eef2f7}
 .btn-d{background:#fee2e2;color:#991b1b;border:none;--btn-deep:#fca5a5}.btn-d:hover{background:#fecaca}
 .btn-sm{padding:4px 9px;font-size:12px}
-.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;align-items:center;justify-content:center}
+/* z-index 140: PHẢI cao hơn #topbar cố định trên mobile (z-index 120) và #stock-alert (130) để popup
+   không bị thanh tiêu đề che mất phần đầu (nút ✕ + tiêu đề). Vẫn dưới #m-hd-add(150)/.hd-lb(200)/#sb(200). */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:140;align-items:center;justify-content:center}
 .mo.on{display:flex}
 .mb{background:#fff;border-radius:12px;padding:22px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .modal-x{position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:var(--bg);border-radius:50%;font-size:14px;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
@@ -167,6 +172,28 @@ tr.row-edit:hover td{background:#eef4ff}
 .fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500}
 .fg input,.fg select,.fg textarea{width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none}
 .fg input:focus,.fg select:focus{border-color:var(--blue)}
+/* Chữ gợi ý (placeholder) của MỌI ô nhập: cỡ nhỏ cho gọn (input trên mobile bị ép 16px chống zoom) */
+input::placeholder,textarea::placeholder{font-size:12px!important;opacity:.7}
+/* ── Ô chọn ngày bọc lại: hiện "01/09/2026" thay cho chữ ngày mặc định của trình duyệt (iOS: "1 thg 9, 2026").
+   CÁCH LÀM (an toàn cho iOS — mở lịch bình thường): ô <input type=date> THẬT vẫn nằm trong luồng, bấm được,
+   chỉ ẩn CHỮ của nó (color:transparent). Ô .ddisp phủ LÊN TRÊN chỉ để hiện chữ đã định dạng, pointer-events:none
+   nên chạm xuyên qua nó tới ô date bên dưới → lịch vẫn bung. ── */
+.dwrap{position:relative;display:block;box-sizing:border-box}
+.dwrap>input[type="date"],.dwrap>input[type="month"]{width:100%;box-sizing:border-box;padding:7px 11px;
+  border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none;
+  color:transparent;-webkit-text-fill-color:transparent}
+.dwrap>input[type="date"]:focus,.dwrap>input[type="month"]:focus{border-color:var(--blue)}
+.dwrap>input[type="date"]::-webkit-date-and-time-value{color:transparent}
+.dwrap>input:disabled{background:var(--bg)}
+.dwrap>.ddisp{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;box-sizing:border-box;
+  padding:7px 11px;border:0;background:transparent;font-size:13px;color:var(--text);outline:none;pointer-events:none}
+.dwrap>input:disabled ~ .ddisp{color:var(--text2)}
+/* ô ngày bọc nằm trong bảng nhập nhiều dòng (.item-table) → gọn lại cho khớp các ô cùng hàng */
+.item-table td .dwrap>input[type="date"],.item-table td .dwrap>.ddisp{padding:5px 8px;font-size:12px;border-radius:6px}
+.item-table td .dwrap{min-width:110px}
+/* trong thanh .sb / khối khoảng ngày: ô ngày bọc cũng phải co giãn như các input khác */
+.sb>.dwrap{flex:1;min-width:140px}
+.date-range .dwrap{flex:1;min-width:0}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
 .mf{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
@@ -220,6 +247,9 @@ tr.row-edit:hover td{background:#eef4ff}
 
 /* ── Nút chuông thông báo ở góc phải thanh tiêu đề ── */
 .tb-right{display:flex;align-items:center;gap:8px}
+.tb-user{font-size:13px;font-weight:600;color:var(--text2);max-width:180px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:480px){.tb-user{display:none}}/* màn điện thoại: ẩn tên cho gọn */
 .tb-bell{position:relative;width:36px;height:36px;flex-shrink:0;border:1px solid var(--border);background:#fff;
   border-radius:9px;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;
   padding:0;transition:background .15s,color .15s,border-color .15s}
@@ -343,6 +373,8 @@ tr.row-edit:hover td{background:#eef4ff}
      Ép về đúng 16px CHỈ ở mobile (desktop giữ nguyên kích thước gọn cũ) để tắt hẳn hành vi zoom này —
      dùng !important vì có nhiều rule cụ thể hơn (.fg input, .sb input, .item-table td input...) đang tự set font-size riêng. */
   input,select,textarea{font-size:16px!important}
+  /* placeholder giữ cỡ nhỏ dù ô nhập bị ép 16px (rule chung ở trên, nhắc lại cho chắc trên mobile) */
+  input::placeholder,textarea::placeholder{font-size:12px!important}
 
   /* Sidebar cố định 215px không dùng được trên điện thoại
      → ẩn đi, thay bằng nút hamburger (☰) ở topbar; bấm vào mới trượt ra toàn bộ menu */
@@ -368,9 +400,17 @@ tr.row-edit:hover td{background:#eef4ff}
   .date-range label{display:none}
   .date-range{gap:8px}
 
-  /* Lưới card TO (biểu đồ/bảng/dropdown bên trong — .grid3 dùng ở Tổng quan, .grid2 hiện chưa dùng chỗ nào)
-     → vẫn xếp dọc 1 cột, ép 2 cột sẽ làm bẹp dúm nội dung bên trong không đọc được */
-  .grid3,.grid2{grid-template-columns:1fr}
+  /* Lưới card TO ở Tổng quan (biểu đồ/bảng/dropdown bên trong) → vẫn xếp dọc 1 cột, ép 2 cột sẽ bẹp dúm.
+     .grid2 (cặp field trong form/modal) thì NGƯỢC LẠI: giữ 2 ô/1 dòng — xem khối "form 2 cột" bên dưới. */
+  .grid3{grid-template-columns:1fr}
+  /* NGOẠI LỆ: 3 ô KPI ở Tổng quan (Hết hàng / Sắp hết / Sắp hết hạn) — giữ 3 cột trên 1 hàng, icon lên
+     trên chữ cho vừa bề ngang màn điện thoại */
+  .dash-kpis{grid-template-columns:repeat(3,1fr);gap:8px}
+  .dash-kpis .kpi-card{flex-direction:column;align-items:flex-start;gap:6px;padding:10px 9px}
+  .dash-kpis .kpi-ic{width:30px;height:30px;border-radius:8px}
+  .dash-kpis .kpi-ic svg{width:15px;height:15px}
+  .dash-kpis .kpi-body .lb{font-size:11px;white-space:normal}
+  .dash-kpis .kpi-body .val{font-size:20px}
   /* Lưới Ô THỐNG KÊ nhỏ (số + nhãn, VD "Tổng sản phẩm"/"Hết hàng" ở Tổng quan, hoặc "Tổng SL"/"Tổng tiền"
      ở các màn Nhập/Xếp/Kiểm kê/Báo cáo) → xếp 2 cột cho gọn thay vì mỗi ô 1 dòng dài lê thê phải cuộn nhiều */
   .grid4,.stat-grid3{grid-template-columns:1fr 1fr;gap:10px}
@@ -381,9 +421,11 @@ tr.row-edit:hover td{background:#eef4ff}
   .kpi-ic svg{width:16px;height:16px}
   .kpi-body .val{font-size:19px}
 
-  /* Thanh công cụ tìm kiếm/lọc: mỗi ô full-width, xếp dọc cho dễ chạm */
+  /* Thanh tìm kiếm & lọc: 2 mục / 1 dòng (mỗi mục nửa chiều ngang). Riêng ô tìm kiếm dạng chữ và khối
+     khoảng ngày "Từ–Đến" vẫn để nguyên full-width (1 dòng riêng) vì cần chỗ để gõ / chứa 2 ô ngày. */
   .sb{gap:8px}
-  .sb>*{flex:1 1 100%}
+  .sb>*{flex:1 1 calc(50% - 4px);min-width:0}
+  .sb>input,.sb>.date-range{flex-basis:100%}
 
   /* Khối tìm kiếm/lọc (search + số dòng...) gấp lại mặc định, bấm mới mở ra — đỡ chiếm chỗ màn hình nhỏ */
   .sb-wrap{margin-bottom:14px}
@@ -394,9 +436,15 @@ tr.row-edit:hover td{background:#eef4ff}
   .sb-toggle::after{content:'▾';color:var(--text2);transition:transform .2s}
   details:not([open])>.sb-toggle::after{transform:rotate(-90deg)}
 
-  /* Modal: bớt padding, các cặp field 2-3 cột → xếp dọc 1 cột */
-  .mb{padding:16px;width:94vw;border-radius:10px}
-  .fr,.fr3{grid-template-columns:1fr}
+  /* Popup LUÔN nằm DƯỚI thanh tiêu đề cố định (48px): ghim mép trên popup ngay dưới header, popup cao lên
+     thì tự cuộn BÊN TRONG chứ không bị đẩy lên chạm/che bởi menu top. */
+  .mo:not(.hd-lb){align-items:flex-start}
+  .mb{padding:16px;width:94vw;border-radius:10px;margin-top:56px;
+     max-height:calc(100vh - 68px);max-height:calc(100dvh - 68px)}
+  .fr,.fr3,.grid2{grid-template-columns:1fr 1fr;gap:10px}
+  /* select nằm trong hàng 2 cột thì lấp đầy nửa cột; select đứng riêng (.fg) vẫn giữ max-width của nó
+     để không kéo dài hết bề ngang màn hình */
+  .fr select,.fr3 select,.grid2 select{max-width:none!important}
 
   /* ── Mọi bảng danh sách (.m-tbl): chuyển từ bảng ngang sang danh sách dạng card,
      tránh phải cuộn ngang khó dùng trên điện thoại. Chỉ hiện tối đa 4 trường quan trọng
