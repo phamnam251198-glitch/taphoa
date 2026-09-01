@@ -5,7 +5,12 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
-      "README.md"
+      "README.md",
+      "PROJECT_CONTEXT.md",
+      "tests/**",
+      "*.mjs",
+      "wipe-all.js",
+      "test-data-*.js"
     ]
   }
 }
