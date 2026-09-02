@@ -81,16 +81,12 @@
     <button class="modal-x" onclick="cm('m-xh-day')" aria-label="Đóng">✕</button>
     <h3 id="xh-day-t" style="padding-right:28px">Phiếu xếp hàng ngày ...</h3>
     <div class="fr">
-      <div class="fg"><label>Gian hàng</label><input id="xhd-h-gh" autocomplete="off" placeholder="(để trống: giữ nguyên)"></div>
-      <div class="fg"><label>Ngày xếp hàng</label><input type="date" id="xhd-h-ngay"></div>
-    </div>
-    <div class="fr">
-      <div class="fg"><label>Ghi chú</label><input id="xhd-h-gc" placeholder="(để trống: giữ nguyên)"></div>
-      <div class="fg"><label>Tháng danh mục</label><select id="xhd-h-dm"><option value="">— giữ nguyên từng dòng —</option></select></div>
-    </div>
-    <div class="fr">
-      <div class="fg"><label>Tìm nhanh trong phiếu</label><input type="text" id="xh-day-q" placeholder="🔍 lọc theo tên SP..." oninput="renderXHDayDetail()"></div>
+      <div class="fg"><label>Tìm nhanh trong phiếu</label><input type="text" id="xh-day-q" placeholder="🔍 lọc theo tên SP, gian hàng..." oninput="renderXHDayDetail()"></div>
       <div class="fg"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Ngày xếp hàng</label><input type="date" id="xhd-h-ngay"></div>
+      <div class="fg"><label>Tháng danh mục</label><select id="xhd-h-dm"><option value="">— giữ nguyên từng dòng —</option></select></div>
     </div>
     <label style="font-size:11px;color:var(--text2);font-weight:500;display:block;margin:4px 0 6px">Danh sách hàng xếp trong ngày *</label>
     <div id="xh-day-tbl"></div>
@@ -411,17 +407,14 @@ async function openXHDay(ngay){
   renderXHDayDetail();
   om('m-xh-day');
 }
-// 4 ô "áp cho mọi dòng" ở đầu popup: mọi dòng cùng giá trị → điền sẵn; khác nhau → để trống (lưu thì giữ nguyên riêng)
+// 2 ô "áp cho mọi dòng" còn lại ở đầu popup (Ngày xếp hàng, Tháng danh mục): mọi dòng cùng giá trị → điền sẵn.
+// (Đã bỏ "Gian hàng" và "Ghi chú" khỏi đây — để giá trị quên xóa sẽ vô tình ghi đè MỌI dòng khi Lưu, kể cả
+// các dòng khác nhóm đang gộp hiển thị riêng bên dưới. Muốn sửa gian hàng riêng từng dòng thì sửa trực tiếp
+// ở ô Gian hàng của dòng đó.)
 function xhDayFillHeader(items){
   const one=idx=>{const s=[...new Set(items.map(r=>r[idx]||''))];return s.length===1?s[0]:'';};
-  const multi=idx=>new Set(items.map(r=>r[idx]||'')).size>1;
-  document.getElementById('xhd-h-gh').value=one(2);
   document.getElementById('xhd-h-ngay').value=one(3)||xhDayCurrent||'';
-  document.getElementById('xhd-h-gc').value=one(4);
   dmFillSelect(document.getElementById('xhd-h-dm'),one(6));
-  document.getElementById('xhd-h-gh').placeholder=multi(2)?'(nhiều giá trị — để trống: giữ nguyên)':'(để trống: giữ nguyên)';
-  document.getElementById('xhd-h-gc').placeholder=multi(4)?'(nhiều giá trị — để trống: giữ nguyên)':'(để trống: giữ nguyên)';
-  attachSearchList(document.getElementById('xhd-h-gh'),()=>C.GH.map(g=>g[0]));
 }
 function renderXHDayDetail(){
   const wrap=document.getElementById('xh-day-tbl');
@@ -434,39 +427,77 @@ function renderXHDayDetail(){
   const totalBar=document.getElementById('xh-day-total');
   totalBar.innerHTML=items.length?`<span>Số dòng: <b>${items.length}</b></span><span>Tổng SL: <b>${fmt(tongSL)}</b></span><span>Số gian hàng: <b>${soGH}</b></span>`:'';
   totalBar.style.display=items.length?'flex':'none';
-  // Ô "Tìm nhanh trong phiếu" chỉ lọc dòng HIỂN THỊ (gian hàng/ngày/ghi chú/tháng đã đưa lên header)
+  // Ô "Tìm nhanh trong phiếu" lọc dòng HIỂN THỊ theo tên sản phẩm hoặc tên gian hàng
   const q=(document.getElementById('xh-day-q')?.value||'').trim().toLowerCase();
-  const shown=items.filter(r=>!q||(r[0]||'').toLowerCase().includes(q));
-  const rowsHtml=shown.map(r=>{
+  const shown=items.filter(r=>!q||(r[0]||'').toLowerCase().includes(q)||(r[2]||'').toLowerCase().includes(q));
+  const rowHtml=r=>{
     const gi=C.XH.indexOf(r);const row=gi+2;
+    const sp=C.TK.find(t=>t[0]===r[0]);
+    const ton=sp?Number(sp[1]||0):null;
+    const tonHtml=ton===null?'—':`<b style="color:${ton<=0?'#d03b3b':'var(--text)'}">${fmt(ton)}</b>`;
     return`<tr>
-      <td><input id="xhd-sp-${row}" value="${esc(r[0])}" autocomplete="off" style="min-width:170px"></td>
-      <td><input type="number" id="xhd-sl-${row}" value="${r[1]||0}" style="width:80px"></td>
+      <td><input id="xhd-sp-${row}" value="${esc(r[0])}" autocomplete="off" oninput="xhdFillTon('${row}')" style="min-width:170px"></td>
+      <td id="xhd-ton-${row}" style="text-align:center;color:var(--text2);font-size:12px;white-space:nowrap">${tonHtml}</td>
+      <td><input type="number" min="0" id="xhd-sl-${row}" value="${r[1]||0}" style="width:80px"></td>
+      <td><input id="xhd-gh-${row}" value="${esc(r[2]||'')}" autocomplete="off" style="min-width:120px"></td>
       <td class="td-del"><button class="btn btn-d btn-sm" onclick="delXH(${row})">✕</button></td>
     </tr>`;
+  };
+  // Gộp các dòng đã có theo Gian hàng — mỗi gian hàng 1 bảng riêng, dễ theo dõi khi 1 ngày xếp cho nhiều gian hàng
+  const groups=new Map();
+  shown.forEach(r=>{
+    const gh=r[2]||'(chưa có gian hàng)';
+    if(!groups.has(gh))groups.set(gh,[]);
+    groups.get(gh).push(r);
+  });
+  const ghNames=[...groups.keys()].sort((a,b)=>a==='(chưa có gian hàng)'?1:b==='(chưa có gian hàng)'?-1:a.localeCompare(b));
+  const groupsHtml=ghNames.map(gh=>{
+    const its=groups.get(gh);
+    const slGroup=its.reduce((s,r)=>s+Number(r[1]||0),0);
+    return`<div class="xhd-gh-group">
+      <div class="xhd-gh-title">🏬 ${esc(gh)}<span class="acc-cnt">${its.length} dòng · SL: ${fmt(slGroup)}</span></div>
+      <table class="item-table"><thead><tr><th>Sản phẩm</th><th>Tồn kho</th><th>Số lượng</th><th>Gian hàng</th><th></th></tr></thead><tbody>${its.map(rowHtml).join('')}</tbody></table>
+    </div>`;
   }).join('');
   let emptyMsg='';
   if(!items.length)emptyMsg='<div class="empty">Không còn phiếu nào trong ngày này — bấm "+ Thêm sản phẩm" để thêm mới</div>';
   else if(!shown.length)emptyMsg=`<div class="empty">Không có dòng nào khớp với ô tìm</div>`;
-  wrap.innerHTML=`<div class="scroll-tbl"><table class="item-table"><thead><tr>
-    <th>Sản phẩm</th><th>Số lượng</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`+emptyMsg;
+  wrap.innerHTML=`<div class="scroll-tbl">${groupsHtml}
+    <div class="xhd-gh-group"><div class="xhd-gh-title">➕ Dòng mới thêm</div>
+      <table class="item-table"><thead><tr><th>Sản phẩm</th><th>Tồn kho</th><th>Số lượng</th><th>Gian hàng</th><th></th></tr></thead><tbody id="xh-day-new-tbody"></tbody></table>
+    </div></div>`+emptyMsg;
   wrap.querySelectorAll('[id^="xhd-sp-"]').forEach(el=>attachSearchList(el,()=>C.TK.map(t=>t[0])));
+  wrap.querySelectorAll('[id^="xhd-gh-"]').forEach(el=>attachSearchList(el,()=>C.GH.map(g=>g[0])));
 }
 // Thêm 1 dòng TRỐNG (chưa lưu) vào popup để xếp thêm sản phẩm mới cho đúng ngày này
 let xhDayNewCount=0;
 function addXHDayRow(){
-  const tbody=document.querySelector('#xh-day-tbl tbody');
+  const tbody=document.getElementById('xh-day-new-tbody');// bảng "Dòng mới thêm" riêng, tránh lẫn vào các bảng gộp theo gian hàng
   if(!tbody)return;
   xhDayNewCount++;
   const id='new'+xhDayNewCount;
   const tr=document.createElement('tr');
   tr.dataset.new='1';tr.dataset.tempId=id;
   tr.innerHTML=`
-    <td><input id="xhd-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." style="min-width:170px"></td>
-    <td><input type="number" id="xhd-sl-${id}" placeholder="0" style="width:80px"></td>
+    <td><input id="xhd-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." oninput="xhdFillTon('${id}')" style="min-width:170px"></td>
+    <td id="xhd-ton-${id}" style="text-align:center;color:var(--text2);font-size:12px;white-space:nowrap">—</td>
+    <td><input type="number" min="0" id="xhd-sl-${id}" placeholder="0" style="width:80px"></td>
+    <td><input id="xhd-gh-${id}" autocomplete="off" placeholder="(để trống: theo ô Gian hàng ở trên)" style="min-width:150px"></td>
     <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(this.closest('tr'))">✕</button></td>`;
   tbody.appendChild(tr);
   attachSearchList(document.getElementById('xhd-sp-'+id),()=>C.TK.map(t=>t[0]));
+  attachSearchList(document.getElementById('xhd-gh-'+id),()=>C.GH.map(g=>g[0]));
+}
+// Hiện tồn kho hiện có của SP đang chọn ở dòng mới thêm trong popup theo ngày (giống modal Tạo phiếu xếp hàng)
+function xhdFillTon(id){
+  const spEl=document.getElementById('xhd-sp-'+id),cell=document.getElementById('xhd-ton-'+id);
+  if(!spEl||!cell)return;
+  const sp=C.TK.find(t=>t[0]===spEl.value.trim());
+  if(sp){
+    const t=Number(sp[1]||0);
+    cell.innerHTML=`<b style="color:${t<=0?'#d03b3b':'var(--text)'}">${fmt(t)}</b>`;
+    const slEl=document.getElementById('xhd-sl-'+id);if(slEl)slEl.max=t;
+  }else cell.textContent='—';
 }
 // Tạo mới 1 dòng Xếp hàng (dùng cho dòng vừa "+ Thêm" trong popup theo ngày) — cùng logic trừ tồn kho như saveXH()
 async function saveXHCreateCore(spIdx,sl,gh,ngay,gc,dm){
@@ -511,9 +542,7 @@ async function delXHDay(){
 }
 async function saveXHDayAll(){
   toast('Đang lưu...');
-  const hGh=document.getElementById('xhd-h-gh').value.trim();
   const hNgay=document.getElementById('xhd-h-ngay').value;
-  const hGc=document.getElementById('xhd-h-gc').value.trim();
   const hDm=document.getElementById('xhd-h-dm').value;
   const items=C.XH.filter(r=>(r[3]||'(chưa có ngày)')===xhDayCurrent);
   for(const r of items){
@@ -523,7 +552,8 @@ async function saveXHDayAll(){
     const old=C.XH[row-2];
     const spIdx=C.TK.findIndex(t=>t[0]===spEl.value);
     const sl=Number(document.getElementById('xhd-sl-'+row).value||0);
-    const res=await saveXHEditCore(row,spIdx,sl,hGh||old[2]||'',hNgay||old[3]||'',hGc||old[4]||'',hDm||old[6]||'');
+    const rowGh=document.getElementById('xhd-gh-'+row)?.value.trim()||old[2]||'';
+    const res=await saveXHEditCore(row,spIdx,sl,rowGh,hNgay||old[3]||'',old[4]||'',hDm||old[6]||'');
     if(!res.ok){toast(`Dòng "${r[0]}": ${res.msg}`,'err');return;}
   }
   const newTrs=[...document.querySelectorAll('#xh-day-tbl tbody tr[data-new="1"]')];
@@ -536,7 +566,8 @@ async function saveXHDayAll(){
     const sl=Number(document.getElementById('xhd-sl-'+id).value||0);
     if(!spVal&&!sl)continue;// dòng để trống hoàn toàn (bấm + Thêm nhưng không gõ gì), bỏ qua
     const spIdx=C.TK.findIndex(t=>t[0]===spVal);
-    const res=await saveXHCreateCore(spIdx,sl,hGh,nNgay,hGc,nDm);
+    const rowGh=document.getElementById('xhd-gh-'+id)?.value.trim()||'';
+    const res=await saveXHCreateCore(spIdx,sl,rowGh,nNgay,'',nDm);
     if(!res.ok){toast(`Dòng mới: ${res.msg}`,'err');return;}
     created.push(`${C.TK[spIdx][0]} x${sl}`);
   }

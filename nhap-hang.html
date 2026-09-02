@@ -237,22 +237,32 @@ async function saveNH(){
   const hlRow=(el,on)=>{const tr=el&&el.closest('tr');if(tr)tr.querySelectorAll('td').forEach(td=>td.style.background=on?'#f5b0b0':'');};
   const spEls=[...document.querySelectorAll('#nh-rows [id^="nh-sp-"]')];
   spEls.forEach(el=>hlRow(el,false));
+  // Chỉ chặn khi trùng CẢ tên lẫn giá nhập (nhập nhầm y hệt) — cùng tên nhưng KHÁC giá nhập thì cho lưu
+  // (thực tế nhập cùng 1 sản phẩm nhiều đợt/nhiều đơn giá khác nhau là bình thường, ví dụ NCC tăng giá)
+  const giaOf=el=>Number(document.getElementById('nh-gia-'+el.id.replace('nh-sp-',''))?.value||0);
   const fb={};let dTr=null,dName='';
-  for(const el of spEls){const n=(el.value||'').trim();if(!n)continue;const k=n.toLowerCase();
+  for(const el of spEls){const n=(el.value||'').trim();if(!n)continue;const k=n.toLowerCase()+'|'+giaOf(el);
     if(fb[k]){hlRow(el,true);hlRow(fb[k],true);if(!dTr){dTr=el.closest('tr');dName=n;}}else fb[k]=el;}
-  if(dTr){toast(`Sản phẩm "${dName}" bị nhập trùng — mỗi sản phẩm chỉ 1 dòng`,'err');dTr.scrollIntoView({block:'center',behavior:'smooth'});return;}
+  if(dTr){toast(`Sản phẩm "${dName}" bị nhập trùng (cùng tên, cùng giá) — mỗi sản phẩm+giá chỉ 1 dòng`,'err');dTr.scrollIntoView({block:'center',behavior:'smooth'});return;}
   toast('Đang lưu '+items.length+' sản phẩm...');
   for(const it of items){
-    const nccGhi=ncc||it.sp[8]||'';
-    const loaiGhi=it.loai||it.sp[13]||'';
-    await apiPost({sheet:'NhapHang',action:'append',row:[it.sp[0],it.sl,it.gia,nccGhi,ngay,gc,user,it.hsd,loaiGhi,it.sp[9]||'',dm]});
-    const newSL=Number(it.sp[1]||0)+it.sl;const upd=[...it.sp];upd[1]=newSL;
-    if(it.gia>0)upd[3]=it.gia;// cập nhật giá nhập mới nhất vào Tồn kho
+    // Luôn đọc bản Tồn kho MỚI NHẤT từ C.TK (không dùng it.sp đã chụp trước vòng lặp) — vì phiếu có thể có
+    // 2 dòng cùng 1 sản phẩm (khác giá nhập), dòng sau phải cộng dồn trên kết quả dòng trước vừa lưu, không
+    // được ghi đè lại từ giá trị cũ (nếu không tồn kho/giá bình quân sẽ bị tính sai khi lưu dòng thứ 2).
+    const cur=C.TK[it.idx];
+    const nccGhi=ncc||cur[8]||'';
+    const loaiGhi=it.loai||cur[13]||'';
+    await apiPost({sheet:'NhapHang',action:'append',row:[cur[0],it.sl,it.gia,nccGhi,ngay,gc,user,it.hsd,loaiGhi,cur[9]||'',dm]});
+    const oldSL=Number(cur[1]||0),oldGia=Number(cur[3]||0);
+    const newSL=oldSL+it.sl;
+    const newGia=it.gia>0?waCostAdd(oldSL,oldGia,it.sl,it.gia):oldGia;// giá nhập bình quân gia quyền
+    const upd=[...cur];upd[1]=newSL;
+    if(it.gia>0)upd[3]=newGia;// cập nhật giá nhập bình quân vào Tồn kho
     if(it.hsd)upd[5]=it.hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
     if(ncc)upd[8]=ncc;// cập nhật nhà cung cấp mới nhất vào Tồn kho (chỉ khi có nhập NCC ở phiếu)
     if(it.loai)upd[13]=it.loai;// cập nhật loại hàng mới nhất vào Tồn kho
     await apiPost({sheet:'TonKho',action:'update',row:it.idx+2,data:upd});
-    C.TK[it.idx][1]=newSL;if(it.gia>0)C.TK[it.idx][3]=it.gia;if(it.hsd)C.TK[it.idx][5]=it.hsd;if(ncc)C.TK[it.idx][8]=ncc;if(it.loai)C.TK[it.idx][13]=it.loai;
+    C.TK[it.idx][1]=newSL;if(it.gia>0)C.TK[it.idx][3]=newGia;if(it.hsd)C.TK[it.idx][5]=it.hsd;if(ncc)C.TK[it.idx][8]=ncc;if(it.loai)C.TK[it.idx][13]=it.loai;
   }
   logAction('Tạo mới','Nhập hàng',`Người nhập: ${user} — ${items.map(it=>`${it.sp[0]} x${it.sl}`).join(', ')}`);
   toast('Đã nhập '+items.length+' sản phẩm thành công!');cm('m-nh');setTimeout(loadNH,800);
@@ -275,30 +285,38 @@ async function saveNHEditCore(row,spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai,dm){
   // khi đổi tên), chỉ dự phòng theo tên cho các phiếu cũ chưa có Mã SP
   const oldIdx=nhTKIndex(old);
   const oldSL=Number(old[1]||0);
+  const oldGiaEntry=Number(old[2]||0);// giá của chính dòng nhập cũ (trước khi sửa) — dùng để bỏ đóng góp cũ khỏi giá bình quân
   if(oldIdx>=0&&oldIdx===spIdx){
-    const newStock=Math.max(0,Number(C.TK[spIdx][1]||0)-oldSL+sl);
+    const curSL=Number(C.TK[spIdx][1]||0),curGia=Number(C.TK[spIdx][3]||0);
+    const newStock=Math.max(0,curSL-oldSL+sl);
+    const newGia=gia>0?waCostEdit(curSL,curGia,oldSL,oldGiaEntry,sl,gia):curGia;// giá nhập bình quân gia quyền
     const upd=[...C.TK[spIdx]];upd[1]=newStock;
-    if(gia>0)upd[3]=gia;// cập nhật giá nhập mới nhất vào Tồn kho
+    if(gia>0)upd[3]=newGia;// cập nhật giá nhập bình quân vào Tồn kho
     if(hsd)upd[5]=hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
     if(ncc)upd[8]=ncc;// cập nhật nhà cung cấp mới nhất vào Tồn kho
     if(loai)upd[13]=loai;// cập nhật loại hàng mới nhất vào Tồn kho
     await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
-    C.TK[spIdx][1]=newStock;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
+    C.TK[spIdx][1]=newStock;if(gia>0)C.TK[spIdx][3]=newGia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
   } else {
     if(oldIdx>=0){
+      // Chỉ bớt SL khỏi sản phẩm CŨ — giá bình quân của phần tồn còn lại không đổi (bản chất bình quân gia quyền:
+      // bớt đều theo tỷ lệ không làm lệch giá trung bình của phần còn lại).
       const newStockOld=Math.max(0,Number(C.TK[oldIdx][1]||0)-oldSL);
       const updOld=[...C.TK[oldIdx]];updOld[1]=newStockOld;
       await apiPost({sheet:'TonKho',action:'update',row:oldIdx+2,data:updOld});
       C.TK[oldIdx][1]=newStockOld;
     }
-    const newStockNew=Number(C.TK[spIdx][1]||0)+sl;
+    // Đổi sang sản phẩm khác: coi như 1 lô mới cộng thẳng vào tồn đang có của sản phẩm MỚI (giống Tạo mới)
+    const curSpSL=Number(C.TK[spIdx][1]||0),curSpGia=Number(C.TK[spIdx][3]||0);
+    const newStockNew=curSpSL+sl;
+    const newGiaNew=gia>0?waCostAdd(curSpSL,curSpGia,sl,gia):curSpGia;
     const updNew=[...C.TK[spIdx]];updNew[1]=newStockNew;
-    if(gia>0)updNew[3]=gia;// cập nhật giá nhập mới nhất vào Tồn kho
+    if(gia>0)updNew[3]=newGiaNew;// cập nhật giá nhập bình quân vào Tồn kho
     if(hsd)updNew[5]=hsd;// cập nhật hạn sử dụng mới nhất vào Tồn kho
     if(ncc)updNew[8]=ncc;// cập nhật nhà cung cấp mới nhất vào Tồn kho
     if(loai)updNew[13]=loai;// cập nhật loại hàng mới nhất vào Tồn kho
     await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:updNew});
-    C.TK[spIdx][1]=newStockNew;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
+    C.TK[spIdx][1]=newStockNew;if(gia>0)C.TK[spIdx][3]=newGiaNew;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
   }
   logAction('Cập nhật','Nhập hàng',`"${old[0]}" SL ${old[1]}→${sl}, Giá ${old[2]}→${gia} — sửa bởi: ${user}`);
   return{ok:true};
@@ -675,10 +693,13 @@ async function saveNHCreateCore(spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai,dm){
   const loaiGhi=loai||sp[13]||'';
   dm=dm||'';
   await apiPost({sheet:'NhapHang',action:'append',row:[sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi,sp[9]||'',dm]});
-  const newSL=Number(sp[1]||0)+sl;const upd=[...sp];upd[1]=newSL;
-  if(gia>0)upd[3]=gia;if(hsd)upd[5]=hsd;if(ncc)upd[8]=ncc;if(loai)upd[13]=loai;
+  const oldSL=Number(sp[1]||0),oldGia=Number(sp[3]||0);
+  const newSL=oldSL+sl;
+  const newGia=gia>0?waCostAdd(oldSL,oldGia,sl,gia):oldGia;// giá nhập bình quân gia quyền
+  const upd=[...sp];upd[1]=newSL;
+  if(gia>0)upd[3]=newGia;if(hsd)upd[5]=hsd;if(ncc)upd[8]=ncc;if(loai)upd[13]=loai;
   await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
-  C.TK[spIdx][1]=newSL;if(gia>0)C.TK[spIdx][3]=gia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
+  C.TK[spIdx][1]=newSL;if(gia>0)C.TK[spIdx][3]=newGia;if(hsd)C.TK[spIdx][5]=hsd;if(ncc)C.TK[spIdx][8]=ncc;if(loai)C.TK[spIdx][13]=loai;
   C.NH.push([sp[0],sl,gia,nccGhi,ngay,gc,user,hsd,loaiGhi,sp[9]||'',dm]);
   return{ok:true};
 }
@@ -709,18 +730,20 @@ async function delNHDay(){
   });
 }
 async function saveNHDayAll(){
-  // Không cho 2 dòng cùng 1 sản phẩm trong 1 phiếu — highlight các dòng trùng
+  // Chỉ chặn khi 2 dòng trùng CẢ tên lẫn giá nhập (nhập nhầm y hệt) — cùng tên nhưng KHÁC giá nhập thì cho
+  // lưu (thực tế nhập cùng 1 sản phẩm nhiều đợt/nhiều đơn giá khác nhau là bình thường)
   const hlRow=(el,on)=>{const tr=el&&el.closest('tr');if(tr)tr.querySelectorAll('td').forEach(td=>td.style.background=on?'#f5b0b0':'');};
   const spInputs=[...document.querySelectorAll('#nh-day-tbl [id^="nhd-sp-"]')];
   spInputs.forEach(el=>hlRow(el,false));
+  const giaOf=el=>Number(document.getElementById('nhd-gia-'+el.id.replace('nhd-sp-',''))?.value||0);
   const firstBy={};let dupTr=null,dupName='';
   for(const el of spInputs){
     const n=(el.value||'').trim();if(!n)continue;
-    const k=n.toLowerCase();
+    const k=n.toLowerCase()+'|'+giaOf(el);
     if(firstBy[k]){hlRow(el,true);hlRow(firstBy[k],true);if(!dupTr){dupTr=el.closest('tr');dupName=n;}}
     else firstBy[k]=el;
   }
-  if(dupTr){toast(`Sản phẩm "${dupName}" bị nhập trùng trong phiếu — mỗi sản phẩm chỉ 1 dòng`,'err');dupTr.scrollIntoView({block:'center',behavior:'smooth'});return;}
+  if(dupTr){toast(`Sản phẩm "${dupName}" bị nhập trùng trong phiếu (cùng tên, cùng giá) — mỗi sản phẩm+giá chỉ 1 dòng`,'err');dupTr.scrollIntoView({block:'center',behavior:'smooth'});return;}
   toast('Đang lưu...');
   // 5 ô header: có giá trị → áp cho MỌI dòng; để trống → giữ nguyên giá trị riêng từng dòng
   const hUser=document.getElementById('nhd-h-user').value;

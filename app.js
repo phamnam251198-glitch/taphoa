@@ -702,6 +702,32 @@ function xhTKIndex(r){
   if(ma){const i=C.TK.findIndex(t=>t[9]===ma);if(i>=0)return i;}
   return C.TK.findIndex(t=>t[0]===r[0]);// dự phòng: bản ghi cũ chưa có Mã SP
 }
+// ── Giá nhập bình quân gia quyền (weighted average cost) ──────────────────
+// Nhập hàng cùng 1 sản phẩm nhiều đợt có thể khác giá (giá NCC lên/xuống theo thời gian) — thay vì lấy giá
+// đợt gần nhất đè thẳng lên Tồn kho (dễ lệch giá vốn thực), tính lại giá bình quân theo tổng giá trị/tổng SL.
+// Dùng khi CỘNG THÊM 1 lô mới vào tồn đang có (Nhập hàng - Tạo mới / Thêm dòng).
+// oldSL/oldGia = tồn & giá bình quân hiện có trước khi cộng; addSL/addGia = lô mới nhập.
+function waCostAdd(oldSL,oldGia,addSL,addGia){
+  oldSL=Number(oldSL)||0;oldGia=Number(oldGia)||0;addSL=Number(addSL)||0;addGia=Number(addGia)||0;
+  if(addGia<=0)return oldGia;// lô mới không ghi giá → giữ nguyên giá bình quân cũ
+  const newSL=oldSL+addSL;
+  if(newSL<=0)return addGia;
+  return(oldSL*oldGia+addSL*addGia)/newSL;
+}
+// Dùng khi SỬA 1 dòng Nhập hàng đã lưu: bỏ đóng góp giá trị của lô CŨ (theo SL/giá cũ của chính dòng đang
+// sửa) ra khỏi giá bình quân hiện tại của sản phẩm, rồi cộng lại theo SL/giá MỚI vừa sửa.
+function waCostEdit(curSL,curGia,oldEntrySL,oldEntryGia,newEntrySL,newEntryGia){
+  curSL=Number(curSL)||0;curGia=Number(curGia)||0;
+  oldEntrySL=Number(oldEntrySL)||0;oldEntryGia=Number(oldEntryGia)||0;
+  newEntrySL=Number(newEntrySL)||0;newEntryGia=Number(newEntryGia)||0;
+  if(newEntryGia<=0)return curGia;// giá dòng đang sửa để trống → không tính lại giá bình quân
+  let val=curSL*curGia;
+  if(oldEntryGia>0)val-=oldEntrySL*oldEntryGia;// bỏ đóng góp giá trị của lô cũ (nếu trước đó có ghi giá)
+  val+=newEntrySL*newEntryGia;
+  const sl=curSL-oldEntrySL+newEntrySL;
+  if(sl<=0)return newEntryGia;
+  return Math.max(0,val)/sl;
+}
 // Chạy 1 LẦN (theo yêu cầu người dùng) để: (1) tự sinh Mã SP cho mọi sản phẩm Tồn kho đang thiếu mã,
 // (2) quét toàn bộ lịch sử Nhập hàng/Xếp hàng, gán Mã SP vào các phiếu cũ chưa có (khớp theo TÊN đang lưu ở
 // phiếu đó với Tồn kho hiện tại — vì vậy nên chạy TRƯỚC khi đổi tên bất kỳ SP nào, kẻo khớp sai/không ra).

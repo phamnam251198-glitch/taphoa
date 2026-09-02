@@ -317,6 +317,9 @@ input::placeholder,textarea::placeholder{font-size:12px!important;opacity:.7}
 .item-table td input,.item-table td select{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none}
 .item-table td input:focus,.item-table td select:focus{border-color:var(--blue)}
 .item-table .td-del{width:30px;text-align:center}
+/* Popup "Danh sách hàng xếp trong ngày" gộp theo Gian hàng — mỗi gian hàng 1 khối bảng riêng */
+.xhd-gh-group{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.xhd-gh-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .add-row-btn{background:#f0f9ff;color:var(--blue);border:1px dashed var(--blue);border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;width:100%;margin-bottom:14px}
 .add-row-btn:hover{background:#e0f2fe}
 .total-bar{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap}
@@ -350,6 +353,9 @@ input::placeholder,textarea::placeholder{font-size:12px!important;opacity:.7}
 .chart-tip b{font-size:13px;font-weight:600}
 .scroll-tbl{max-height:400px;overflow-y:auto;overflow-x:auto}
 .scroll-tbl table thead th{position:sticky;top:0;z-index:1}
+/* Bảng nằm bên trong 1 khối accordion (.acc-group) đã tự đóng/mở được rồi — không giới hạn chiều cao/scroll dọc
+   lần nữa nữa (tránh cắt cụt dữ liệu nhìn như lỗi khi >9-10 dòng); chỉ giữ cuộn ngang cho màn hình hẹp */
+.acc-tbl-wrap{overflow-x:auto}
 
 /* Nút hamburger + backdrop: ẩn hoàn toàn ở desktop, chỉ hiện trong media query mobile bên dưới */
 .tb-left{display:flex;align-items:center;gap:8px}

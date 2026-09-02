@@ -112,7 +112,7 @@ function rGHKView(){
     const tongSL=its.reduce((s,[,sl])=>s+Number(sl||0),0);
     return`<details class="acc-group ${loaiColorClass(loai,idx)}" open>
       <summary>🏷️ ${esc(loai)}<span class="acc-cnt">${its.length} SP · Tổng SL: ${fmt(tongSL)}</span></summary>
-      <div class="scroll-tbl"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th>Sản phẩm</th><th style="width:110px">Số lượng</th><th style="width:130px"></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="acc-tbl-wrap"><table class="m-tbl" style="table-layout:fixed"><thead><tr><th>Sản phẩm</th><th style="width:110px">Số lượng</th><th style="width:130px"></th></tr></thead><tbody>${rows}</tbody></table></div>
     </details>`;
   }).join('');
   paneEl.innerHTML=`<div class="card"><div class="ch">
