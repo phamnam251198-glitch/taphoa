@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Xếp hàng</title>
-<link rel="stylesheet" href="style.css?v=20260901bg">
+<link rel="stylesheet" href="style.css?v=20260915h">
 </head>
 <body>
 
@@ -28,7 +28,10 @@
           <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
           <input type="date" id="to-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
         </div>
-        <button class="btn btn-g" onclick="document.getElementById('from-xh').value='';document.getElementById('to-xh').value='';document.getElementById('dm-xh').value='';fXH()">✕</button>
+        <button class="btn btn-g" onclick="document.getElementById('from-xh').value='';document.getElementById('to-xh').value='';document.getElementById('dm-xh').value='';document.getElementById('gh-xh').value='';fXH()">✕</button>
+        <select id="gh-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+          <option value="">Tất cả gian hàng</option>
+        </select>
         <select id="dm-xh" onchange="fXH()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
           <option value="">Tất cả các tháng</option>
         </select>
@@ -111,7 +114,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260901bg"></script>
+<script src="app.js?v=20260915h"></script>
 <script>
 // ── JS riêng cho màn Xếp hàng ──
 let xhRowCount=0;
@@ -214,12 +217,18 @@ function groupXHByDate(data){
 async function loadXH(){
   document.getElementById('xh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selXH.clear();updateSelUI('xh-delsel-btn','xh-selcnt',0);
+  await ensureGH();// cần để đổ ô lọc "Gian hàng"
   const data=await apiGet('XepHang');C.XH=data;
   await dmHealSheet('XepHang',data,6,3);// dọn danhMucId cũ dạng "DM..." → "YYYY-MM" theo ngày xếp
   const dmSel=document.getElementById('dm-xh');
   if(dmSel){
     const cur=dmSel.value;
     dmSel.innerHTML='<option value="">Tất cả các tháng</option>'+dmFilterMonths(data.map(r=>r[6])).map(m=>`<option value="${m}"${m===cur?' selected':''}>${dmFmt(m)}</option>`).join('');
+  }
+  const ghSel=document.getElementById('gh-xh');
+  if(ghSel){
+    const cur=ghSel.value;
+    ghSel.innerHTML='<option value="">Tất cả gian hàng</option>'+C.GH.map(g=>`<option${g[0]===cur?' selected':''}>${esc(g[0])}</option>`).join('');
   }
   rXH(groupXHByDate(data).sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||'')));
   // Không tự vẽ lại popup nếu đang có dòng mới chưa lưu (bấm "+ Thêm") — tránh mất trắng nội dung đang gõ dở
@@ -338,16 +347,18 @@ async function delSelXH(){
   });
 }
 function fXH(){
-  const q=document.getElementById('q-xh').value.toLowerCase();
+  const q=vnNorm(document.getElementById('q-xh').value);
   const from=document.getElementById('from-xh').value;
   const to=document.getElementById('to-xh').value;
   const dm=document.getElementById('dm-xh')?.value||'';
+  const gh=document.getElementById('gh-xh')?.value||'';
   const pg=Number(document.getElementById('pg-xh').value);
   let d=[...C.XH];
   if(from)d=d.filter(r=>r[3]>=from);
   if(to)d=d.filter(r=>r[3]<=to);
   if(dm)d=d.filter(r=>(r[6]||'')===dm);
-  if(q)d=d.filter(r=>(r[0]||'').toLowerCase().includes(q)||(r[2]||'').toLowerCase().includes(q));
+  if(gh)d=d.filter(r=>(r[2]||'')===gh);
+  if(q)d=d.filter(r=>vnNorm(r[0]).includes(q)||vnNorm(r[2]).includes(q));
   let groups=groupXHByDate(d);
   if(xhSortCol)groups.sort((a,b)=>xhCompare(a,b,xhSortCol)*xhSortDir);
   else groups.sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
@@ -402,7 +413,12 @@ async function openXHDay(ngay){
   xhDayCurrent=ngay;
   await ensureTK();
   await ensureGH();
-  document.getElementById('xh-day-q').value='';
+  // Kế thừa bộ lọc đang áp dụng ở màn danh sách chính (ô "Gian hàng" hoặc ô tìm kiếm) — mở phiếu chi tiết
+  // ra vẫn đang lọc đúng như ngoài danh sách, đỡ phải gõ lại. Ưu tiên "Gian hàng" (khớp chính xác, đúng cột
+  // ô Tìm nhanh trong phiếu đang hỗ trợ lọc theo); không có thì mới dùng ô tìm kiếm chung.
+  const outerGh=document.getElementById('gh-xh')?.value||'';
+  const outerQ=document.getElementById('q-xh')?.value||'';
+  document.getElementById('xh-day-q').value=outerGh||outerQ||'';
   xhDayFillHeader(C.XH.filter(r=>(r[3]||'(chưa có ngày)')===ngay));
   renderXHDayDetail();
   om('m-xh-day');
@@ -428,8 +444,8 @@ function renderXHDayDetail(){
   totalBar.innerHTML=items.length?`<span>Số dòng: <b>${items.length}</b></span><span>Tổng SL: <b>${fmt(tongSL)}</b></span><span>Số gian hàng: <b>${soGH}</b></span>`:'';
   totalBar.style.display=items.length?'flex':'none';
   // Ô "Tìm nhanh trong phiếu" lọc dòng HIỂN THỊ theo tên sản phẩm hoặc tên gian hàng
-  const q=(document.getElementById('xh-day-q')?.value||'').trim().toLowerCase();
-  const shown=items.filter(r=>!q||(r[0]||'').toLowerCase().includes(q)||(r[2]||'').toLowerCase().includes(q));
+  const q=vnNorm((document.getElementById('xh-day-q')?.value||'').trim());
+  const shown=items.filter(r=>!q||vnNorm(r[0]).includes(q)||vnNorm(r[2]).includes(q));
   const rowHtml=r=>{
     const gi=C.XH.indexOf(r);const row=gi+2;
     const sp=C.TK.find(t=>t[0]===r[0]);

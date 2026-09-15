@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Nhật ký hoạt động</title>
-<link rel="stylesheet" href="style.css?v=20260901bg">
+<link rel="stylesheet" href="style.css?v=20260915h">
 </head>
 <body>
 
@@ -57,7 +57,7 @@
 
 
 <div id="toast"></div>
-<script src="app.js?v=20260901bg"></script>
+<script src="app.js?v=20260915h"></script>
 <script>
 // ── JS riêng cho màn Nhật ký hoạt động ──
 function fmtDT(iso){
@@ -76,7 +76,7 @@ async function loadLog(){
 }
 const LOG_ACT_BG={'Tạo mới':'bg-g','Cập nhật':'bg-b','Xóa':'bg-r'};
 function fLog(){
-  const q=document.getElementById('q-log').value.toLowerCase();
+  const q=vnNorm(document.getElementById('q-log').value);
   const from=document.getElementById('from-log').value;
   const to=document.getElementById('to-log').value;
   const act=document.getElementById('act-log').value;
@@ -89,7 +89,7 @@ function fLog(){
     if(act&&r[2]!==act)return false;
     if(obj&&r[3]!==obj)return false;
     const ten=(findUserByEmail(r[1])||[])[0]||'';
-    if(q&&!((r[1]||'').toLowerCase().includes(q)||ten.toLowerCase().includes(q)||(r[4]||'').toLowerCase().includes(q)))return false;
+    if(q&&!(vnNorm(r[1]).includes(q)||vnNorm(ten).includes(q)||vnNorm(r[4]).includes(q)))return false;
     return true;
   });
   if(pg>0)d=d.slice(0,pg);

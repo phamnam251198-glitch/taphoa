@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Tồn kho</title>
-<link rel="stylesheet" href="style.css?v=20260901bg">
+<link rel="stylesheet" href="style.css?v=20260915h">
 </head>
 <body>
 
@@ -87,7 +87,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260901bg"></script>
+<script src="app.js?v=20260915h"></script>
 <script>
 // ── JS riêng cho màn Tồn kho ──
 let selTK=new Set();
@@ -198,11 +198,11 @@ function rTK(data){
   updateTKToggleBtn();
 }
 function fTK(){
-  const q=document.getElementById('q-tk').value.toLowerCase();
+  const q=vnNorm(document.getElementById('q-tk').value);
   const st=document.getElementById('st-tk').value;
   const loai=document.getElementById('loai-tk')?.value||'';
   const stMatch=r=>!st||(st==='hsd'?isHsdAlert(r):stTK(r)===st);
-  const filtered=C.TK.filter(r=>((r[0]||'').toLowerCase().includes(q)||(r[9]||'').toLowerCase().includes(q))&&stMatch(r)&&(!loai||r[13]===loai));
+  const filtered=C.TK.filter(r=>(vnNorm(r[0]).includes(q)||vnNorm(r[9]).includes(q))&&stMatch(r)&&(!loai||r[13]===loai));
   filtered.sort((a,b)=>tkCompare(a,b,tkSortCol)*tkSortDir);
   rTK(filtered);
 }

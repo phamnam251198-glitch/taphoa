@@ -206,6 +206,16 @@ async function apiDeleteRows(sheet,indices){
 
 // apiGetRaw dùng để check initialized
 function fmt(n){return Number(n||0).toLocaleString('vi-VN');}
+// Chuẩn hóa chuỗi để tìm kiếm KHÔNG PHÂN BIỆT DẤU tiếng Việt (gõ "lu" vẫn ra "Lương khô") — bỏ dấu + viết
+// thường. Dùng ở MỌI ô tìm kiếm/lọc trong app: so khớp bằng vnNorm(text).includes(vnNorm(query)) thay vì
+// text.toLowerCase().includes(query) như trước (chỉ bỏ phân biệt hoa/thường, không bỏ được dấu).
+function vnNorm(s){return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();}
+// Làm tròn tiền về hàng nghìn CHỈ DÙNG KHI HIỂN THỊ các con số "tổng cộng" (tổng theo ngày/tháng/nhóm/người...):
+// dưới 500đ (phần dư khi chia 1000) → làm tròn xuống, từ 500đ → làm tròn lên. KHÔNG dùng cho: giá sản phẩm,
+// "Thành tiền" của riêng 1 dòng (SL×Giá 1 sản phẩm), hay số tiền người dùng tự gõ tay (VD Số tiền hóa đơn) —
+// những chỗ đó vẫn hiển thị đúng số gốc. Chỉ bọc quanh fmt() lúc HIỂN THỊ, KHÔNG ghi đè lại biến số gốc dùng
+// để tính toán/sắp xếp tiếp — tránh sai lệch dồn tích khi cộng nhiều số đã làm tròn lại với nhau.
+function roundMoney(n){return Math.round(Number(n||0)/1000)*1000;}
 // Ngày cách hôm nay n ngày (YYYY-MM-DD). Dựng chuỗi theo giờ ĐỊA PHƯƠNG (KHÔNG qua toISOString/UTC) để ở
 // VN (UTC+7) sáng sớm không bị lùi 1 ngày. Dùng cho ô "Từ ngày" mặc định, ngày mặc định phiếu Nhập/Xếp/
 // Kiểm kê, mốc so "hôm nay" khi tính số ngày còn lại tới HSD...
@@ -522,9 +532,9 @@ function attachSearchList(input,getItems){
   function render(){
     // vừa CHỌN xong 1 option → giữ menu đóng (event 'input' do choose() phát ra sẽ không mở lại menu)
     if(picking){menu.style.display='none';return;}
-    const q=input.value.trim().toLowerCase();
+    const q=vnNorm(input.value.trim());
     const all=getItems();
-    items=(q?all.filter(v=>v.toLowerCase().includes(q)):all).filter((v,i,a)=>a.indexOf(v)===i);
+    items=(q?all.filter(v=>vnNorm(v).includes(q)):all).filter((v,i,a)=>a.indexOf(v)===i);
     hi=-1;
     if(!items.length){menu.innerHTML='<div class="ac-empty">Không có kết quả khớp</div>';}
     else menu.innerHTML=items.map((v,i)=>`<div class="ac-item" data-i="${i}">${esc(v)}</div>`).join('');
@@ -777,12 +787,24 @@ function sortByMode(data,mode){
   else arr.sort((a,b)=>statusRank(a)-statusRank(b)||(a[0]||'').localeCompare(b[0]||''));// 'status' (mặc định): khẩn cấp trước
   return arr;
 }
+// r = 1 dòng GianHangKho [ten,gianHang,offset,maSP] — maSP ở index 3 (thêm sau, dòng cũ trước đây chưa có
+// cột này thì r[3] undefined → tự rơi về dự phòng tra theo tên, giống hệt cách xhTKIndex/nhTKIndex đã làm)
+function ghkRowTKIndex(r){
+  if(!r)return-1;
+  const ma=r[3];
+  if(ma){const i=C.TK.findIndex(t=>t[9]===ma);if(i>=0)return i;}
+  return C.TK.findIndex(t=>t[0]===r[0]);
+}
+// ghkBase/ghkOffset/ghkQty tra theo MÃ SP (qua xhTKIndex/ghkRowTKIndex, không phải so khớp tên chữ) — để
+// đổi tên sản phẩm không làm tách lẻ dữ liệu Đồ gian hàng ra 2 dòng khác nhau (VD "Banh mứt" đổi thành
+// "Bánh mứt" vẫn phải gộp làm 1, không hiện thành 2 sản phẩm riêng biệt trong Đồ gian hàng/Chuyển gian hàng).
 function ghkBase(tenSP,gianHang){
-  return C.XH.filter(r=>r[0]===tenSP&&r[2]===gianHang).reduce((s,r)=>s+Number(r[1]||0),0);
+  const spIdx=C.TK.findIndex(t=>t[0]===tenSP);
+  return C.XH.filter(r=>r[2]===gianHang&&(spIdx>=0?xhTKIndex(r)===spIdx:r[0]===tenSP)).reduce((s,r)=>s+Number(r[1]||0),0);
 }
 function ghkOffset(tenSP,gianHang){
-  const r=C.GHK.find(r=>r[0]===tenSP&&r[1]===gianHang);
-  return r?Number(r[2]||0):0;
+  const spIdx=C.TK.findIndex(t=>t[0]===tenSP);
+  return C.GHK.filter(r=>r[1]===gianHang&&(spIdx>=0?ghkRowTKIndex(r)===spIdx:r[0]===tenSP)).reduce((s,r)=>s+Number(r[2]||0),0);
 }
 function ghkQty(tenSP,gianHang){
   return Math.max(0,ghkBase(tenSP,gianHang)+ghkOffset(tenSP,gianHang));

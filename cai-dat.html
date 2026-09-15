@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Cài đặt</title>
-<link rel="stylesheet" href="style.css?v=20260901bg">
+<link rel="stylesheet" href="style.css?v=20260915h">
 </head>
 <body>
 
@@ -211,7 +211,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260901bg"></script>
+<script src="app.js?v=20260915h"></script>
 <script>
 // ── JS riêng cho màn Cài đặt ──
 function goSetTab(name){
@@ -331,8 +331,8 @@ async function delSelNCC(){
   });
 }
 function fNCC(){
-  const q=document.getElementById('q-ncc').value.toLowerCase();
-  const d=C.NCC.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  const q=vnNorm(document.getElementById('q-ncc').value);
+  const d=C.NCC.filter(r=>vnNorm(r[0]).includes(q));
   if(nccSortCol)d.sort((a,b)=>nccCompare(a,b,nccSortCol)*nccSortDir);
   nccPage=1;
   rNCC(d);
@@ -402,8 +402,8 @@ async function delSelGH(){
   });
 }
 function fGH(){
-  const q=document.getElementById('q-gh').value.toLowerCase();
-  const d=C.GH.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  const q=vnNorm(document.getElementById('q-gh').value);
+  const d=C.GH.filter(r=>vnNorm(r[0]).includes(q));
   d.sort((a,b)=>(a[0]||'').localeCompare(b[0]||'')*ghSortDir);
   ghPage=1;
   rGH(d);
@@ -483,9 +483,9 @@ async function delSelLoai(){
 }
 let loaiLastQ='';
 function fLoai(){
-  const q=document.getElementById('q-loai').value.toLowerCase();
+  const q=vnNorm(document.getElementById('q-loai').value);
   if(q!==loaiLastQ){loaiPage=1;loaiLastQ=q;}// chỉ về trang 1 khi Ô TÌM KIẾM thực sự đổi — không phải mỗi lần bấm ↑↓ đưa lên/xuống (fLoai() cũng được gọi lại sau đó để vẽ lại đúng thứ tự)
-  const d=C.LOAI.filter(r=>(r[0]||'').toLowerCase().includes(q));
+  const d=C.LOAI.filter(r=>vnNorm(r[0]).includes(q));
   rLoai(d);
 }
 function initLoai(){document.getElementById('m-loai-t').textContent='Thêm loại hàng';document.getElementById('loai-ten').value='';document.getElementById('loai-row').value='';om('m-loai');}

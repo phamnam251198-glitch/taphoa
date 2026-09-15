@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Doanh thu</title>
-<link rel="stylesheet" href="style.css?v=20260901bg">
+<link rel="stylesheet" href="style.css?v=20260915h">
 <style>
 .dt-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .dt-filter>*{flex:0 1 auto}
@@ -82,7 +82,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260901bg"></script>
+<script src="app.js?v=20260915h"></script>
 <script>
 // ── JS riêng cho màn Doanh thu ──
 // Mỗi tháng danh mục 1 dòng: khoảng ngày = dmRange(ym) (cấu hình ở Cài đặt, mặc định 01→cuối tháng).
@@ -149,8 +149,8 @@ function renderDT(){
   const bien = tot.dt ? Math.round(tot.ln / tot.dt * 100) : 0;
 
   document.getElementById('dt-sum').innerHTML = rows.length ? `<div class="grid3 stat-grid3" style="margin-bottom:16px">
-    <div class="kpi g"><div class="lb">Tổng doanh thu</div><div class="val">${fmt(tot.dt)}đ</div></div>
-    <div class="kpi b"><div class="lb">Tổng lợi nhuận gộp</div><div class="val">${fmt(tot.ln)}đ</div></div>
+    <div class="kpi g"><div class="lb">Tổng doanh thu</div><div class="val">${fmt(roundMoney(tot.dt))}đ</div></div>
+    <div class="kpi b"><div class="lb">Tổng lợi nhuận gộp</div><div class="val">${fmt(roundMoney(tot.ln))}đ</div></div>
     <div class="kpi p"><div class="lb">Biên lợi nhuận</div><div class="val">${bien}%</div></div></div>` : '';
 
   const el = document.getElementById('dt-tbl');
@@ -168,9 +168,9 @@ function renderDT(){
       return `<tr class="row-edit" onclick="openDTDetail('${r.ym}')" title="Bấm xem chi tiết theo sản phẩm">
         <td data-label="Tháng danh mục"><b>${dmFmt(r.ym)}</b>${capNote}${uocNote}${note}</td>
         <td data-label="SL bán ra">${fmt(r.sl)}</td>
-        <td data-label="Doanh thu">${fmt(r.dt)}đ</td>
-        <td data-label="Giá vốn">${fmt(r.von)}đ</td>
-        <td data-label="Lợi nhuận" style="${cl};font-weight:600">${fmt(r.ln)}đ</td>
+        <td data-label="Doanh thu">${fmt(roundMoney(r.dt))}đ</td>
+        <td data-label="Giá vốn">${fmt(roundMoney(r.von))}đ</td>
+        <td data-label="Lợi nhuận" style="${cl};font-weight:600">${fmt(roundMoney(r.ln))}đ</td>
         <td data-label="LN%" style="${cl}">${b}%</td></tr>`;
     }).join('') + '</tbody></table>';
 }
@@ -217,7 +217,7 @@ function openDTDetail(ym){
   const ds = its.map(i => i.dauDate).filter(Boolean), cs = its.map(i => i.cuoiDate).filter(Boolean);
   const span = ds.length ? ` — ${dVN(ds.reduce((a, b) => a < b ? a : b))} → ${dVN(cs.reduce((a, b) => a > b ? a : b))}` : '';
   document.getElementById('dt-d-t').textContent = `Doanh thu ${dmFmt(ym)}${span}`;
-  document.getElementById('dt-d-sum').innerHTML = `<p style="font-size:12px;color:var(--text2);margin-bottom:10px">${its.length} SP tính được · ${DT_DETAIL.missItems.length} SP chưa kiểm kê · Doanh thu <b>${fmt(row.dt)}đ</b> · Lợi nhuận <b>${fmt(row.ln)}đ</b>${row.soUoc ? ` · <span style="color:#b8860b">${row.soUoc} SP ~ ước tính (tính từ lần kiểm kê đầu trong kỳ)</span>` : ''}</p>
+  document.getElementById('dt-d-sum').innerHTML = `<p style="font-size:12px;color:var(--text2);margin-bottom:10px">${its.length} SP tính được · ${DT_DETAIL.missItems.length} SP chưa kiểm kê · Doanh thu <b>${fmt(roundMoney(row.dt))}đ</b> · Lợi nhuận <b>${fmt(roundMoney(row.ln))}đ</b>${row.soUoc ? ` · <span style="color:#b8860b">${row.soUoc} SP ~ ước tính (tính từ lần kiểm kê đầu trong kỳ)</span>` : ''}</p>
     <button class="btn btn-p btn-sm" onclick="openDTPie()" style="margin-bottom:12px"${its.length ? '' : ' disabled'}>🥧 Biểu đồ tròn — tỷ trọng theo sản phẩm</button>`;
   renderDTDetailBody();
   om('m-dt-detail');

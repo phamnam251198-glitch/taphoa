@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tạp Hóa — Kho lưu trữ hóa đơn</title>
-<link rel="stylesheet" href="style.css?v=20260901bg">
+<link rel="stylesheet" href="style.css?v=20260915h">
 <style>
 /* ── Kho lưu trữ hóa đơn — CSS riêng cho màn này (không đụng style.css dùng chung) ── */
 .hd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
@@ -187,7 +187,7 @@
 </div>
 
 <div id="toast"></div>
-<script src="app.js?v=20260901bg"></script>
+<script src="app.js?v=20260915h"></script>
 <script>
 // ── JS riêng cho màn Kho lưu trữ hóa đơn ──
 // Lưu trữ: sheet "HoaDon" 1 dòng = [id, ngay, ncc, soTien, ghiChu, nguoiLuu, thoiGianLuu, soAnh, thumb, nguoiNhap, danhMucId]
@@ -240,7 +240,7 @@ async function loadHD(){
   fHD();
 }
 function fHD(){
-  const q=(document.getElementById('q-hd').value||'').toLowerCase().trim();
+  const q=vnNorm((document.getElementById('q-hd').value||'').trim());
   const from=document.getElementById('from-hd').value;
   const to=document.getElementById('to-hd').value;
   const user=document.getElementById('user-hd').value;
@@ -252,7 +252,7 @@ function fHD(){
     if(user&&(r[9]||'')!==user)return false;
     if(dm&&(r[10]||'')!==dm)return false;
     if(q){
-      const hay=((r[2]||'')+' '+(r[4]||'')+' '+(r[9]||'')+' '+(r[5]||'')+' '+dmLabel(r[10])).toLowerCase();
+      const hay=vnNorm((r[2]||'')+' '+(r[4]||'')+' '+(r[9]||'')+' '+(r[5]||'')+' '+dmLabel(r[10]));
       if(!hay.includes(q))return false;
     }
     return true;
@@ -286,7 +286,7 @@ function rHD(list){
   el.innerHTML='<div class="hd-people">'+hdGroupList.map((g,i)=>`
     <div class="hd-person" onclick="openHDMonth(${i})">
       <div class="nm"><span class="av">📅</span>${/^\d{4}-\d{2}$/.test(g.m)?esc(dmFmt(g.m)):esc(g.m)}</div>
-      <div class="st"><b>${g.anh}</b> hóa đơn · ${g.users} người nhập · ${g.tong?fmt(g.tong)+'đ':'—'}</div>
+      <div class="st"><b>${g.anh}</b> hóa đơn · ${g.users} người nhập · ${g.tong?fmt(roundMoney(g.tong))+'đ':'—'}</div>
     </div>`).join('')+'</div>';
 }
 // Popup 1 THÁNG: hiện THẲNG toàn bộ ảnh của mọi hóa đơn trong tháng (nhóm theo từng hóa đơn, kèm nút xóa).
@@ -334,7 +334,7 @@ function openHDMonth(i){
   const g=hdGroupList[i];if(!g)return;
   hdRenderInvList(g.items,
     /^\d{4}-\d{2}$/.test(g.m)?dmFmt(g.m):g.m,
-    `<b>${g.anh}</b> hóa đơn · ${g.users} người nhập · tổng <b>${g.tong?fmt(g.tong)+'đ':'—'}</b>`);
+    `<b>${g.anh}</b> hóa đơn · ${g.users} người nhập · tổng <b>${g.tong?fmt(roundMoney(g.tong))+'đ':'—'}</b>`);
 }
 function openLbFor(invoiceId,start){
   hdViewUrls=hdPersonImgs[invoiceId]||[];
