@@ -129,6 +129,16 @@
   </div>
 </div>
 
+<!-- MODAL CHI TIẾT 1 SẢN PHẨM TRONG "HÀNG NHẬP NHIỀU" (bấm 1 dòng trong bảng xếp hạng) -->
+<div class="mo" id="m-nh-top-detail">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-nh-top-detail')" aria-label="Đóng">✕</button>
+    <h3 id="nhtd-t" style="padding-right:28px">Chi tiết nhập hàng</h3>
+    <div id="nhtd-sum" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+    <div id="nhtd-body"></div>
+  </div>
+</div>
+
 <!-- POPUP: các ngày nhập trong 1 THÁNG DANH MỤC (bấm 1 tháng ở danh sách chính) -->
 <div class="mo" id="m-nh-month">
   <div class="mb mb-lg">
@@ -388,16 +398,18 @@ function nhCompare(a,b,col){
 }
 // "Hàng nhập nhiều" — gộp theo Mã SP (qua nhTKIndex) chứ không theo tên, để đổi tên SP không tách lẻ dữ liệu.
 // KHÔNG hiển thị inline nữa: ô thống kê ở đầu màn (openNHTop) → popup m-nh-top.
-let nhTopN=5;
+let nhTopN=5,NH_TOP_ROWS=[];// NH_TOP_ROWS: dòng đang hiển thị trong bảng xếp hạng — tra theo chỉ số khi bấm xem chi tiết
 function nhTopAgg(flat){
   const map=new Map();
   (flat||[]).forEach(r=>{
     const idx=nhTKIndex(r);
     const key=idx>=0?'i'+idx:'n'+r[0];
     const ten=idx>=0?C.TK[idx][0]:r[0];
-    if(!map.has(key))map.set(key,{ten,idx,sl:0,tien:0,lan:0});
+    if(!map.has(key))map.set(key,{ten,idx,sl:0,tien:0,lan:0,entries:[]});
     const g=map.get(key);
-    g.sl+=Number(r[1]||0);g.tien+=Number(r[1]||0)*Number(r[2]||0);g.lan++;
+    const sl=Number(r[1]||0),gia=Number(r[2]||0);
+    g.sl+=sl;g.tien+=sl*gia;g.lan++;
+    g.entries.push({ngay:r[4]||'',sl,gia,nguoi:r[6]||''});// giữ lại từng lần nhập — bấm dòng để xem chi tiết theo ngày
   });
   return[...map.values()].sort((a,b)=>b.sl-a.sl);
 }
@@ -413,11 +425,29 @@ function renderNHTopBody(){
   if(to)flat=flat.filter(r=>(r[4]||'')<=to);
   const all=nhTopAgg(flat);
   const top=nhTopN>0?all.slice(0,nhTopN):all;
+  NH_TOP_ROWS=top;// lưu lại để openNHTopDetail() tra theo chỉ số dòng khi bấm
   el.innerHTML=top.length
     ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Số lần nhập</th><th>Tổng SL</th><th>Tổng tiền</th><th>Tồn kho hiện tại</th></tr></thead><tbody>
-    ${top.map((g,i)=>`<tr><td>${i+1}</td><td><b>${esc(g.ten)}</b></td><td>${g.lan}</td><td>${fmt(g.sl)}</td><td>${fmt(roundMoney(g.tien))}đ</td><td>${g.idx>=0?fmt(C.TK[g.idx][1]||0):'<span style="color:var(--text2)">—</span>'}</td></tr>`).join('')}
+    ${top.map((g,i)=>`<tr class="row-edit" onclick="openNHTopDetail(${i})" title="Bấm xem chi tiết theo ngày"><td>${i+1}</td><td><b>${esc(g.ten)}</b></td><td>${g.lan}</td><td>${fmt(g.sl)}</td><td>${fmt(roundMoney(g.tien))}đ</td><td>${g.idx>=0?fmt(C.TK[g.idx][1]||0):'<span style="color:var(--text2)">—</span>'}</td></tr>`).join('')}
     </tbody></table></div>`
     :'<div class="empty">Chưa có dữ liệu nhập trong khoảng đang lọc</div>';
+}
+// Bấm 1 dòng trong bảng "Hàng nhập nhiều" → xem chi tiết từng lần nhập (ngày/SL/giá/người nhập) của đúng
+// sản phẩm đó, TÍNH TRONG ĐÚNG khoảng "Từ"/"Đến" đang lọc ở popup cha (vì entries lấy từ nhTopAgg(flat) đã
+// được lọc theo khoảng đó ở renderNHTopBody).
+function openNHTopDetail(i){
+  const g=NH_TOP_ROWS[i];if(!g)return;
+  const entries=g.entries.slice().sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
+  const from=document.getElementById('nht-from')?.value||'',to=document.getElementById('nht-to')?.value||'';
+  const rangeTxt=(from||to)?` — ${from?dVN(from):'…'} → ${to?dVN(to):'…'}`:' — toàn bộ thời gian';
+  document.getElementById('nhtd-t').textContent=`Chi tiết nhập hàng — ${g.ten}`;
+  document.getElementById('nhtd-sum').innerHTML=`${entries.length} lần nhập${rangeTxt} · Tổng SL <b>${fmt(g.sl)}</b> · Tổng tiền <b>${fmt(roundMoney(g.tien))}đ</b>`;
+  document.getElementById('nhtd-body').innerHTML=entries.length
+    ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Ngày nhập</th><th>Số lượng</th><th>Giá nhập</th><th>Thành tiền</th><th>Người nhập</th></tr></thead><tbody>
+      ${entries.map(e=>`<tr><td data-label="Ngày nhập">${e.ngay?dVN(e.ngay):'—'}</td><td data-label="Số lượng">${fmt(e.sl)}</td><td data-label="Giá nhập">${fmt(e.gia)}đ</td><td data-label="Thành tiền">${fmt(e.sl*e.gia)}đ</td><td data-label="Người nhập">${esc(e.nguoi)}</td></tr>`).join('')}
+      </tbody></table></div>`
+    :'<div class="empty">Không có dữ liệu</div>';
+  om('m-nh-top-detail');
 }
 function changeNHTopN(v){nhTopN=Number(v);renderNHTopBody();}
 async function openNHTop(){
