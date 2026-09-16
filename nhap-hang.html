@@ -121,12 +121,15 @@
       <select id="nht-dm" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
         <option value="">Tất cả các tháng</option>
       </select>
+      <select id="nht-loai" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="">Tất cả loại hàng</option>
+      </select>
       <select id="nh-topn" onchange="changeNHTopN(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
         <option value="5">Top 5</option>
         <option value="10">Top 10</option>
         <option value="0">Tất cả</option>
       </select>
-      <button class="btn btn-g btn-sm" onclick="document.getElementById('nht-from').value='';document.getElementById('nht-to').value='';document.getElementById('nht-dm').value='';renderNHTopBody()">✕ Xóa lọc</button>
+      <button class="btn btn-g btn-sm" onclick="document.getElementById('nht-from').value='';document.getElementById('nht-to').value='';document.getElementById('nht-dm').value='';document.getElementById('nht-loai').value='';renderNHTopBody()">✕ Xóa lọc</button>
     </div>
     <div id="nh-top-body"></div>
   </div>
@@ -418,16 +421,18 @@ function nhTopAgg(flat){
 }
 function renderNHTopBody(){
   const el=document.getElementById('nh-top-body');if(!el)return;
-  // Ô "Từ"/"Đến"/"Tháng danh mục" RIÊNG của popup này — lọc thẳng trên toàn bộ C.NH (không phụ thuộc ô
-  // tìm kiếm/Người nhập ở màn danh sách chính), để xem xếp hạng theo 1 khoảng ngày/tháng tùy ý mà không
-  // cần đóng popup ra ngoài đổi bộ lọc chính rồi mở lại.
+  // Ô "Từ"/"Đến"/"Tháng danh mục"/"Loại hàng" RIÊNG của popup này — lọc thẳng trên toàn bộ C.NH (không phụ
+  // thuộc ô tìm kiếm/Người nhập ở màn danh sách chính), để xem xếp hạng theo 1 khoảng ngày/tháng/loại hàng
+  // tùy ý mà không cần đóng popup ra ngoài đổi bộ lọc chính rồi mở lại.
   const from=document.getElementById('nht-from')?.value||'';
   const to=document.getElementById('nht-to')?.value||'';
   const dm=document.getElementById('nht-dm')?.value||'';
+  const loai=document.getElementById('nht-loai')?.value||'';
   let flat=C.NH||[];
   if(from)flat=flat.filter(r=>(r[4]||'')>=from);
   if(to)flat=flat.filter(r=>(r[4]||'')<=to);
   if(dm)flat=flat.filter(r=>(r[10]||'')===dm);
+  if(loai)flat=flat.filter(r=>(r[8]||'')===loai);
   const all=nhTopAgg(flat);
   const top=nhTopN>0?all.slice(0,nhTopN):all;
   NH_TOP_ROWS=top;// lưu lại để openNHTopDetail() tra theo chỉ số dòng khi bấm
@@ -445,9 +450,11 @@ function openNHTopDetail(i){
   const entries=g.entries.slice().sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
   const from=document.getElementById('nht-from')?.value||'',to=document.getElementById('nht-to')?.value||'';
   const dm=document.getElementById('nht-dm')?.value||'';
+  const loai=document.getElementById('nht-loai')?.value||'';
   const parts=[];
   if(from||to)parts.push(`${from?dVN(from):'…'} → ${to?dVN(to):'…'}`);
   if(dm)parts.push(dmFmt(dm));
+  if(loai)parts.push(loai);
   const rangeTxt=parts.length?' — '+parts.join(' · '):' — toàn bộ thời gian';
   document.getElementById('nhtd-t').textContent=`Chi tiết nhập hàng — ${g.ten}`;
   document.getElementById('nhtd-sum').innerHTML=`${entries.length} lần nhập${rangeTxt} · Tổng SL <b>${fmt(g.sl)}</b> · Tổng tiền <b>${fmt(roundMoney(g.tien))}đ</b>`;
@@ -463,15 +470,19 @@ async function openNHTop(){
   // C.TK (Tồn kho) chỉ được nạp khi mở phiếu "Thêm mới"/popup theo ngày — bấm "Hàng nhập nhiều" ngay khi
   // vừa vào màn (chưa mở phiếu nào) thì C.TK rỗng, cột "Tồn kho hiện tại" sẽ luôn ra "—". Nạp trước ở đây.
   await ensureTK();
+  await ensureLoai();
   const s=document.getElementById('nh-topn');if(s)s.value=String(nhTopN);
   // Kế thừa khoảng ngày + Tháng danh mục đang lọc ở màn danh sách chính (nếu có) làm giá trị mặc định — mở
   // ra vẫn đúng khoảng đang xem ngoài kia, muốn xem khoảng khác thì sửa ngay trong popup, không ảnh hưởng
-  // bộ lọc chính.
+  // bộ lọc chính. (Loại hàng không có ô lọc ở màn chính nên không kế thừa gì, để trống mặc định.)
   document.getElementById('nht-from').value=document.getElementById('from-nh')?.value||'';
   document.getElementById('nht-to').value=document.getElementById('to-nh')?.value||'';
   const dmSel=document.getElementById('nht-dm'),curDm=document.getElementById('dm-nh')?.value||'';
   dmSel.innerHTML='<option value="">Tất cả các tháng</option>'+
     dmFilterMonths((C.NH||[]).map(r=>r[10])).map(m=>`<option value="${m}"${m===curDm?' selected':''}>${dmFmt(m)}</option>`).join('');
+  const loaiSel=document.getElementById('nht-loai'),curLoai=loaiSel.value;
+  loaiSel.innerHTML='<option value="">Tất cả loại hàng</option>'+
+    C.LOAI.map(r=>`<option${r[0]===curLoai?' selected':''}>${esc(r[0])}</option>`).join('');
   renderNHTopBody();
   om('m-nh-top');
 }
