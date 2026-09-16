@@ -722,7 +722,7 @@ function waCostAdd(oldSL,oldGia,addSL,addGia){
   if(addGia<=0)return oldGia;// lô mới không ghi giá → giữ nguyên giá bình quân cũ
   const newSL=oldSL+addSL;
   if(newSL<=0)return addGia;
-  return(oldSL*oldGia+addSL*addGia)/newSL;
+  return Math.round((oldSL*oldGia+addSL*addGia)/newSL);// làm tròn về đồng — tiền VNĐ không có phần lẻ
 }
 // Dùng khi SỬA 1 dòng Nhập hàng đã lưu: bỏ đóng góp giá trị của lô CŨ (theo SL/giá cũ của chính dòng đang
 // sửa) ra khỏi giá bình quân hiện tại của sản phẩm, rồi cộng lại theo SL/giá MỚI vừa sửa.
@@ -736,7 +736,7 @@ function waCostEdit(curSL,curGia,oldEntrySL,oldEntryGia,newEntrySL,newEntryGia){
   val+=newEntrySL*newEntryGia;
   const sl=curSL-oldEntrySL+newEntrySL;
   if(sl<=0)return newEntryGia;
-  return Math.max(0,val)/sl;
+  return Math.round(Math.max(0,val)/sl);// làm tròn về đồng — tiền VNĐ không có phần lẻ
 }
 // Chạy 1 LẦN (theo yêu cầu người dùng) để: (1) tự sinh Mã SP cho mọi sản phẩm Tồn kho đang thiếu mã,
 // (2) quét toàn bộ lịch sử Nhập hàng/Xếp hàng, gán Mã SP vào các phiếu cũ chưa có (khớp theo TÊN đang lưu ở

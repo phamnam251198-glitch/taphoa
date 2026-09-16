@@ -108,11 +108,13 @@ async function loadTK(){
   tkPageByLoai={};// tải mới hẳn thì reset về trang 1 cho mọi khối Loại hàng
   const data=await apiGet('TonKho');C.TK=data;
   // Tự chữa dữ liệu: SL tồn không bao giờ được âm (xảy ra do vài thao tác cũ chưa chặn) → kéo về 0 & lưu lại
+  // Giá nhập cũng không được lẻ thập phân (từng bị lỗi tính giá bình quân gia quyền ra số dài kiểu
+  // 9488.138917262515 trước khi các hàm waCostAdd/waCostEdit được sửa để tự làm tròn) → làm tròn & lưu lại
   for(let i=0;i<data.length;i++){
-    if(Number(data[i][1]||0)<0){
-      const row=[...data[i]];row[1]=0;data[i]=row;C.TK[i]=row;
-      apiPost({sheet:'TonKho',action:'update',row:i+2,data:row}).catch(()=>{});
-    }
+    let row=data[i],changed=false;
+    if(Number(row[1]||0)<0){row=[...row];row[1]=0;changed=true;}
+    if(row[3]&&!Number.isInteger(Number(row[3]))){row=changed?row:[...row];row[3]=Math.round(Number(row[3]));changed=true;}
+    if(changed){data[i]=row;C.TK[i]=row;apiPost({sheet:'TonKho',action:'update',row:i+2,data:row}).catch(()=>{});}
   }
   const low=data.filter(r=>Number(r[1]||0)<=getSapHet(r));
   const al=document.getElementById('la');
@@ -257,7 +259,7 @@ async function initSPForm(){
 async function editSP(row){
   const r=C.TK[row-2];document.getElementById('m-sp-t').textContent='Sửa sản phẩm';
   document.getElementById('sp-ten').value=r[0]||'';document.getElementById('sp-sl').value=r[1]||'';
-  document.getElementById('sp-dv').value=r[2]||'';document.getElementById('sp-gn').value=r[3]||'';
+  document.getElementById('sp-dv').value=r[2]||'';document.getElementById('sp-gn').value=r[3]?Math.round(r[3]):'';
   document.getElementById('sp-gb').value=r[4]||'';document.getElementById('sp-hsd').value=r[5]||'';
   document.getElementById('sp-ng').value=r[7]||'';document.getElementById('sp-ncc').value=r[8]||'';
   document.getElementById('sp-ma').value=r[9]||'';
