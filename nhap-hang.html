@@ -118,12 +118,15 @@
       <input type="date" id="nht-from" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
       <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
       <input type="date" id="nht-to" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+      <select id="nht-dm" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="">Tất cả các tháng</option>
+      </select>
       <select id="nh-topn" onchange="changeNHTopN(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
         <option value="5">Top 5</option>
         <option value="10">Top 10</option>
         <option value="0">Tất cả</option>
       </select>
-      <button class="btn btn-g btn-sm" onclick="document.getElementById('nht-from').value='';document.getElementById('nht-to').value='';renderNHTopBody()">✕ Xóa lọc</button>
+      <button class="btn btn-g btn-sm" onclick="document.getElementById('nht-from').value='';document.getElementById('nht-to').value='';document.getElementById('nht-dm').value='';renderNHTopBody()">✕ Xóa lọc</button>
     </div>
     <div id="nh-top-body"></div>
   </div>
@@ -415,14 +418,16 @@ function nhTopAgg(flat){
 }
 function renderNHTopBody(){
   const el=document.getElementById('nh-top-body');if(!el)return;
-  // Ô "Từ"/"Đến" RIÊNG của popup này — lọc thẳng trên toàn bộ C.NH (không phụ thuộc ô tìm kiếm/Người
-  // nhập/Tháng danh mục ở màn danh sách chính), để xem xếp hạng theo 1 khoảng ngày tùy ý mà không cần
-  // đóng popup ra ngoài đổi bộ lọc chính rồi mở lại.
+  // Ô "Từ"/"Đến"/"Tháng danh mục" RIÊNG của popup này — lọc thẳng trên toàn bộ C.NH (không phụ thuộc ô
+  // tìm kiếm/Người nhập ở màn danh sách chính), để xem xếp hạng theo 1 khoảng ngày/tháng tùy ý mà không
+  // cần đóng popup ra ngoài đổi bộ lọc chính rồi mở lại.
   const from=document.getElementById('nht-from')?.value||'';
   const to=document.getElementById('nht-to')?.value||'';
+  const dm=document.getElementById('nht-dm')?.value||'';
   let flat=C.NH||[];
   if(from)flat=flat.filter(r=>(r[4]||'')>=from);
   if(to)flat=flat.filter(r=>(r[4]||'')<=to);
+  if(dm)flat=flat.filter(r=>(r[10]||'')===dm);
   const all=nhTopAgg(flat);
   const top=nhTopN>0?all.slice(0,nhTopN):all;
   NH_TOP_ROWS=top;// lưu lại để openNHTopDetail() tra theo chỉ số dòng khi bấm
@@ -433,13 +438,17 @@ function renderNHTopBody(){
     :'<div class="empty">Chưa có dữ liệu nhập trong khoảng đang lọc</div>';
 }
 // Bấm 1 dòng trong bảng "Hàng nhập nhiều" → xem chi tiết từng lần nhập (ngày/SL/giá/người nhập) của đúng
-// sản phẩm đó, TÍNH TRONG ĐÚNG khoảng "Từ"/"Đến" đang lọc ở popup cha (vì entries lấy từ nhTopAgg(flat) đã
-// được lọc theo khoảng đó ở renderNHTopBody).
+// sản phẩm đó, TÍNH TRONG ĐÚNG khoảng "Từ"/"Đến"/"Tháng danh mục" đang lọc ở popup cha (vì entries lấy từ
+// nhTopAgg(flat) đã được lọc theo đó ở renderNHTopBody).
 function openNHTopDetail(i){
   const g=NH_TOP_ROWS[i];if(!g)return;
   const entries=g.entries.slice().sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
   const from=document.getElementById('nht-from')?.value||'',to=document.getElementById('nht-to')?.value||'';
-  const rangeTxt=(from||to)?` — ${from?dVN(from):'…'} → ${to?dVN(to):'…'}`:' — toàn bộ thời gian';
+  const dm=document.getElementById('nht-dm')?.value||'';
+  const parts=[];
+  if(from||to)parts.push(`${from?dVN(from):'…'} → ${to?dVN(to):'…'}`);
+  if(dm)parts.push(dmFmt(dm));
+  const rangeTxt=parts.length?' — '+parts.join(' · '):' — toàn bộ thời gian';
   document.getElementById('nhtd-t').textContent=`Chi tiết nhập hàng — ${g.ten}`;
   document.getElementById('nhtd-sum').innerHTML=`${entries.length} lần nhập${rangeTxt} · Tổng SL <b>${fmt(g.sl)}</b> · Tổng tiền <b>${fmt(roundMoney(g.tien))}đ</b>`;
   document.getElementById('nhtd-body').innerHTML=entries.length
@@ -455,10 +464,14 @@ async function openNHTop(){
   // vừa vào màn (chưa mở phiếu nào) thì C.TK rỗng, cột "Tồn kho hiện tại" sẽ luôn ra "—". Nạp trước ở đây.
   await ensureTK();
   const s=document.getElementById('nh-topn');if(s)s.value=String(nhTopN);
-  // Kế thừa khoảng ngày đang lọc ở màn danh sách chính (nếu có) làm giá trị mặc định — mở ra vẫn đúng
-  // khoảng đang xem ngoài kia, muốn xem khoảng khác thì sửa ngay trong popup, không ảnh hưởng bộ lọc chính.
+  // Kế thừa khoảng ngày + Tháng danh mục đang lọc ở màn danh sách chính (nếu có) làm giá trị mặc định — mở
+  // ra vẫn đúng khoảng đang xem ngoài kia, muốn xem khoảng khác thì sửa ngay trong popup, không ảnh hưởng
+  // bộ lọc chính.
   document.getElementById('nht-from').value=document.getElementById('from-nh')?.value||'';
   document.getElementById('nht-to').value=document.getElementById('to-nh')?.value||'';
+  const dmSel=document.getElementById('nht-dm'),curDm=document.getElementById('dm-nh')?.value||'';
+  dmSel.innerHTML='<option value="">Tất cả các tháng</option>'+
+    dmFilterMonths((C.NH||[]).map(r=>r[10])).map(m=>`<option value="${m}"${m===curDm?' selected':''}>${dmFmt(m)}</option>`).join('');
   renderNHTopBody();
   om('m-nh-top');
 }
