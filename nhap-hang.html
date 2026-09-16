@@ -395,7 +395,7 @@ function nhTopAgg(flat){
     const idx=nhTKIndex(r);
     const key=idx>=0?'i'+idx:'n'+r[0];
     const ten=idx>=0?C.TK[idx][0]:r[0];
-    if(!map.has(key))map.set(key,{ten,sl:0,tien:0,lan:0});
+    if(!map.has(key))map.set(key,{ten,idx,sl:0,tien:0,lan:0});
     const g=map.get(key);
     g.sl+=Number(r[1]||0);g.tien+=Number(r[1]||0)*Number(r[2]||0);g.lan++;
   });
@@ -414,8 +414,8 @@ function renderNHTopBody(){
   const all=nhTopAgg(flat);
   const top=nhTopN>0?all.slice(0,nhTopN):all;
   el.innerHTML=top.length
-    ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Số lần nhập</th><th>Tổng SL</th><th>Tổng tiền</th></tr></thead><tbody>
-    ${top.map((g,i)=>`<tr><td>${i+1}</td><td><b>${esc(g.ten)}</b></td><td>${g.lan}</td><td>${fmt(g.sl)}</td><td>${fmt(roundMoney(g.tien))}đ</td></tr>`).join('')}
+    ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Số lần nhập</th><th>Tổng SL</th><th>Tổng tiền</th><th>Tồn kho hiện tại</th></tr></thead><tbody>
+    ${top.map((g,i)=>`<tr><td>${i+1}</td><td><b>${esc(g.ten)}</b></td><td>${g.lan}</td><td>${fmt(g.sl)}</td><td>${fmt(roundMoney(g.tien))}đ</td><td>${g.idx>=0?fmt(C.TK[g.idx][1]||0):'<span style="color:var(--text2)">—</span>'}</td></tr>`).join('')}
     </tbody></table></div>`
     :'<div class="empty">Chưa có dữ liệu nhập trong khoảng đang lọc</div>';
 }
