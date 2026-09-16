@@ -420,7 +420,10 @@ function renderNHTopBody(){
     :'<div class="empty">Chưa có dữ liệu nhập trong khoảng đang lọc</div>';
 }
 function changeNHTopN(v){nhTopN=Number(v);renderNHTopBody();}
-function openNHTop(){
+async function openNHTop(){
+  // C.TK (Tồn kho) chỉ được nạp khi mở phiếu "Thêm mới"/popup theo ngày — bấm "Hàng nhập nhiều" ngay khi
+  // vừa vào màn (chưa mở phiếu nào) thì C.TK rỗng, cột "Tồn kho hiện tại" sẽ luôn ra "—". Nạp trước ở đây.
+  await ensureTK();
   const s=document.getElementById('nh-topn');if(s)s.value=String(nhTopN);
   // Kế thừa khoảng ngày đang lọc ở màn danh sách chính (nếu có) làm giá trị mặc định — mở ra vẫn đúng
   // khoảng đang xem ngoài kia, muốn xem khoảng khác thì sửa ngay trong popup, không ảnh hưởng bộ lọc chính.
