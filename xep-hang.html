@@ -113,6 +113,43 @@
   </div>
 </div>
 
+<!-- MODAL "HÀNG XẾP NHIỀU NHẤT" (bấm từ ô thống kê ở đầu màn) -->
+<div class="mo" id="m-xh-top">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-xh-top')" aria-label="Đóng">✕</button>
+    <h3 style="padding-right:28px">🏆 Hàng xếp nhiều nhất</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+      <input type="date" id="xht-from" onchange="renderXHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+      <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+      <input type="date" id="xht-to" onchange="renderXHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+      <select id="xht-dm" onchange="renderXHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="">Tất cả các tháng</option>
+      </select>
+      <select id="xht-loai" onchange="renderXHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="">Tất cả loại hàng</option>
+      </select>
+      <select id="xh-topn" onchange="changeXHTopN(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="5">Top 5</option>
+        <option value="10">Top 10</option>
+        <option value="0">Tất cả</option>
+      </select>
+      <button class="btn btn-g btn-sm" onclick="document.getElementById('xht-from').value='';document.getElementById('xht-to').value='';document.getElementById('xht-dm').value='';document.getElementById('xht-loai').value='';renderXHTopBody()">✕ Xóa lọc</button>
+    </div>
+    <div id="xh-top-body"></div>
+  </div>
+</div>
+
+<!-- MODAL CHI TIẾT 1 SẢN PHẨM TRONG "HÀNG XẾP NHIỀU NHẤT" (bấm 1 dòng trong bảng xếp hạng) -->
+<div class="mo" id="m-xh-top-detail">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-xh-top-detail')" aria-label="Đóng">✕</button>
+    <h3 id="xhtd-t" style="padding-right:28px">Chi tiết xếp hàng</h3>
+    <div id="xhtd-sum" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+    <div id="xhtd-body"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 <script src="app.js?v=20260915h"></script>
 <script>
@@ -247,12 +284,94 @@ function xhCompare(a,b,col){
     default:return(a.ngay||'').localeCompare(b.ngay||'');
   }
 }
+// "Hàng xếp nhiều nhất" — gộp theo Mã SP (qua xhTKIndex) chứ không theo tên, để đổi tên SP không tách lẻ
+// dữ liệu. Ô thống kê ở đầu màn (openXHTop) → popup m-xh-top, giống hệt "Hàng nhập nhiều" ở Nhập hàng.
+let xhTopN=5,XH_TOP_ROWS=[];
+function xhTopAgg(flat){
+  const map=new Map();
+  (flat||[]).forEach(r=>{
+    const idx=xhTKIndex(r);
+    const key=idx>=0?'i'+idx:'n'+r[0];
+    const ten=idx>=0?C.TK[idx][0]:r[0];
+    if(!map.has(key))map.set(key,{ten,idx,sl:0,lan:0,entries:[]});
+    const g=map.get(key);
+    const sl=Number(r[1]||0);
+    g.sl+=sl;g.lan++;
+    g.entries.push({ngay:r[3]||'',sl,gh:r[2]||''});// giữ lại từng lần xếp — bấm dòng để xem chi tiết theo ngày
+  });
+  return[...map.values()].sort((a,b)=>b.sl-a.sl);
+}
+function renderXHTopBody(){
+  const el=document.getElementById('xh-top-body');if(!el)return;
+  // Ô "Từ"/"Đến"/"Tháng danh mục"/"Loại hàng" RIÊNG của popup này — lọc thẳng trên toàn bộ C.XH (không phụ
+  // thuộc ô tìm kiếm/Gian hàng ở màn danh sách chính), để xem xếp hạng theo 1 khoảng ngày/tháng/loại hàng
+  // tùy ý mà không cần đóng popup ra ngoài đổi bộ lọc chính rồi mở lại.
+  const from=document.getElementById('xht-from')?.value||'';
+  const to=document.getElementById('xht-to')?.value||'';
+  const dm=document.getElementById('xht-dm')?.value||'';
+  const loai=document.getElementById('xht-loai')?.value||'';
+  let flat=C.XH||[];
+  if(from)flat=flat.filter(r=>(r[3]||'')>=from);
+  if(to)flat=flat.filter(r=>(r[3]||'')<=to);
+  if(dm)flat=flat.filter(r=>(r[6]||'')===dm);
+  if(loai)flat=flat.filter(r=>{const idx=xhTKIndex(r);return idx>=0&&C.TK[idx][13]===loai;});
+  const all=xhTopAgg(flat);
+  const top=xhTopN>0?all.slice(0,xhTopN):all;
+  XH_TOP_ROWS=top;// lưu lại để openXHTopDetail() tra theo chỉ số dòng khi bấm
+  el.innerHTML=top.length
+    ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Số lần xếp</th><th>Tổng SL</th><th>Tồn kho hiện tại</th></tr></thead><tbody>
+    ${top.map((g,i)=>`<tr class="row-edit" onclick="openXHTopDetail(${i})" title="Bấm xem chi tiết theo ngày"><td>${i+1}</td><td><b>${esc(g.ten)}</b></td><td>${g.lan}</td><td>${fmt(g.sl)}</td><td>${g.idx>=0?fmt(C.TK[g.idx][1]||0):'<span style="color:var(--text2)">—</span>'}</td></tr>`).join('')}
+    </tbody></table></div>`
+    :'<div class="empty">Chưa có dữ liệu xếp trong khoảng đang lọc</div>';
+}
+function changeXHTopN(v){xhTopN=Number(v);renderXHTopBody();}
+async function openXHTop(){
+  await ensureTK();
+  await ensureLoai();
+  const s=document.getElementById('xh-topn');if(s)s.value=String(xhTopN);
+  // Kế thừa khoảng ngày + Tháng danh mục đang lọc ở màn danh sách chính (nếu có) làm giá trị mặc định.
+  // (Loại hàng không có ô lọc ở màn chính nên không kế thừa gì, để trống mặc định.)
+  document.getElementById('xht-from').value=document.getElementById('from-xh')?.value||'';
+  document.getElementById('xht-to').value=document.getElementById('to-xh')?.value||'';
+  const dmSel=document.getElementById('xht-dm'),curDm=document.getElementById('dm-xh')?.value||'';
+  dmSel.innerHTML='<option value="">Tất cả các tháng</option>'+
+    dmFilterMonths((C.XH||[]).map(r=>r[6])).map(m=>`<option value="${m}"${m===curDm?' selected':''}>${dmFmt(m)}</option>`).join('');
+  const loaiSel=document.getElementById('xht-loai'),curLoai=loaiSel.value;
+  loaiSel.innerHTML='<option value="">Tất cả loại hàng</option>'+
+    C.LOAI.map(r=>`<option${r[0]===curLoai?' selected':''}>${esc(r[0])}</option>`).join('');
+  renderXHTopBody();
+  om('m-xh-top');
+}
+// Bấm 1 dòng trong bảng "Hàng xếp nhiều nhất" → xem chi tiết từng lần xếp (ngày/SL/gian hàng) của đúng sản
+// phẩm đó, TÍNH TRONG ĐÚNG khoảng "Từ"/"Đến"/"Tháng danh mục"/"Loại hàng" đang lọc ở popup cha.
+function openXHTopDetail(i){
+  const g=XH_TOP_ROWS[i];if(!g)return;
+  const entries=g.entries.slice().sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));
+  const from=document.getElementById('xht-from')?.value||'',to=document.getElementById('xht-to')?.value||'';
+  const dm=document.getElementById('xht-dm')?.value||'';
+  const loai=document.getElementById('xht-loai')?.value||'';
+  const parts=[];
+  if(from||to)parts.push(`${from?dVN(from):'…'} → ${to?dVN(to):'…'}`);
+  if(dm)parts.push(dmFmt(dm));
+  if(loai)parts.push(loai);
+  const rangeTxt=parts.length?' — '+parts.join(' · '):' — toàn bộ thời gian';
+  document.getElementById('xhtd-t').textContent=`Chi tiết xếp hàng — ${g.ten}`;
+  document.getElementById('xhtd-sum').innerHTML=`${entries.length} lần xếp${rangeTxt} · Tổng SL <b>${fmt(g.sl)}</b>`;
+  document.getElementById('xhtd-body').innerHTML=entries.length
+    ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Ngày xếp</th><th>Số lượng</th><th>Gian hàng</th></tr></thead><tbody>
+      ${entries.map(e=>`<tr><td data-label="Ngày xếp">${e.ngay?dVN(e.ngay):'—'}</td><td data-label="Số lượng">${fmt(e.sl)}</td><td data-label="Gian hàng">${esc(e.gh)}</td></tr>`).join('')}
+      </tbody></table></div>`
+    :'<div class="empty">Không có dữ liệu</div>';
+  om('m-xh-top-detail');
+}
 function rXH(groups){
   const flat=groups.flatMap(g=>g.items);
-  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid3 stat-grid3" style="margin-bottom:16px">
+  const soSP=xhTopAgg(flat).length;
+  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid4 stat-grid3" style="margin-bottom:16px">
     <div class="kpi b"><div class="lb">Số ngày xếp</div><div class="val">${groups.length}</div></div>
     <div class="kpi p"><div class="lb">Tổng SL đã xếp</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
-    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div></div>`:'';
+    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div>
+    <div class="kpi p" style="cursor:pointer" onclick="openXHTop()" title="Bấm để xem chi tiết"><div class="lb">Hàng xếp nhiều nhất</div><div class="val">${soSP} <span style="font-size:13px;font-weight:500;color:var(--text2)">mặt hàng ›</span></div></div></div>`:'';
   const el=document.getElementById('xh-tbl');
   if(!groups.length){el.innerHTML='<div class="empty">🏷️ Chưa có phiếu xếp hàng</div>';return;}
   // ── DANH SÁCH THEO THÁNG DANH MỤC — bấm 1 tháng → popup các ngày xếp của tháng đó ──
