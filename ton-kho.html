@@ -65,8 +65,8 @@
       <div class="fg"><label>Đơn vị</label><input id="sp-dv" placeholder="gói, chai..."></div>
     </div>
     <div class="fr">
-      <div class="fg"><label>Giá nhập (đ)</label><input id="sp-gn" type="number" placeholder="0"></div>
-      <div class="fg"><label>Giá bán (đ)</label><input id="sp-gb" type="number" placeholder="0"></div>
+      <div class="fg"><label>Giá nhập (đ)</label><input id="sp-gn" type="text" inputmode="numeric" placeholder="0"></div>
+      <div class="fg"><label>Giá bán (đ)</label><input id="sp-gb" type="text" inputmode="numeric" placeholder="0"></div>
     </div>
     <div class="fr">
       <div class="fg"><label>Hạn sử dụng</label><input id="sp-hsd" type="date"></div>
@@ -251,6 +251,7 @@ async function initSPForm(){
   document.getElementById('m-sp-t').textContent='Thêm sản phẩm';
   ['sp-ma','sp-ten','sp-sl','sp-dv','sp-gn','sp-gb','sp-hsd','sp-ng','sp-hsdsap','sp-hsdgan','sp-ncc','sp-loai'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('sp-row').value='';
+  attachMoneyInput(document.getElementById('sp-gn'));attachMoneyInput(document.getElementById('sp-gb'));
   await ensureNCC();
   attachSearchList(document.getElementById('sp-ncc'),()=>C.NCC.map(r=>r[0]));
   attachSearchList(document.getElementById('sp-loai'),()=>C.LOAI.map(r=>r[0]));
@@ -259,8 +260,9 @@ async function initSPForm(){
 async function editSP(row){
   const r=C.TK[row-2];document.getElementById('m-sp-t').textContent='Sửa sản phẩm';
   document.getElementById('sp-ten').value=r[0]||'';document.getElementById('sp-sl').value=r[1]||'';
-  document.getElementById('sp-dv').value=r[2]||'';document.getElementById('sp-gn').value=r[3]?Math.round(r[3]):'';
-  document.getElementById('sp-gb').value=r[4]||'';document.getElementById('sp-hsd').value=r[5]||'';
+  document.getElementById('sp-dv').value=r[2]||'';attachMoneyInput(document.getElementById('sp-gn'));attachMoneyInput(document.getElementById('sp-gb'));
+  setMoneyVal(document.getElementById('sp-gn'),r[3]?Math.round(r[3]):0);
+  setMoneyVal(document.getElementById('sp-gb'),r[4]||0);document.getElementById('sp-hsd').value=r[5]||'';
   document.getElementById('sp-ng').value=r[7]||'';document.getElementById('sp-ncc').value=r[8]||'';
   document.getElementById('sp-ma').value=r[9]||'';
   document.getElementById('sp-hsdsap').value=r[11]||'';
@@ -296,7 +298,7 @@ async function saveSP(){
   if(!ma&&!er)ma=genNextMaSP();// SP mới mà chưa gõ mã → tự sinh, để luôn có khóa liên kết ổn định (không phụ thuộc tên nữa)
   if(!ma){toast('Thiếu Mã SP — không được để trống (sẽ làm hỏng liên kết với phiếu Nhập/Xếp hàng)','err');return;}
   if(C.TK.some((t,i)=>t[9]===ma&&String(i+2)!==er)){toast(`Mã SP "${ma}" đã được dùng cho sản phẩm khác`,'err');return;}
-  const row=[ten,Math.max(0,Number(document.getElementById('sp-sl').value)||0),document.getElementById('sp-dv').value,document.getElementById('sp-gn').value||0,document.getElementById('sp-gb').value||0,document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
+  const row=[ten,Math.max(0,Number(document.getElementById('sp-sl').value)||0),document.getElementById('sp-dv').value,moneyVal(document.getElementById('sp-gn')),moneyVal(document.getElementById('sp-gb')),document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
   toast('Đang lưu...');
   await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
   logAction(er?'Cập nhật':'Tạo mới','Tồn kho',`Sản phẩm "${ten}", SL: ${row[1]}`);

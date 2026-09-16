@@ -135,7 +135,7 @@
     <h3 id="hd-add-title" style="padding-right:28px">🧾 Thêm hóa đơn</h3>
     <div class="grid2" style="margin-bottom:0">
       <div class="fg"><label>Ngày hóa đơn *</label><input type="date" id="hd-ngay"></div>
-      <div class="fg"><label>Số tiền (đ)</label><input type="number" id="hd-tien" placeholder="0"></div>
+      <div class="fg"><label>Số tiền (đ)</label><input type="text" inputmode="numeric" id="hd-tien" placeholder="0"></div>
     </div>
     <div class="grid2" style="margin-bottom:0">
       <div class="fg"><label>Nhà cung cấp</label><input id="hd-ncc" autocomplete="off" placeholder="Gõ tên nhà cung cấp..."></div>
@@ -358,6 +358,7 @@ function openAddHD(){
   document.getElementById('hd-ngay').value=td();
   document.getElementById('hd-ncc').value='';
   document.getElementById('hd-tien').value='';
+  attachMoneyInput(document.getElementById('hd-tien'));
   document.getElementById('hd-gc').value='';
   document.getElementById('hd-file').value='';
   document.getElementById('hd-cam').value='';
@@ -379,7 +380,8 @@ async function openEditHD(id){
   document.getElementById('hd-save-btn').textContent='Lưu';
   document.getElementById('hd-ngay').value=(rec[1]||'').slice(0,10)||td();
   document.getElementById('hd-ncc').value=rec[2]||'';
-  document.getElementById('hd-tien').value=Number(rec[3]||0)||'';
+  attachMoneyInput(document.getElementById('hd-tien'));
+  setMoneyVal(document.getElementById('hd-tien'),rec[3]||0);
   document.getElementById('hd-gc').value=rec[4]||'';
   document.getElementById('hd-file').value='';
   document.getElementById('hd-cam').value='';
@@ -477,7 +479,7 @@ async function saveHD(){
     await initFirebase();
     const ngay=document.getElementById('hd-ngay').value||td();
     const ncc=document.getElementById('hd-ncc').value.trim();
-    const tien=Number(document.getElementById('hd-tien').value||0);
+    const tien=moneyVal(document.getElementById('hd-tien'));
     const gc=document.getElementById('hd-gc').value.trim();
     const nguoiNhap=document.getElementById('hd-user').value;
 

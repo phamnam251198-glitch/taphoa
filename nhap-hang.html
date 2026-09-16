@@ -147,21 +147,22 @@ function addNHRow(){
   tr.id='nh-r-'+id;
   tr.innerHTML=`<td><input id="nh-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." oninput="nhFillGia(${id})" style="min-width:130px"></td>
     <td><input type="number" id="nh-sl-${id}" placeholder="0" oninput="nhCalc(${id},'sl')" style="width:70px"></td>
-    <td><input type="number" id="nh-gia-${id}" placeholder="0" oninput="nhCalc(${id},'gia')" style="width:90px"></td>
-    <td><input type="number" id="nh-tong-${id}" placeholder="0" oninput="nhCalc(${id},'tong')" style="width:100px"></td>
+    <td><input type="text" inputmode="numeric" id="nh-gia-${id}" placeholder="0" oninput="nhCalc(${id},'gia')" style="width:90px"></td>
+    <td><input type="text" inputmode="numeric" id="nh-tong-${id}" placeholder="0" oninput="nhCalc(${id},'tong')" style="width:100px"></td>
     <td><input type="date" id="nh-hsd-${id}" style="width:130px"></td>
     <td><input id="nh-loai-${id}" autocomplete="off" style="width:110px"></td>
     <td class="td-del"><button class="btn btn-d btn-sm" onclick="removeRowEl(document.getElementById('nh-r-${id}'));calcNH()">✕</button></td>`;
   document.getElementById('nh-rows').appendChild(tr);
   attachSearchList(document.getElementById('nh-sp-'+id),()=>C.TK.map(t=>t[0]));
   attachSearchList(document.getElementById('nh-loai-'+id),()=>C.LOAI.map(r=>r[0]));
+  attachMoneyInput(document.getElementById('nh-gia-'+id));attachMoneyInput(document.getElementById('nh-tong-'+id));
 }
 // Gõ/chọn sản phẩm khớp đúng tên có sẵn → gợi ý sẵn Giá nhập = giá nhập cũ, Loại hàng = loại đã lưu, rồi tính lại Tổng theo giá đó
 function nhFillGia(id){
   const val=document.getElementById('nh-sp-'+id).value;
   const idx=C.TK.findIndex(t=>t[0]===val);
   if(idx>=0){
-    document.getElementById('nh-gia-'+id).value=C.TK[idx][3]||0;
+    setMoneyVal(document.getElementById('nh-gia-'+id),C.TK[idx][3]||0);
     document.getElementById('nh-loai-'+id).value=C.TK[idx][13]||'';
     nhCalc(id,'gia');
   } else calcNH();
@@ -174,11 +175,11 @@ function nhCalc(id,changed){
   const tongEl=document.getElementById('nh-tong-'+id);
   const sl=Number(slEl.value||0);
   if(changed==='tong'){
-    const tong=Number(tongEl.value||0);
-    if(sl>0)giaEl.value=Math.round(tong/sl);
+    const tong=moneyVal(tongEl);
+    if(sl>0)setMoneyVal(giaEl,Math.round(tong/sl));
   } else {
-    const gia=Number(giaEl.value||0);
-    tongEl.value=sl*gia||'';
+    const gia=moneyVal(giaEl);
+    setMoneyVal(tongEl,sl*gia||0);
   }
   calcNH();
 }
@@ -188,7 +189,7 @@ function calcNH(){
   rows.forEach(tr=>{
     const id=tr.id.replace('nh-r-','');
     tsl+=Number(document.getElementById('nh-sl-'+id)?.value||0);
-    ttt+=Number(document.getElementById('nh-tong-'+id)?.value||0);
+    ttt+=moneyVal(document.getElementById('nh-tong-'+id));
   });
   document.getElementById('nh-tsl').textContent=fmt(tsl);
   document.getElementById('nh-ttt').textContent=fmt(roundMoney(ttt))+'đ';
@@ -225,7 +226,7 @@ async function saveNH(){
     const spVal=document.getElementById('nh-sp-'+id)?.value||'';
     const idx=C.TK.findIndex(t=>t[0]===spVal);
     const sl=Number(document.getElementById('nh-sl-'+id)?.value||0);
-    const gia=Number(document.getElementById('nh-gia-'+id)?.value||0);// đã tự đồng bộ với Tổng giá nhập qua nhCalc()
+    const gia=moneyVal(document.getElementById('nh-gia-'+id));// đã tự đồng bộ với Tổng giá nhập qua nhCalc()
     const hsd=document.getElementById('nh-hsd-'+id)?.value||'';
     const loai=document.getElementById('nh-loai-'+id)?.value||'';
     if(idx>=0&&sl>0)items.push({idx,sp:C.TK[idx],sl,gia,hsd,loai});
@@ -239,7 +240,7 @@ async function saveNH(){
   spEls.forEach(el=>hlRow(el,false));
   // Chỉ chặn khi trùng CẢ tên lẫn giá nhập (nhập nhầm y hệt) — cùng tên nhưng KHÁC giá nhập thì cho lưu
   // (thực tế nhập cùng 1 sản phẩm nhiều đợt/nhiều đơn giá khác nhau là bình thường, ví dụ NCC tăng giá)
-  const giaOf=el=>Number(document.getElementById('nh-gia-'+el.id.replace('nh-sp-',''))?.value||0);
+  const giaOf=el=>moneyVal(document.getElementById('nh-gia-'+el.id.replace('nh-sp-','')));
   const fb={};let dTr=null,dName='';
   for(const el of spEls){const n=(el.value||'').trim();if(!n)continue;const k=n.toLowerCase()+'|'+giaOf(el);
     if(fb[k]){hlRow(el,true);hlRow(fb[k],true);if(!dTr){dTr=el.closest('tr');dName=n;}}else fb[k]=el;}
@@ -620,7 +621,7 @@ function nhDayFillHeader(items){
 // Sửa trực tiếp (inline) từng dòng nhập ngay trong popup — tính lại "Thành tiền" khi gõ SL/Giá
 function nhdCalc(id){
   const sl=Number(document.getElementById('nhd-sl-'+id)?.value||0);
-  const gia=Number(document.getElementById('nhd-gia-'+id)?.value||0);
+  const gia=moneyVal(document.getElementById('nhd-gia-'+id));
   const el=document.getElementById('nhd-tt-'+id);
   if(el)el.textContent=fmt(sl*gia)+'đ';
 }
@@ -653,7 +654,7 @@ function renderNHDayDetail(){
     return`<tr>
       <td><input id="nhd-sp-${row}" value="${esc(r[0])}" autocomplete="off" oninput="nhdFillLoai(${row})" style="min-width:150px"></td>
       <td><input type="number" id="nhd-sl-${row}" value="${r[1]||0}" style="width:70px" oninput="nhdCalc(${row})"></td>
-      <td><input type="number" id="nhd-gia-${row}" value="${r[2]||0}" style="width:95px" oninput="nhdCalc(${row})"></td>
+      <td><input type="text" inputmode="numeric" id="nhd-gia-${row}" value="${r[2]?Number(r[2]).toLocaleString('vi-VN'):''}" style="width:95px" oninput="nhdCalc(${row})"></td>
       <td><b id="nhd-tt-${row}">${fmt(Number(r[1]||0)*Number(r[2]||0))}đ</b></td>
       <td><input type="date" id="nhd-hsd-${row}" value="${r[7]||''}" style="width:140px"></td>
       <td><input id="nhd-loai-${row}" value="${esc(r[8]||'')}" autocomplete="off" style="width:120px"></td>
@@ -688,6 +689,7 @@ function renderNHDayDetail(){
     </div></div>`+emptyMsg;
   wrap.querySelectorAll('[id^="nhd-sp-"]').forEach(el=>attachSearchList(el,()=>C.TK.map(t=>t[0])));
   wrap.querySelectorAll('[id^="nhd-loai-"]').forEach(el=>attachSearchList(el,()=>C.LOAI.map(r=>r[0])));
+  wrap.querySelectorAll('[id^="nhd-gia-"]').forEach(attachMoneyInput);
 }
 // Thêm 1 dòng TRỐNG (chưa lưu) vào popup để nhập thêm sản phẩm mới cho đúng ngày này
 let nhDayNewCount=0;
@@ -703,7 +705,7 @@ function addNHDayRow(){
   tr.innerHTML=`
     <td><input id="nhd-sp-${id}" autocomplete="off" placeholder="Gõ tên sản phẩm..." oninput="nhdFillLoai('${id}')" style="min-width:150px"></td>
     <td><input type="number" id="nhd-sl-${id}" placeholder="0" style="width:70px" oninput="nhdCalc('${id}')"></td>
-    <td><input type="number" id="nhd-gia-${id}" placeholder="0" style="width:95px" oninput="nhdCalc('${id}')"></td>
+    <td><input type="text" inputmode="numeric" id="nhd-gia-${id}" placeholder="0" style="width:95px" oninput="nhdCalc('${id}')"></td>
     <td><b id="nhd-tt-${id}">0đ</b></td>
     <td><input type="date" id="nhd-hsd-${id}" style="width:140px"></td>
     <td><input id="nhd-loai-${id}" autocomplete="off" style="width:120px"></td>
@@ -712,6 +714,7 @@ function addNHDayRow(){
   tbody.appendChild(tr);
   attachSearchList(document.getElementById('nhd-sp-'+id),()=>C.TK.map(t=>t[0]));
   attachSearchList(document.getElementById('nhd-loai-'+id),()=>C.LOAI.map(r=>r[0]));
+  attachMoneyInput(document.getElementById('nhd-gia-'+id));
 }
 // Tạo mới 1 dòng Nhập hàng (dùng cho dòng vừa "+ Thêm" trong popup theo ngày) — cùng logic cộng tồn kho như saveNH()
 async function saveNHCreateCore(spIdx,sl,gia,ncc,ngay,gc,user,hsd,loai,dm){
@@ -765,7 +768,7 @@ async function saveNHDayAll(){
   const hlRow=(el,on)=>{const tr=el&&el.closest('tr');if(tr)tr.querySelectorAll('td').forEach(td=>td.style.background=on?'#f5b0b0':'');};
   const spInputs=[...document.querySelectorAll('#nh-day-tbl [id^="nhd-sp-"]')];
   spInputs.forEach(el=>hlRow(el,false));
-  const giaOf=el=>Number(document.getElementById('nhd-gia-'+el.id.replace('nhd-sp-',''))?.value||0);
+  const giaOf=el=>moneyVal(document.getElementById('nhd-gia-'+el.id.replace('nhd-sp-','')));
   const firstBy={};let dupTr=null,dupName='';
   for(const el of spInputs){
     const n=(el.value||'').trim();if(!n)continue;
@@ -789,7 +792,7 @@ async function saveNHDayAll(){
     const old=C.NH[row-2];
     const spIdx=C.TK.findIndex(t=>t[0]===spEl.value);
     const sl=Number(document.getElementById('nhd-sl-'+row).value||0);
-    const gia=Number(document.getElementById('nhd-gia-'+row).value||0);
+    const gia=moneyVal(document.getElementById('nhd-gia-'+row));
     const hsd=document.getElementById('nhd-hsd-'+row).value;
     const loai=document.getElementById('nhd-loai-'+row).value;
     const rowUser=document.getElementById('nhd-user-'+row)?.value||old[6]||'';
@@ -806,7 +809,7 @@ async function saveNHDayAll(){
     const sl=Number(document.getElementById('nhd-sl-'+id).value||0);
     if(!spVal&&!sl)continue;// dòng để trống hoàn toàn (bấm + Thêm nhưng không gõ gì), bỏ qua
     const spIdx=C.TK.findIndex(t=>t[0]===spVal);
-    const gia=Number(document.getElementById('nhd-gia-'+id).value||0);
+    const gia=moneyVal(document.getElementById('nhd-gia-'+id));
     const hsd=document.getElementById('nhd-hsd-'+id).value;
     const loai=document.getElementById('nhd-loai-'+id).value;
     const rowUser=document.getElementById('nhd-user-'+id)?.value||currentUserName();

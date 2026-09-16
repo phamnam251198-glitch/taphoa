@@ -206,6 +206,27 @@ async function apiDeleteRows(sheet,indices){
 
 // apiGetRaw dùng để check initialized
 function fmt(n){return Number(n||0).toLocaleString('vi-VN');}
+// ── Ô NHẬP TIỀN tự thêm dấu chấm phân cách hàng nghìn khi gõ (Giá nhập, Giá bán, Thành tiền, Số tiền...) ──
+// input type="number" của trình duyệt KHÔNG cho hiển thị dấu phân cách, nên các ô tiền dùng type="text" +
+// inputmode="numeric" (vẫn bật bàn phím số trên điện thoại), tự lọc ký tự không phải số và tự chèn dấu "."
+// theo hàng nghìn mỗi khi gõ — khớp định dạng vi-VN mà fmt() đang dùng để HIỂN THỊ tiền trong toàn app.
+// Đọc giá trị số thật bằng moneyVal(el); đặt giá trị đã format bằng setMoneyVal(el,v).
+function attachMoneyInput(el){
+  if(!el||el.dataset.moneyBound)return;
+  el.dataset.moneyBound='1';
+  el.addEventListener('input',()=>{
+    const before=el.value.slice(0,el.selectionStart).replace(/[^\d]/g,'').length;
+    const digits=el.value.replace(/[^\d]/g,'').replace(/^0+(?=\d)/,'');
+    el.value=digits?Number(digits).toLocaleString('vi-VN'):'';
+    let pos=el.value.length,n=0;
+    if(before>0){
+      for(let i=0;i<el.value.length;i++){if(/\d/.test(el.value[i])){n++;if(n===before){pos=i+1;break;}}}
+    } else pos=0;
+    el.setSelectionRange(pos,pos);
+  });
+}
+function moneyVal(el){return el?Number((el.value||'').replace(/[^\d]/g,''))||0:0;}
+function setMoneyVal(el,v){if(el)el.value=v?Number(v).toLocaleString('vi-VN'):'';}
 // Chuẩn hóa chuỗi để tìm kiếm KHÔNG PHÂN BIỆT DẤU tiếng Việt (gõ "lu" vẫn ra "Lương khô") — bỏ dấu + viết
 // thường. Dùng ở MỌI ô tìm kiếm/lọc trong app: so khớp bằng vnNorm(text).includes(vnNorm(query)) thay vì
 // text.toLowerCase().includes(query) như trước (chỉ bỏ phân biệt hoa/thường, không bỏ được dấu).
