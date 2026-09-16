@@ -113,12 +113,17 @@
   <div class="mb mb-lg">
     <button class="modal-x" onclick="cm('m-nh-top')" aria-label="Đóng">✕</button>
     <h3 style="padding-right:28px">🏆 Hàng nhập nhiều</h3>
-    <div style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <label style="font-size:12px;color:var(--text2);white-space:nowrap">Từ</label>
+      <input type="date" id="nht-from" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+      <label style="font-size:12px;color:var(--text2);white-space:nowrap">Đến</label>
+      <input type="date" id="nht-to" onchange="renderNHTopBody()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
       <select id="nh-topn" onchange="changeNHTopN(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
         <option value="5">Top 5</option>
         <option value="10">Top 10</option>
         <option value="0">Tất cả</option>
       </select>
+      <button class="btn btn-g btn-sm" onclick="document.getElementById('nht-from').value='';document.getElementById('nht-to').value='';renderNHTopBody()">✕ Xóa lọc</button>
     </div>
     <div id="nh-top-body"></div>
   </div>
@@ -383,7 +388,7 @@ function nhCompare(a,b,col){
 }
 // "Hàng nhập nhiều" — gộp theo Mã SP (qua nhTKIndex) chứ không theo tên, để đổi tên SP không tách lẻ dữ liệu.
 // KHÔNG hiển thị inline nữa: ô thống kê ở đầu màn (openNHTop) → popup m-nh-top.
-let nhTopN=5,nhLastFlat=[];
+let nhTopN=5;
 function nhTopAgg(flat){
   const map=new Map();
   (flat||[]).forEach(r=>{
@@ -398,7 +403,15 @@ function nhTopAgg(flat){
 }
 function renderNHTopBody(){
   const el=document.getElementById('nh-top-body');if(!el)return;
-  const all=nhTopAgg(nhLastFlat);
+  // Ô "Từ"/"Đến" RIÊNG của popup này — lọc thẳng trên toàn bộ C.NH (không phụ thuộc ô tìm kiếm/Người
+  // nhập/Tháng danh mục ở màn danh sách chính), để xem xếp hạng theo 1 khoảng ngày tùy ý mà không cần
+  // đóng popup ra ngoài đổi bộ lọc chính rồi mở lại.
+  const from=document.getElementById('nht-from')?.value||'';
+  const to=document.getElementById('nht-to')?.value||'';
+  let flat=C.NH||[];
+  if(from)flat=flat.filter(r=>(r[4]||'')>=from);
+  if(to)flat=flat.filter(r=>(r[4]||'')<=to);
+  const all=nhTopAgg(flat);
   const top=nhTopN>0?all.slice(0,nhTopN):all;
   el.innerHTML=top.length
     ?`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th style="width:40px">#</th><th>Sản phẩm</th><th>Số lần nhập</th><th>Tổng SL</th><th>Tổng tiền</th></tr></thead><tbody>
@@ -409,12 +422,15 @@ function renderNHTopBody(){
 function changeNHTopN(v){nhTopN=Number(v);renderNHTopBody();}
 function openNHTop(){
   const s=document.getElementById('nh-topn');if(s)s.value=String(nhTopN);
+  // Kế thừa khoảng ngày đang lọc ở màn danh sách chính (nếu có) làm giá trị mặc định — mở ra vẫn đúng
+  // khoảng đang xem ngoài kia, muốn xem khoảng khác thì sửa ngay trong popup, không ảnh hưởng bộ lọc chính.
+  document.getElementById('nht-from').value=document.getElementById('from-nh')?.value||'';
+  document.getElementById('nht-to').value=document.getElementById('to-nh')?.value||'';
   renderNHTopBody();
   om('m-nh-top');
 }
 function rNH(groups){
   const flat=groups.flatMap(g=>g.items);
-  nhLastFlat=flat;
   const total=flat.reduce((s,r)=>s+Number(r[1]||0)*Number(r[2]||0),0);
   const soSP=nhTopAgg(flat).length;
   document.getElementById('nh-sum').innerHTML=flat.length?`<div class="grid4 stat-grid3" style="margin-bottom:16px">
