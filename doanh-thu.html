@@ -38,6 +38,8 @@
         <select id="dt-moc" onchange="renderDT()" disabled title="Xem doanh thu tính đến 1 mốc kiểm kê trong kỳ"><option value="">Đến mốc kiểm kê cuối cùng</option></select>
         <button class="btn btn-g" onclick="dtClear()">✕ Xóa lọc</button>
         <button class="btn btn-p" onclick="openDTChart()">📊 Biểu đồ</button>
+        <button class="btn btn-p" onclick="openDTTrend()">📈 Xu hướng SP/Loại hàng</button>
+        <button class="btn btn-g" onclick="exportDT()">📤 Xuất Excel</button>
       </div>
       </details>
       <div class="dt-note">Doanh thu ƯỚC TÍNH = <b>SL đã rời kệ gian hàng</b> (tồn đầu kỳ + đã xếp hàng − tồn cuối kỳ) × <b>giá bán hiện tại</b>.
@@ -54,6 +56,26 @@
     <button class="modal-x" onclick="cm('m-dt-detail')" aria-label="Đóng">✕</button>
     <h3 id="dt-d-t" style="padding-right:28px">Chi tiết doanh thu</h3>
     <div id="dt-d-sum"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input type="text" id="dt-d-q" placeholder="Tìm sản phẩm..." oninput="renderDTDetailBody()" style="flex:1 1 200px;box-sizing:border-box;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none">
+      <select id="dt-d-loai" onchange="renderDTDetailBody()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none"><option value="">Tất cả loại hàng</option></select>
+      <select id="dt-d-goiy" onchange="renderDTDetailBody()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
+        <option value="">Tất cả gợi ý</option>
+        <option value="🔴 Giảm giá gấp">🔴 Giảm giá gấp</option>
+        <option value="🔴 Giảm giá/dừng nhập">🔴 Giảm giá/dừng nhập</option>
+        <option value="⚠️ Đang lỗ — xem lại giá">⚠️ Đang lỗ — xem lại giá</option>
+        <option value="⚠️ Biên lãi thấp">⚠️ Biên lãi thấp</option>
+        <option value="🟢 Nên nhập thêm">🟢 Nên nhập thêm</option>
+        <option value="—">— (không có gì đặc biệt)</option>
+      </select>
+      <div style="display:flex;gap:6px;align-items:center">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">HSD từ</label>
+        <input type="date" id="dt-d-hsd-tu" onchange="renderDTDetailBody()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">đến</label>
+        <input type="date" id="dt-d-hsd-den" onchange="renderDTDetailBody()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:#fff">
+      </div>
+      <button class="btn btn-g" onclick="exportDTDetail()">📤 Xuất Excel</button>
+    </div>
     <div id="dt-d-body"></div>
   </div>
 </div>
@@ -81,6 +103,20 @@
   </div>
 </div>
 
+<!-- XU HƯỚNG 1 SẢN PHẨM / 1 LOẠI HÀNG QUA NHIỀU THÁNG DANH MỤC -->
+<div class="mo" id="m-dt-trend">
+  <div class="mb mb-lg">
+    <button class="modal-x" onclick="cm('m-dt-trend')" aria-label="Đóng">✕</button>
+    <h3 style="padding-right:28px">📈 Xu hướng qua nhiều tháng</h3>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-sm" id="dt-tr-sp" onclick="dtTrendMode('sp')">Theo sản phẩm</button>
+      <button class="btn btn-sm" id="dt-tr-loai" onclick="dtTrendMode('loai')">Theo loại hàng</button>
+    </div>
+    <div id="dt-tr-pick" style="margin-bottom:14px"></div>
+    <div id="dt-tr-body"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 <script src="app.js?v=20260915h"></script>
 <script>
@@ -93,7 +129,7 @@ let DT_ROWS = [];
 async function loadDT(){
   document.getElementById('dt-tbl').innerHTML = '<div class="ld"><div class="spin"></div></div>';
   await ensureDmKy();
-  [C.TK, C.KK, C.XH] = await Promise.all([apiGet('TonKho'), apiGet('KiemKe'), apiGet('XepHang')]);
+  [C.TK, C.KK, C.XH, C.NH, C.GH, C.GHK] = await Promise.all([apiGet('TonKho'), apiGet('KiemKe'), apiGet('XepHang'), apiGet('NhapHang'), apiGet('GianHang'), apiGet('GianHangKho')]);
   // Danh sách tháng = 7 tháng mặc định + mọi Tháng danh mục có trên phiếu Kiểm kê Gian hàng / Xếp hàng
   // (giống các màn khác — dùng dmFilterMonths). Mới nhất lên đầu.
   const months = dmFilterMonths([
@@ -104,7 +140,7 @@ async function loadDT(){
 
   DT_ROWS = months.map(ym => {
     const r = computeRevenuePeriod(ym);
-    return { ym, sl: r.sl, dt: r.dt, von: r.von, ln: r.ln, missing: r.missing, soUoc: r.soUoc, tongSP: r.tongSP, items: r.items, missItems: r.missItems };
+    return { ym, sl: r.sl, dt: r.dt, von: r.von, ln: r.ln, gop: r.dt - nhTongTienDm(ym), missing: r.missing, soUoc: r.soUoc, tongSP: r.tongSP, items: r.items, missItems: r.missItems };
   });
 
   const sel = document.getElementById('dt-dm'), cur = sel.value;
@@ -113,6 +149,10 @@ async function loadDT(){
   dtDmChanged();
 }
 
+// Tổng tiền Nhập hàng (SL nhập × giá nhập) của các phiếu có Tháng danh mục = ym (mọi SP gộp lại).
+function nhTongTienDm(ym){
+  return C.NH.filter(r => r[10] === ym).reduce((s, r) => s + Number(r[1] || 0) * Number(r[2] || 0), 0);
+}
 function dtClear(){ document.getElementById('dt-dm').value = ''; document.getElementById('dt-moc').value = ''; dtDmChanged(); }
 
 // Đổi Tháng danh mục → đổ lại dropdown "mốc kiểm kê" của kỳ đó (mới → cũ), giữ lựa chọn cũ nếu còn hợp lệ.
@@ -140,7 +180,7 @@ function renderDT(){
   let rows;
   if (flt){
     const r = computeRevenuePeriod(flt, cap);
-    rows = [{ ym: flt, cap, sl: r.sl, dt: r.dt, von: r.von, ln: r.ln, missing: r.missing, soUoc: r.soUoc, tongSP: r.tongSP, items: r.items, missItems: r.missItems }];
+    rows = [{ ym: flt, cap, sl: r.sl, dt: r.dt, von: r.von, ln: r.ln, gop: r.dt - nhTongTienDm(flt), missing: r.missing, soUoc: r.soUoc, tongSP: r.tongSP, items: r.items, missItems: r.missItems }];
   } else {
     rows = DT_ROWS.filter(r => r.missing < r.tongSP || r.sl !== 0);
   }
@@ -158,10 +198,11 @@ function renderDT(){
     el.innerHTML = '<div class="empty">📊 Chưa có dữ liệu — cần có lịch sử Kiểm kê Gian hàng để tính doanh thu</div>';
     return;
   }
-  el.innerHTML = '<table class="m-tbl"><thead><tr><th>Tháng danh mục</th><th>SL bán ra</th><th>Doanh thu</th><th>Giá vốn</th><th>Lợi nhuận</th><th>LN%</th></tr></thead><tbody>' +
+  el.innerHTML = '<table class="m-tbl"><thead><tr><th>Tháng danh mục</th><th>SL bán ra</th><th>Doanh thu</th><th title="Doanh thu trừ tổng tiền nhập hàng trong tháng danh mục">Doanh thu gộp</th><th>Giá vốn</th><th>Lợi nhuận</th><th>LN%</th></tr></thead><tbody>' +
     rows.map(r => {
       const b = r.dt ? Math.round(r.ln / r.dt * 100) : 0;
       const cl = r.ln < 0 ? 'color:#d03b3b' : (r.ln > 0 ? 'color:#0ca30c' : '');
+      const gopCl = r.gop < 0 ? 'color:#d03b3b' : (r.gop > 0 ? 'color:#0ca30c' : '');
       const note = r.missing ? ` <span style="color:var(--text2);font-size:10px">(${r.missing} SP thiếu kiểm kê)</span>` : '';
       const uocNote = r.soUoc ? ` <span style="color:#b8860b;font-size:10px">· ${r.soUoc} SP ước tính từ mốc đầu trong kỳ</span>` : '';
       const capNote = r.cap ? ` <span style="color:var(--text2);font-size:10px">· tính đến ${dVN(r.cap)}</span>` : '';
@@ -169,31 +210,146 @@ function renderDT(){
         <td data-label="Tháng danh mục"><b>${dmFmt(r.ym)}</b>${capNote}${uocNote}${note}</td>
         <td data-label="SL bán ra">${fmt(r.sl)}</td>
         <td data-label="Doanh thu">${fmt(roundMoney(r.dt))}đ</td>
+        <td data-label="Doanh thu gộp" style="${gopCl}">${fmt(roundMoney(r.gop))}đ</td>
         <td data-label="Giá vốn">${fmt(roundMoney(r.von))}đ</td>
         <td data-label="Lợi nhuận" style="${cl};font-weight:600">${fmt(roundMoney(r.ln))}đ</td>
         <td data-label="LN%" style="${cl}">${b}%</td></tr>`;
     }).join('') + '</tbody></table>';
 }
+// Xuất đúng các dòng ĐANG HIỂN THỊ (DT_SHOWN, đã áp bộ lọc tháng/mốc kiểm kê hiện tại) — không phải toàn bộ.
+function exportDT(){
+  const headers = ['Tháng danh mục', 'SL bán ra', 'Doanh thu', 'Doanh thu gộp', 'Giá vốn', 'Lợi nhuận', 'LN%'];
+  const rows = DT_SHOWN.map(r => {
+    const b = r.dt ? Math.round(r.ln / r.dt * 100) : 0;
+    return [dmFmt(r.ym), r.sl, roundMoney(r.dt), roundMoney(r.gop), roundMoney(r.von), roundMoney(r.ln), b + '%'];
+  });
+  exportCSV(`DoanhThu_${td()}.csv`, headers, rows);
+}
 
 // ── Chi tiết doanh thu 1 kỳ theo từng SP — có sắp xếp theo cột (giống màn Tồn kho) ──
 const DT_DCOLS = [
   { key: 'ten', label: 'Sản phẩm' }, { key: 'daBan', label: 'SL bán' },
+  { key: 'sellThrough', label: 'Tỷ lệ tiêu thụ' },
+  { key: 'tbNgay', label: 'TB/ngày' }, { key: 'canBan', label: 'Cần bán/ngày' },
   { key: 'giaBan', label: 'Giá bán' }, { key: 'giaNhap', label: 'Giá nhập' },
   { key: 'doanhThu', label: 'Doanh thu' }, { key: 'giaVon', label: 'Giá vốn' }, { key: 'loiNhuan', label: 'Lợi nhuận' },
+  { key: 'goiY', label: 'Gợi ý' },
 ];
 let DT_DETAIL = null, dtSortCol = 'doanhThu', dtSortDir = -1; // -1 = giảm dần
 function dtDetailSort(col){
   if (dtSortCol === col) dtSortDir *= -1; else { dtSortCol = col; dtSortDir = 1; }
   renderDTDetailBody();
 }
+// Số ngày LÀM VIỆC (bỏ Thứ 7/CN) từ SAU ngày đầu kỳ đến hết ngày cuối kỳ — cùng quy ước "tính từ sau mốc
+// đầu" như xhAddedInRange (app.js) để khớp đúng khoảng đã tính SL bán.
+function dtWeekdayCount(fromExclusive, toInclusive){
+  if (!fromExclusive || !toInclusive || fromExclusive >= toInclusive) return 0;
+  let d = bAddDays(fromExclusive, 1), n = 0;
+  while (d <= toInclusive){
+    const wd = new Date(d + 'T00:00:00Z').getUTCDay(); // 0=CN, 6=T7
+    if (wd !== 0 && wd !== 6) n++;
+    d = bAddDays(d, 1);
+  }
+  return n;
+}
+function dtItemTbNgay(it){
+  const n = dtWeekdayCount(it.dauDate, it.cuoiDate);
+  return n ? it.daBan / n : 0;
+}
+// Tỷ lệ tiêu thụ (sell-through) = SL đã bán ÷ (SL đã bán + Tồn hiện tại LIVE) × 100% — dùng ĐÚNG "tồn hiện
+// tại" giống cột "Cần bán/ngày" bên cạnh (Kho tổng + mọi gian hàng, tính live) để nhất quán số liệu trong
+// cùng 1 hàng, KHÔNG dùng tồn cuối kỳ tại lần kiểm kê cũ (số đó không hiện ra ở đâu, dễ gây lệch/khó hiểu).
+// Khác "TB/ngày" (tốc độ tuyệt đối): SP nhập ít mà tỷ lệ ~100% (tồn hiện tại gần 0) rất có thể là THIẾU
+// HÀNG (mất doanh thu), không hẳn là "bán chạy" đơn thuần. null khi cả đã bán lẫn tồn hiện tại đều = 0.
+function dtItemSellThrough(it){
+  const total = it.daBan + dtItemTongTon(it);
+  return total > 0 ? (it.daBan / total) * 100 : null;
+}
+// Hạn chót để "bán hết tồn hiện tại": SP CÓ Hạn sử dụng → luôn tính đến đúng Hạn sử dụng đó (kể cả khi hạn
+// nằm sau cuối tháng). SP KHÔNG có Hạn sử dụng → tính đến cuối Tháng danh mục đang xem (mục tiêu "bán hết trong tháng").
+function dtItemDeadline(it){
+  return it.hsd || dmRange(DT_DETAIL.ym).to;
+}
+// Tồn hiện tại THẬT (live, tính ngay lúc mở popup) = Tồn Kho tổng (TonKho) + tồn ở TẤT CẢ gian hàng khác
+// (cộng dồn Xếp hàng + điều chỉnh Kiểm kê của từng gian, qua ghkQty ở app.js) — không dùng số tại lần kiểm
+// kê cũ nữa vì có thể đã lạc hậu (đã xếp/bán thêm sau đó mà chưa kiểm kê lại).
+function dtItemTongTon(it){
+  const spIdx = C.TK.findIndex(t => (it.ma && t[9] === it.ma) || (!it.ma && t[0] === it.ten));
+  const khoTong = spIdx >= 0 ? Number(C.TK[spIdx][1] || 0) : 0;
+  const cacGianHang = (C.GH || []).reduce((s, g) => s + ghkQty(it.ten, g[0]), 0);
+  return khoTong + cacGianHang;
+}
+// Mức CẦN bán mỗi ngày (từ hôm nay, bỏ Thứ 7/CN) để bán hết tồn hiện tại trước hạn chót ở trên. Hạn chót
+// đã tới/qua rồi (không còn ngày làm việc nào) → coi là "Gấp!" (rate=null).
+function dtItemCanBan(it){
+  const today = td(), deadline = dtItemDeadline(it), ton = dtItemTongTon(it);
+  const days = deadline > today ? dtWeekdayCount(today, deadline) : 0;
+  return { ton, days, deadline, rate: days ? ton / days : null };
+}
+// Gợi ý hành động — quy tắc đơn giản, minh bạch (không phải AI đoán), dựa trên đúng số đã tính sẵn ở trên.
+// Ưu tiên từ cấp bách nhất (nguy cơ đổ bỏ hàng tồn/hết hạn) → đến cảnh báo lãi → đến gợi ý nhập thêm.
+// prio dùng để SẮP XẾP cột này khi bấm sort (cao = cấp bách hơn); không phải điểm số hiển thị ra ngoài.
+function dtItemGoiY(it){
+  const tb = dtItemTbNgay(it), cb = dtItemCanBan(it);
+  const bienLN = it.doanhThu ? it.loiNhuan / it.doanhThu : null;
+  // 2 cảnh báo "giảm giá/dừng nhập" chỉ có ý nghĩa khi SP THẬT SỰ có nguy cơ hết hạn — tức phải có Hạn sử
+  // dụng. SP không có Hạn sử dụng (hàng khô/tích trữ, không lo hỏng nhanh) thì KHÔNG cảnh báo dù tồn nhiều/
+  // bán chậm — "cuối tháng danh mục" chỉ là mốc kế toán, không phải hạn thật để ép bán, tính "Cần bán/ngày"
+  // vẫn giữ nguyên công thức cũ, chỉ bỏ 2 nhánh cảnh báo đỏ này khi thiếu Hạn sử dụng.
+  if (it.hsd && cb.ton > 0 && cb.rate === null)
+    return { prio: 4, text: '🔴 Giảm giá gấp', cl: 'color:#d03b3b;font-weight:600',
+      title: `Còn ${fmt(cb.ton)} tồn nhưng đã hết ngày làm việc để bán hết trước hạn ${dVN(cb.deadline)}` };
+  if (it.hsd && cb.ton > 0 && cb.rate !== null && (tb === 0 || cb.rate > tb * 1.5))
+    return { prio: 3, text: '🔴 Giảm giá/dừng nhập', cl: 'color:#d03b3b;font-weight:600',
+      title: `Đang bán ${tb.toFixed(1)}/ngày, cần ${cb.rate.toFixed(1)}/ngày mới hết ${fmt(cb.ton)} tồn trước hạn ${dVN(cb.deadline)}` };
+  if (bienLN !== null && bienLN < 0)
+    return { prio: 2, text: '⚠️ Đang lỗ — xem lại giá', cl: 'color:#d03b3b',
+      title: `Biên lợi nhuận ${(bienLN * 100).toFixed(1)}%` };
+  if (bienLN !== null && bienLN < 0.1)
+    return { prio: 1, text: '⚠️ Biên lãi thấp', cl: 'color:#b8860b',
+      title: `Biên lợi nhuận chỉ ${(bienLN * 100).toFixed(1)}%` };
+  if (tb > 0 && cb.ton > 0 && (cb.ton / tb) < 7)
+    return { prio: 1, text: '🟢 Nên nhập thêm', cl: 'color:#0ca30c;font-weight:600',
+      title: `Tồn hiện tại chỉ đủ bán ~${(cb.ton / tb).toFixed(1)} ngày nữa với tốc độ đang bán` };
+  return { prio: 0, text: '—', cl: 'color:var(--text2)', title: '' };
+}
 function dtDCompare(a, b, col){
   if (col === 'ten') return (a.ten || '').localeCompare(b.ten || '');
+  if (col === 'tbNgay') return dtItemTbNgay(a) - dtItemTbNgay(b);
+  if (col === 'sellThrough'){
+    const sa = dtItemSellThrough(a), sb = dtItemSellThrough(b);
+    return (sa === null ? -1 : sa) - (sb === null ? -1 : sb);
+  }
+  if (col === 'canBan'){
+    const ra = dtItemCanBan(a).rate, rb = dtItemCanBan(b).rate;
+    return (ra === null ? Infinity : ra) - (rb === null ? Infinity : rb);
+  }
+  if (col === 'goiY') return dtItemGoiY(a).prio - dtItemGoiY(b).prio;
   return Number(a[col] || 0) - Number(b[col] || 0);
+}
+let DT_DETAIL_SHOWN = { items: [], miss: [] };
+function exportDTDetail(){
+  if (!DT_DETAIL) return;
+  const headers = ['Sản phẩm', 'SL bán', 'Tỷ lệ tiêu thụ', 'TB/ngày', 'Cần bán/ngày', 'Tồn hiện tại', 'Giá bán', 'Giá nhập', 'Doanh thu', 'Giá vốn', 'Lợi nhuận', 'Gợi ý'];
+  const rows = DT_DETAIL_SHOWN.items.map(it => {
+    const cb = dtItemCanBan(it), gy = dtItemGoiY(it), st = dtItemSellThrough(it);
+    return [it.ten, it.daBan, st === null ? '' : st.toFixed(0) + '%', dtItemTbNgay(it).toFixed(1), cb.rate === null ? 'Gấp!' : cb.rate.toFixed(1), cb.ton, it.giaBan, it.giaNhap, it.doanhThu, it.giaVon, it.loiNhuan, gy.text];
+  });
+  DT_DETAIL_SHOWN.miss.forEach(it => rows.push([it.ten, 'chưa kiểm kê', '', '', '', '', it.giaBan, it.giaNhap, '', '', '', it.reason || '']));
+  exportCSV(`DoanhThu_${DT_DETAIL.ym}.csv`, headers, rows);
 }
 function renderDTDetailBody(){
   if (!DT_DETAIL) return;
-  const items = DT_DETAIL.items.slice().sort((a, b) => dtDCompare(a, b, dtSortCol) * dtSortDir);
-  const miss = DT_DETAIL.missItems.slice(); // luôn xếp cuối, theo tên
+  const q = vnNorm(document.getElementById('dt-d-q')?.value || '');
+  const loai = document.getElementById('dt-d-loai')?.value || '';
+  const hsdTu = document.getElementById('dt-d-hsd-tu')?.value || '';
+  const hsdDen = document.getElementById('dt-d-hsd-den')?.value || '';
+  const goiY = document.getElementById('dt-d-goiy')?.value || '';
+  const dMatch = it => (!q || vnNorm(it.ten).includes(q)) && (!loai || (it.loai || '') === loai) &&
+    (!hsdTu || (it.hsd && it.hsd >= hsdTu)) && (!hsdDen || (it.hsd && it.hsd <= hsdDen));
+  const items = DT_DETAIL.items.filter(it => dMatch(it) && (!goiY || dtItemGoiY(it).text === goiY)).sort((a, b) => dtDCompare(a, b, dtSortCol) * dtSortDir);
+  const miss = goiY ? [] : DT_DETAIL.missItems.filter(dMatch); // SP chưa kiểm kê không có Gợi ý thật để so, lọc theo Gợi ý thì bỏ hẳn nhóm này
+  DT_DETAIL_SHOWN = { items, miss }; // lưu lại đúng dữ liệu đang hiển thị (đã lọc/sắp xếp) để exportDTDetail() dùng
   const ths = DT_DCOLS.map(c => {
     const on = dtSortCol === c.key;
     return `<th class="th-sort${on ? ' th-sort-on' : ''}" onclick="dtDetailSort('${c.key}')">${c.label} <span class="sort-ic">${on ? (dtSortDir === 1 ? '▲' : '▼') : '⇅'}</span></th>`;
@@ -202,17 +358,34 @@ function renderDTDetailBody(){
   const rowHtml = it => {
     const cl = it.loiNhuan < 0 ? 'color:#d03b3b' : '';
     const uoc = it.dauUoc ? ` <span style="color:#b8860b;font-size:10px">~ từ ${dVN(it.dauDate)}</span>` : '';
-    return `<tr><td data-label="Sản phẩm"><b>${esc(it.ten)}</b>${uoc}</td><td data-label="SL bán">${fmt(it.daBan)}</td><td data-label="Giá bán">${fmt(it.giaBan)}đ</td><td data-label="Giá nhập">${fmt(it.giaNhap)}đ</td><td data-label="Doanh thu">${fmt(it.doanhThu)}đ</td><td data-label="Giá vốn">${fmt(it.giaVon)}đ</td><td data-label="Lợi nhuận" style="${cl};font-weight:600">${fmt(it.loiNhuan)}đ</td></tr>`;
+    const tb = dtItemTbNgay(it), cb = dtItemCanBan(it);
+    const cbTitle = `Tồn hiện tại (Kho tổng + mọi gian hàng, ${fmt(cb.ton)}) ÷ số ngày làm việc còn lại (bỏ Thứ 7, CN) đến hạn ${dVN(cb.deadline)}`;
+    const tonNote = ` <span style="color:var(--text2);font-size:10px">/ ${fmt(cb.ton)} tồn / ${fmt(cb.days)} ngày còn lại</span>`;
+    const cbCell = cb.rate === null
+      ? `<span style="color:#d03b3b;font-weight:600" title="${esc(cbTitle)} — đã hết ngày làm việc để bán hết trước hạn!">Gấp!</span>${tonNote}`
+      : `<span style="${cb.rate > tb ? 'color:#d03b3b;font-weight:600' : ''}" title="${esc(cbTitle)}">${cb.rate.toFixed(1)}</span>${tonNote}`;
+    const gy = dtItemGoiY(it);
+    const st = dtItemSellThrough(it);
+    const stCell = st === null ? '—' : `<span style="${st >= 90 ? 'color:#d03b3b;font-weight:600' : ''}" title="SL đã bán ÷ (Tồn đầu kỳ + đã xếp thêm trong kỳ) — gần 100% có thể là thiếu hàng giữa chừng, không hẳn bán chạy">${st.toFixed(0)}%</span>`;
+    return `<tr><td data-label="Sản phẩm"><b>${esc(it.ten)}</b>${uoc}</td><td data-label="SL bán">${fmt(it.daBan)}</td><td data-label="Tỷ lệ tiêu thụ">${stCell}</td><td data-label="TB/ngày" title="SL bán ÷ số ngày làm việc (bỏ Thứ 7, CN) từ sau ngày đầu kỳ đến hết ngày cuối kỳ">${tb.toFixed(1)}</td><td data-label="Cần bán/ngày">${cbCell}</td><td data-label="Giá bán">${fmt(it.giaBan)}đ</td><td data-label="Giá nhập">${fmt(it.giaNhap)}đ</td><td data-label="Doanh thu">${fmt(it.doanhThu)}đ</td><td data-label="Giá vốn">${fmt(it.giaVon)}đ</td><td data-label="Lợi nhuận" style="${cl};font-weight:600">${fmt(it.loiNhuan)}đ</td><td data-label="Gợi ý" style="${gy.cl};white-space:nowrap" title="${esc(gy.title)}">${gy.text}</td></tr>`;
   };
-  const missRowHtml = it => `<tr style="opacity:.7"><td data-label="Sản phẩm"><b>${esc(it.ten)}</b> <span style="color:var(--text2);font-size:10px">(${esc(it.reason || '')})</span></td><td data-label="SL bán">${na}</td><td data-label="Giá bán">${fmt(it.giaBan)}đ</td><td data-label="Giá nhập">${fmt(it.giaNhap)}đ</td><td data-label="Doanh thu">${na}</td><td data-label="Giá vốn">${na}</td><td data-label="Lợi nhuận">${na}</td></tr>`;
+  const missRowHtml = it => `<tr style="opacity:.7"><td data-label="Sản phẩm"><b>${esc(it.ten)}</b> <span style="color:var(--text2);font-size:10px">(${esc(it.reason || '')})</span></td><td data-label="SL bán">${na}</td><td data-label="Tỷ lệ tiêu thụ">${na}</td><td data-label="TB/ngày">${na}</td><td data-label="Cần bán/ngày">${na}</td><td data-label="Giá bán">${fmt(it.giaBan)}đ</td><td data-label="Giá nhập">${fmt(it.giaNhap)}đ</td><td data-label="Doanh thu">${na}</td><td data-label="Giá vốn">${na}</td><td data-label="Lợi nhuận">${na}</td><td data-label="Gợi ý">${na}</td></tr>`;
   document.getElementById('dt-d-body').innerHTML = (items.length || miss.length)
-    ? `<div class="scroll-tbl"><table class="m-tbl"><thead><tr>${ths}</tr></thead><tbody>${items.map(rowHtml).join('')}${miss.map(missRowHtml).join('')}</tbody></table></div>`
-    : '<div class="empty">Chưa có sản phẩm nào trong kỳ này</div>';
+    ? `<div class="scroll-tbl"><table class="m-tbl"><thead><tr>${ths}</tr></thead><tbody>${items.map(rowHtml).join('')}${miss.map(missRowHtml).join('')}</tbody></table></div>
+       <p style="font-size:11px;color:var(--text2);margin-top:8px">"Tỷ lệ tiêu thụ" = SL đã bán ÷ (SL đã bán + Tồn hiện tại) × 100% — dùng đúng "Tồn hiện tại" như cột "Cần bán/ngày" bên cạnh (Kho tổng + mọi gian hàng, tính live) để khớp số trong cùng 1 hàng. Đỏ (≥90%) = tồn hiện tại gần như đã hết so với lượng đã bán — SP nhập ít mà tỷ lệ cao thường là THIẾU HÀNG (mất doanh thu tiềm năng), không hẳn chỉ là "bán chạy".<br>"Cần bán/ngày" hiện dạng <b>mức cần bán trung bình / tồn hiện tại / số ngày làm việc còn lại</b> — tồn hiện tại = Kho tổng + tồn ở mọi gian hàng (tính live ngay lúc mở popup); số ngày còn lại = số ngày làm việc (bỏ Thứ 7, CN) từ hôm nay đến hạn chót — SP có Hạn sử dụng thì tính đến đúng Hạn sử dụng, SP không có thì tính đến cuối Tháng danh mục đang xem. Đỏ = đang bán chậm hơn mức cần để hết hàng trước hạn (so với cột "TB/ngày"); "Gấp!" = đã hết ngày làm việc mà vẫn còn tồn.<br>"Gợi ý" là quy tắc tự động dựa trên các số ở trên (không phải AI đoán, rê chuột vào từng ô để xem lý do): 🔴 Giảm giá/dừng nhập — tồn khó bán hết trước hạn (CHỈ cảnh báo với SP có gắn Hạn sử dụng — hàng không có hạn coi như hàng tích trữ, không ép bán theo tháng); ⚠️ Đang lỗ/Biên lãi thấp — giá bán đang thấp hơn hoặc gần bằng giá vốn; 🟢 Nên nhập thêm — đang bán chạy, tồn sắp cạn. Chỉ mang tính tham khảo, cần đối chiếu thực tế trước khi quyết định.</p>`
+    : ((q || loai || hsdTu || hsdDen || goiY) ? '<div class="empty">Không tìm thấy sản phẩm khớp tìm kiếm</div>' : '<div class="empty">Chưa có sản phẩm nào trong kỳ này</div>');
 }
-function openDTDetail(ym){
+async function openDTDetail(ym){
   const row = DT_SHOWN.find(r => r.ym === ym) || DT_ROWS.find(r => r.ym === ym);
   if (!row) return;
   DT_DETAIL = { ym, items: row.items || [], missItems: row.missItems || [] };
+  const qEl = document.getElementById('dt-d-q'); if (qEl) qEl.value = '';
+  const hsdTuEl = document.getElementById('dt-d-hsd-tu'); if (hsdTuEl) hsdTuEl.value = '';
+  const hsdDenEl = document.getElementById('dt-d-hsd-den'); if (hsdDenEl) hsdDenEl.value = '';
+  const goiYEl = document.getElementById('dt-d-goiy'); if (goiYEl) goiYEl.value = '';
+  await ensureLoai();
+  const loaiEl = document.getElementById('dt-d-loai');
+  if (loaiEl) loaiEl.innerHTML = '<option value="">Tất cả loại hàng</option>' + C.LOAI.map(r => `<option>${esc(r[0])}</option>`).join('');
   const its = row.items;
   const ds = its.map(i => i.dauDate).filter(Boolean), cs = its.map(i => i.cuoiDate).filter(Boolean);
   const span = ds.length ? ` — ${dVN(ds.reduce((a, b) => a < b ? a : b))} → ${dVN(cs.reduce((a, b) => a > b ? a : b))}` : '';
@@ -243,6 +416,18 @@ function dtPieHover(e){
   tip.style.top=(e.clientY+14)+'px';
 }
 function dtPieOut(){ document.getElementById('dt-pie-tip').style.display='none'; }
+let dtPieSortCol='frac', dtPieSortDir=-1;
+function dtPieSort(col){
+  if (dtPieSortCol === col) dtPieSortDir *= -1; else { dtPieSortCol = col; dtPieSortDir = col === 'ten' ? 1 : -1; }
+  renderDTPie();
+}
+function dtPCompare(a, b, col, totDT){
+  if (col === 'ten') return (a.it.ten || '').localeCompare(b.it.ten || '');
+  if (col === 'frac') return a.frac - b.frac;
+  if (col === 'lnPctOfDT') return (totDT ? a.it.loiNhuan / totDT : 0) - (totDT ? b.it.loiNhuan / totDT : 0);
+  if (col === 'bienLN') return (a.it.doanhThu ? a.it.loiNhuan / a.it.doanhThu : 0) - (b.it.doanhThu ? b.it.loiNhuan / b.it.doanhThu : 0);
+  return Number(a.it[col] || 0) - Number(b.it[col] || 0);
+}
 function renderDTPie(){
   if(!DT_DETAIL) return;
   const mode=dtPieMode_;
@@ -284,34 +469,64 @@ function renderDTPie(){
     const [x1,y1]=P(s.a1,0),[x2,y2]=P(s.a2,0);
     svg+=`<path d="M${CX},${CY} L${x1},${y1} A${RX},${RY} 0 ${large} 1 ${x2},${y2} Z" fill="${s.col}" stroke="#fff" stroke-width="1" data-tip="${esc(tip)}" style="cursor:pointer"><title>${esc(tip)}</title></path>`;
   });
-  const rows=segs.map((s,i)=>{
+  const TH='padding:3px 7px;position:sticky;top:0;background:var(--card,#fff);border-bottom:1px solid var(--border)';
+  const PCOLS=[
+    {key:'ten',label:'Sản phẩm',align:'left'},
+    {key:'daBan',label:'SL bán',align:'right'},
+    {key:'frac',label:`% ${mode==='ln'?'LN':'DT'}`,align:'right'},
+    {key:'doanhThu',label:'Doanh thu',align:'right'},
+    {key:'loiNhuan',label:'Lợi nhuận',align:'right'},
+    {key:'bienLN',label:'Biên LN (SP)',align:'right'},
+    {key:'lnPctOfDT',label:'LN/ΣDT',align:'right'},
+  ];
+  const ths=PCOLS.map(c=>{
+    const on=dtPieSortCol===c.key;
+    return `<th class="th-sort${on?' th-sort-on':''}" style="${TH};text-align:${c.align}" onclick="dtPieSort('${c.key}')">${c.label} <span class="sort-ic">${on?(dtPieSortDir===1?'▲':'▼'):'⇅'}</span></th>`;
+  }).join('');
+  const sorted=segs.slice().sort((a,b)=>dtPCompare(a,b,dtPieSortCol,totDT)*dtPieSortDir);
+  const rows=sorted.map((s,i)=>{
     const it=s.it;
     const lnPctOfDT=totDT?Math.round(it.loiNhuan/totDT*1000)/10:0;
+    const bienLN=it.doanhThu?Math.round(it.loiNhuan/it.doanhThu*1000)/10:0;
     return `<tr>
       <td style="padding:3px 7px;text-align:right;color:var(--text2)">${i+1}</td>
       <td style="padding:3px 7px;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${s.col};margin-right:6px;vertical-align:middle"></span>${esc(it.ten)}</td>
+      <td style="padding:3px 7px;text-align:right">${fmt(it.daBan)}</td>
       <td style="padding:3px 7px;text-align:right;font-weight:700">${(s.frac*100).toFixed(1)}%</td>
       <td style="padding:3px 7px;text-align:right;white-space:nowrap">${fmt(it.doanhThu)}đ</td>
       <td style="padding:3px 7px;text-align:right;white-space:nowrap;color:${it.loiNhuan<0?'#d03b3b':''}">${fmt(it.loiNhuan)}đ</td>
+      <td style="padding:3px 7px;text-align:right;color:${bienLN<0?'#d03b3b':''}">${bienLN}%</td>
       <td style="padding:3px 7px;text-align:right;color:var(--text2)">${lnPctOfDT}%</td>
     </tr>`;
   }).join('');
+  const totDaBan=items.reduce((s,it)=>s+Number(it.daBan||0),0);
+  const totDoanhThu=items.reduce((s,it)=>s+Number(it.doanhThu||0),0);
+  const totLoiNhuan=items.reduce((s,it)=>s+Number(it.loiNhuan||0),0);
+  const totLnPctOfDT=totDT?Math.round(totLoiNhuan/totDT*1000)/10:0;
+  const totBienLN=totDoanhThu?Math.round(totLoiNhuan/totDoanhThu*1000)/10:0;
+  const TF='padding:3px 7px;position:sticky;bottom:0;background:var(--card,#fff);border-top:2px solid var(--border);font-weight:700';
+  const foot=`<tr>
+    <td style="${TF}"></td>
+    <td style="${TF}">Tổng</td>
+    <td style="${TF};text-align:right">${fmt(totDaBan)}</td>
+    <td style="${TF};text-align:right">100%</td>
+    <td style="${TF};text-align:right;white-space:nowrap">${fmt(totDoanhThu)}đ</td>
+    <td style="${TF};text-align:right;white-space:nowrap;color:${totLoiNhuan<0?'#d03b3b':''}">${fmt(totLoiNhuan)}đ</td>
+    <td style="${TF};text-align:right;color:${totBienLN<0?'#d03b3b':''}">${totBienLN}%</td>
+    <td style="${TF};text-align:right;color:var(--text2)">${totLnPctOfDT}%</td>
+  </tr>`;
   const scrollWrap=segs.length>10?'max-height:320px;overflow-y:auto;':'';
-  const TH='padding:3px 7px;position:sticky;top:0;background:var(--card,#fff);border-bottom:1px solid var(--border)';
   body.innerHTML=`
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
       <svg viewBox="0 0 236 190" style="width:236px;height:190px;flex:none" onmousemove="dtPieHover(event)" onmouseleave="dtPieOut()">${svg}</svg>
       <div style="flex:1;min-width:260px">
         <div style="${scrollWrap}overflow-x:auto">
           <table style="font-size:12px;border-collapse:collapse">
-            <thead><tr style="color:var(--text2)">
+            <thead><tr>
               <th style="${TH};text-align:right">#</th>
-              <th style="${TH};text-align:left">Sản phẩm</th>
-              <th style="${TH};text-align:right">% ${mode==='ln'?'LN':'DT'}</th>
-              <th style="${TH};text-align:right">Doanh thu</th>
-              <th style="${TH};text-align:right">Lợi nhuận</th>
-              <th style="${TH};text-align:right">LN/ΣDT</th></tr></thead>
+              ${ths}</tr></thead>
             <tbody>${rows}</tbody>
+            <tfoot>${foot}</tfoot>
           </table>
         </div>
         <p style="font-size:11px;color:var(--text2);margin-top:8px">Di chuột vào lát bánh để xem tên SP. Lát bánh = % ${mode==='ln'?'lợi nhuận':'doanh thu'} của SP trên tổng của kỳ. "LN/ΣDT" = lợi nhuận SP đó chiếm bao nhiêu % tổng doanh thu cả kỳ.</p>
@@ -319,10 +534,9 @@ function renderDTPie(){
     </div>`;
 }
 
-function openDTChart(){
-  const rows = DT_ROWS.filter(r => r.dt || r.ln).slice().reverse(); // cũ → mới
-  const body = document.getElementById('dt-chart-body');
-  if (!rows.length) { body.innerHTML = '<div class="empty">Chưa có dữ liệu để vẽ</div>'; om('m-dt-chart'); return; }
+// Biểu đồ cột 2 chuỗi (Doanh thu/Lợi nhuận) dùng chung cho "Biểu đồ theo tháng" và "Xu hướng SP/Loại hàng"
+// — rows: mảng object bất kỳ có field theo `series[].key`; xLabel(row) → nhãn trục X.
+function dtBarChartSVG(rows, series, xLabel){
   const abbr = v => {
     v = Number(v || 0); const s = v < 0 ? '-' : ''; v = Math.abs(v);
     if (v >= 1e9) return s + (v / 1e9).toFixed(1) + ' tỷ';
@@ -331,10 +545,10 @@ function openDTChart(){
     return s + v;
   };
   const bw = 20, bgap = 5, ggap = 30, padL = 54, padR = 16, padT = 22, padB = 46, H = 220;
-  const groupW = 2 * bw + bgap;
+  const groupW = series.length * bw + (series.length - 1) * bgap;
   const W = padL + padR + rows.length * groupW + (rows.length - 1) * ggap;
   let maxV = 1, minV = 0;
-  rows.forEach(r => { maxV = Math.max(maxV, r.dt, r.ln); minV = Math.min(minV, r.ln); });
+  rows.forEach(r => series.forEach(s => { maxV = Math.max(maxV, r[s.key]); minV = Math.min(minV, r[s.key]); }));
   const span = maxV - minV || 1;
   const y = v => padT + H * (1 - (v - minV) / span);
   const zeroY = y(0);
@@ -346,20 +560,73 @@ function openDTChart(){
   let bars = '';
   rows.forEach((r, i) => {
     const x0 = padL + i * (groupW + ggap);
-    [[r.dt, '#0ca30c'], [r.ln, '#3b82f6']].forEach(([val, color], j) => {
+    series.forEach((s, j) => {
+      const val = r[s.key];
       const bx = x0 + j * (bw + bgap);
       const top = Math.min(y(val), zeroY);
       const h = Math.abs(zeroY - y(val));
-      bars += `<rect x="${bx}" y="${top}" width="${bw}" height="${Math.max(h, 1)}" rx="2" fill="${color}"/>`;
+      bars += `<rect x="${bx}" y="${top}" width="${bw}" height="${Math.max(h, 1)}" rx="2" fill="${s.color}"/>`;
       if (Math.abs(val) >= span * 0.05) bars += `<text x="${bx + bw / 2}" y="${(val >= 0 ? top - 3 : top + h + 9)}" text-anchor="middle" font-size="8" fill="#334155">${abbr(val)}</text>`;
     });
-    bars += `<text x="${x0 + groupW / 2}" y="${padT + H + 16}" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">${dmFmt(r.ym)}</text>`;
+    bars += `<text x="${x0 + groupW / 2}" y="${padT + H + 16}" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">${esc(xLabel(r))}</text>`;
   });
-  body.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px"><span style="color:#0ca30c">■</span> Doanh thu &nbsp;&nbsp; <span style="color:#3b82f6">■</span> Lợi nhuận gộp</div>
-    <div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H + padT + padB}" style="min-width:${Math.min(W, 900)}px;max-width:100%;height:${H + padT + padB}px">
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H + padT + padB}" style="min-width:${Math.min(W, 900)}px;max-width:100%;height:${H + padT + padB}px">
       <line x1="${padL}" y1="${zeroY}" x2="${W - padR}" y2="${zeroY}" stroke="#cbd5e1"/>${grid}${bars}
     </svg></div>`;
+}
+const DT_SERIES_DTLN = [{key:'dt',color:'#0ca30c'},{key:'ln',color:'#3b82f6'}];
+const DT_SERIES_LEGEND = '<div style="font-size:12px;color:var(--text2);margin-bottom:8px"><span style="color:#0ca30c">■</span> Doanh thu &nbsp;&nbsp; <span style="color:#3b82f6">■</span> Lợi nhuận gộp</div>';
+function openDTChart(){
+  const rows = DT_ROWS.filter(r => r.dt || r.ln).slice().reverse(); // cũ → mới
+  const body = document.getElementById('dt-chart-body');
+  if (!rows.length) { body.innerHTML = '<div class="empty">Chưa có dữ liệu để vẽ</div>'; om('m-dt-chart'); return; }
+  body.innerHTML = DT_SERIES_LEGEND + dtBarChartSVG(rows, DT_SERIES_DTLN, r => dmFmt(r.ym));
   om('m-dt-chart');
+}
+
+// ── Xu hướng 1 SẢN PHẨM / 1 LOẠI HÀNG qua nhiều Tháng danh mục (cộng dồn từ DT_ROWS[].items) ──
+let dtTrendMode_ = 'sp', dtTrendKey = '';
+function dtTrendAllNames(){
+  const set = new Set();
+  DT_ROWS.forEach(r => (r.items || []).forEach(it => set.add(it.ten)));
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+function dtTrendPickSP(v){ dtTrendKey = (v || '').trim(); renderDTTrendBody(); }
+function renderDTTrendPick(){
+  const el = document.getElementById('dt-tr-pick');
+  document.getElementById('dt-tr-sp').className = 'btn btn-sm' + (dtTrendMode_ === 'sp' ? ' btn-p' : ' btn-g');
+  document.getElementById('dt-tr-loai').className = 'btn btn-sm' + (dtTrendMode_ === 'loai' ? ' btn-p' : ' btn-g');
+  if (dtTrendMode_ === 'sp'){
+    el.innerHTML = `<input type="text" id="dt-tr-q" placeholder="Gõ tên sản phẩm..." value="${esc(dtTrendKey)}" oninput="dtTrendPickSP(this.value)" style="width:100%;box-sizing:border-box;padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none">`;
+    attachSearchList(document.getElementById('dt-tr-q'), dtTrendAllNames);
+  } else {
+    el.innerHTML = `<select id="dt-tr-loaisel" onchange="dtTrendKey=this.value;renderDTTrendBody()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none"><option value="">-- Chọn loại hàng --</option>${C.LOAI.map(r => `<option${r[0] === dtTrendKey ? ' selected' : ''}>${esc(r[0])}</option>`).join('')}</select>`;
+  }
+}
+function dtTrendMode(m){ dtTrendMode_ = m; dtTrendKey = ''; renderDTTrendPick(); renderDTTrendBody(); }
+async function openDTTrend(){
+  await ensureLoai();
+  dtTrendMode_ = 'sp'; dtTrendKey = '';
+  renderDTTrendPick();
+  renderDTTrendBody();
+  om('m-dt-trend');
+}
+function renderDTTrendBody(){
+  const el = document.getElementById('dt-tr-body');
+  if (!dtTrendKey){ el.innerHTML = `<div class="empty">Chọn 1 ${dtTrendMode_ === 'sp' ? 'sản phẩm' : 'loại hàng'} để xem xu hướng qua các tháng</div>`; return; }
+  const mode = dtTrendMode_;
+  const rows = DT_ROWS.map(r => {
+    const its = (r.items || []).filter(it => mode === 'sp' ? it.ten === dtTrendKey : (it.loai || '') === dtTrendKey);
+    return { ym: r.ym, sl: its.reduce((s, it) => s + it.daBan, 0), dt: its.reduce((s, it) => s + it.doanhThu, 0), ln: its.reduce((s, it) => s + it.loiNhuan, 0) };
+  }).filter(x => x.dt || x.ln || x.sl).reverse(); // cũ → mới, để vẽ biểu đồ đúng chiều thời gian
+  if (!rows.length){ el.innerHTML = '<div class="empty">Chưa tính được doanh thu nào cho lựa chọn này (có thể do thiếu mốc kiểm kê)</div>'; return; }
+  const rowsHtml = rows.slice().reverse().map(r => { // bảng: mới → cũ, giống bảng tổng ở đầu màn
+    const b = r.dt ? Math.round(r.ln / r.dt * 100) : 0;
+    const cl = r.ln < 0 ? 'color:#d03b3b' : (r.ln > 0 ? 'color:#0ca30c' : '');
+    return `<tr><td data-label="Tháng danh mục"><b>${dmFmt(r.ym)}</b></td><td data-label="SL bán">${fmt(r.sl)}</td><td data-label="Doanh thu">${fmt(roundMoney(r.dt))}đ</td><td data-label="Lợi nhuận" style="${cl};font-weight:600">${fmt(roundMoney(r.ln))}đ</td><td data-label="LN%" style="${cl}">${b}%</td></tr>`;
+  }).join('');
+  el.innerHTML = DT_SERIES_LEGEND + dtBarChartSVG(rows, DT_SERIES_DTLN, r => dmFmt(r.ym)) +
+    `<div class="scroll-tbl" style="margin-top:14px"><table class="m-tbl"><thead><tr><th>Tháng danh mục</th><th>SL bán</th><th>Doanh thu</th><th>Lợi nhuận</th><th>LN%</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
 }
 
 bootPage('dt', function () {

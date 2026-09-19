@@ -42,6 +42,7 @@
           <option value="0">Tất cả</option>
         </select>
         <button class="btn btn-d" id="xh-delsel-btn" onclick="delSelXH()" style="display:none">Xóa (<span id="xh-selcnt">0</span>)</button>
+        <button class="btn btn-g" onclick="exportXH()">📤 Xuất Excel</button>
       </div>
       </details>
       <div id="xh-sum"></div>
@@ -255,8 +256,10 @@ async function loadXH(){
   document.getElementById('xh-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selXH.clear();updateSelUI('xh-delsel-btn','xh-selcnt',0);
   await ensureGH();// cần để đổ ô lọc "Gian hàng"
+  await ensureTK();// cần Tồn kho hiện tại để renameHealSheet nối lại bản ghi tên cũ
   const data=await apiGet('XepHang');C.XH=data;
   await dmHealSheet('XepHang',data,6,3);// dọn danhMucId cũ dạng "DM..." → "YYYY-MM" theo ngày xếp
+  await renameHealSheet('XepHang',data,0,5);// nối bản ghi xếp hàng ghi tên cũ (trước khi đổi tên SP) về đúng SP hiện tại
   const dmSel=document.getElementById('dm-xh');
   if(dmSel){
     const cur=dmSel.value;
@@ -364,6 +367,47 @@ function openXHTopDetail(i){
     :'<div class="empty">Không có dữ liệu</div>';
   om('m-xh-top-detail');
 }
+// Lưu đúng dữ liệu ĐANG HIỂN THỊ (2 chế độ: gộp theo tháng / phẳng theo tìm kiếm) để exportXH() xuất đúng
+// những gì đang xem trên màn hình, giống hệt cách làm ở Nhập hàng (NH_EXPORT).
+let XH_EXPORT={mode:'grouped',rows:[]};
+function exportXH(){
+  if(XH_EXPORT.mode==='flat'){
+    const headers=['Ngày xếp','Sản phẩm','Số lượng','Gian hàng','Ghi chú'];
+    const rows=XH_EXPORT.rows.map(r=>[r[3]?dVN(r[3]):'',r[0],r[1],r[2]||'',r[4]||'']);
+    exportCSV(`XepHang_${td()}.csv`,headers,rows);
+  }else{
+    const headers=['Tháng danh mục','Số ngày xếp','Số SP','Tổng SL','Gian hàng'];
+    const rows=XH_EXPORT.rows.map(x=>[/^\d{4}-\d{2}$/.test(x.m)?dmFmt(x.m):x.m,x.nDay,x.soSP,x.tongSL,x.gh.join(', ')]);
+    exportCSV(`XepHang_${td()}.csv`,headers,rows);
+  }
+}
+// Chế độ "đang tìm kiếm" (q-xh có chữ): hiện thẳng từng bản ghi xếp khớp, mới nhất lên đầu — giống rNHFlat
+// bên Nhập hàng. Bấm 1 dòng → mở popup sửa phiếu của đúng NGÀY đó.
+function rXHFlat(flat){
+  const nDay=new Set(flat.map(r=>r[3]||'(chưa có ngày)')).size;
+  const soSP=xhTopAgg(flat).length;
+  document.getElementById('xh-sum').innerHTML=flat.length?`<div class="grid4 stat-grid3" style="margin-bottom:16px">
+    <div class="kpi b"><div class="lb">Số ngày xếp</div><div class="val">${nDay}</div></div>
+    <div class="kpi p"><div class="lb">Tổng SL đã xếp</div><div class="val">${fmt(flat.reduce((s,r)=>s+Number(r[1]||0),0))}</div></div>
+    <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div>
+    <div class="kpi p" style="cursor:pointer" onclick="openXHTop()" title="Bấm để xem chi tiết"><div class="lb">Hàng xếp nhiều nhất</div><div class="val">${soSP} <span style="font-size:13px;font-weight:500;color:var(--text2)">mặt hàng ›</span></div></div></div>`:'';
+  document.getElementById('xh-delsel-btn').style.display='none';// chọn hàng loạt chỉ áp dụng ở chế độ gộp theo tháng
+  const el=document.getElementById('xh-tbl');
+  if(!flat.length){el.innerHTML='<div class="empty">Không tìm thấy bản ghi nào khớp tìm kiếm</div>';XH_EXPORT={mode:'flat',rows:[]};return;}
+  const rows=flat.slice().sort((a,b)=>(b[3]||'').localeCompare(a[3]||''));
+  XH_EXPORT={mode:'flat',rows};// lưu lại đúng dữ liệu đang hiển thị để "Xuất Excel" xuất đúng
+  el.innerHTML=`<div class="scroll-tbl"><table class="m-tbl"><thead><tr><th>Ngày xếp</th><th>Sản phẩm</th><th>Số lượng</th><th>Gian hàng</th><th class="mobile-hide">Ghi chú</th></tr></thead><tbody>`+
+    rows.map(r=>{
+      const ngay=r[3]||'';
+      return`<tr class="row-edit" onclick="openXHDay('${esc(ngay)}')" title="Bấm xem/sửa phiếu ngày này">
+        <td data-label="Ngày xếp"><b>${ngay?esc(dVN(ngay)):'(chưa có ngày)'}</b></td>
+        <td data-label="Sản phẩm">${esc(r[0])}</td>
+        <td data-label="Số lượng">${fmt(r[1])}</td>
+        <td data-label="Gian hàng">${esc(r[2]||'')}</td>
+        <td class="mobile-hide" data-label="Ghi chú">${esc(r[4]||'')}</td>
+      </tr>`;
+    }).join('')+'</tbody></table></div>';
+}
 function rXH(groups){
   const flat=groups.flatMap(g=>g.items);
   const soSP=xhTopAgg(flat).length;
@@ -373,7 +417,7 @@ function rXH(groups){
     <div class="kpi g"><div class="lb">Số gian hàng</div><div class="val">${new Set(flat.map(r=>r[2]).filter(Boolean)).size}</div></div>
     <div class="kpi p" style="cursor:pointer" onclick="openXHTop()" title="Bấm để xem chi tiết"><div class="lb">Hàng xếp nhiều nhất</div><div class="val">${soSP} <span style="font-size:13px;font-weight:500;color:var(--text2)">mặt hàng ›</span></div></div></div>`:'';
   const el=document.getElementById('xh-tbl');
-  if(!groups.length){el.innerHTML='<div class="empty">🏷️ Chưa có phiếu xếp hàng</div>';return;}
+  if(!groups.length){el.innerHTML='<div class="empty">🏷️ Chưa có phiếu xếp hàng</div>';XH_EXPORT={mode:'grouped',rows:[]};return;}
   // ── DANH SÁCH THEO THÁNG DANH MỤC — bấm 1 tháng → popup các ngày xếp của tháng đó ──
   const byM=new Map();
   groups.forEach(g=>g.items.forEach(r=>{
@@ -388,6 +432,7 @@ function rXH(groups){
     tongSL:e.items.reduce((s,r)=>s+Number(r[1]||0),0),
     gh:[...e.gh]
   })).sort((a,b)=>(b.m||'').localeCompare(a.m||''));
+  XH_EXPORT={mode:'grouped',rows:mRows};// lưu lại đúng dữ liệu đang hiển thị để "Xuất Excel" xuất đúng
   el.innerHTML=`<table class="m-tbl"><thead><tr><th>Tháng danh mục</th><th>Số ngày xếp</th><th>Số SP</th><th>Tổng SL</th><th class="mobile-hide">Gian hàng</th></tr></thead><tbody>`+
     mRows.map(x=>`<tr class="row-edit" onclick="openXHMonth('${esc(x.m)}')" title="Bấm để xem các ngày xếp trong tháng này"><td data-label="Tháng danh mục"><span class="bg bg-b">${/^\d{4}-\d{2}$/.test(x.m)?esc(dmFmt(x.m)):esc(x.m)}</span></td><td data-label="Số ngày xếp">${x.nDay}</td><td data-label="Số SP">${x.soSP}</td><td data-label="Tổng SL">${fmt(x.tongSL)}</td><td class="mobile-hide" data-label="Gian hàng">${x.gh.map(n=>`<span class="bg bg-p">${esc(n)}</span>`).join(' ')}</td></tr>`).join('')+
     '</tbody></table>';
@@ -478,6 +523,8 @@ function fXH(){
   if(dm)d=d.filter(r=>(r[6]||'')===dm);
   if(gh)d=d.filter(r=>(r[2]||'')===gh);
   if(q)d=d.filter(r=>vnNorm(r[0]).includes(q)||vnNorm(r[2]).includes(q));
+  // Có từ khóa tìm kiếm → hiện thẳng từng bản ghi khớp, không gộp theo Tháng danh mục nữa — giống Nhập hàng.
+  if(q){rXHFlat(d);return;}
   let groups=groupXHByDate(d);
   if(xhSortCol)groups.sort((a,b)=>xhCompare(a,b,xhSortCol)*xhSortDir);
   else groups.sort((a,b)=>(b.ngay||'').localeCompare(a.ngay||''));

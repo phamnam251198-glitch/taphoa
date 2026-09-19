@@ -830,6 +830,58 @@ function ghkOffset(tenSP,gianHang){
 function ghkQty(tenSP,gianHang){
   return Math.max(0,ghkBase(tenSP,gianHang)+ghkOffset(tenSP,gianHang));
 }
+// Tổng tồn THẬT của 1 SP trên toàn hệ thống = Kho tổng (TonKho) + tồn ở TẤT CẢ gian hàng (cộng dồn qua
+// ghkQty). Dùng chung cho Doanh thu (tính "Cần bán/ngày") và Nhập hàng (tính "Gợi ý nhập hàng").
+function tongTonSP(spIdx){
+  if(spIdx<0||!C.TK[spIdx])return 0;
+  const ten=C.TK[spIdx][0];
+  const khoTong=Number(C.TK[spIdx][1]||0);
+  const cacGianHang=(C.GH||[]).reduce((s,g)=>s+ghkQty(ten,g[0]),0);
+  return khoTong+cacGianHang;
+}
+// Tốc độ Xếp hàng GẦN ĐÂY (SL đã xếp ra MỌI gian hàng / ngày, trung bình N ngày gần nhất tính đến hôm nay)
+// — dùng làm proxy tốc độ tiêu thụ khi CHƯA có đủ dữ liệu Kiểm kê (kiểm kê thủ công, không phải SP nào cũng
+// có đều đặn). Luôn tính được cho mọi SP từng lên kệ, không cần chờ ai kiểm kê.
+function xhRecentRate(spIdx,days){
+  if(spIdx<0)return 0;
+  const from=bAddDays(td(),-days);
+  const tong=C.XH.filter(r=>(r[3]||'')>=from&&xhTKIndex(r)===spIdx).reduce((s,r)=>s+Number(r[1]||0),0);
+  return tong/days;
+}
+// Tự dọn các dòng GianHangKho TRÙNG (cùng 1 SP + cùng 1 Gian hàng nhưng bị tách thành nhiều dòng riêng) —
+// hậu quả của bug cũ ở Kiểm kê (ghi thiếu Mã SP + chỉ so khớp theo tên, có lúc không tìm ra dòng có sẵn nên
+// tạo dòng MỚI thay vì cập nhật dòng cũ, dòng cũ giữ nguyên offset không đổi). Gộp offset các dòng trùng
+// thành 1 dòng (giữ dòng có index nhỏ nhất), xóa các dòng thừa. Giống dmHealSheet — chạy âm thầm mỗi khi
+// tải Đồ gian hàng, không cần màn hình riêng.
+async function ghkHealDupes(){
+  const groups=new Map();
+  C.GHK.forEach((r,i)=>{
+    const spIdx=ghkRowTKIndex(r);
+    const key=(r[1]||'')+'|'+(spIdx>=0?'i'+spIdx:'n'+(r[0]||''));
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(i);
+  });
+  const toDelete=[];let merged=0;
+  for(const idxs of groups.values()){
+    if(idxs.length<2)continue;
+    idxs.sort((a,b)=>a-b);
+    const keepIdx=idxs[0];
+    const totalOffset=idxs.reduce((s,i)=>s+Number(C.GHK[i][2]||0),0);
+    const spIdx=ghkRowTKIndex(C.GHK[keepIdx]);
+    const maSP=spIdx>=0?(C.TK[spIdx][9]||''):(C.GHK[keepIdx][3]||'');
+    const row=[C.GHK[keepIdx][0],C.GHK[keepIdx][1],totalOffset,maSP];
+    await apiPost({sheet:'GianHangKho',action:'update',row:keepIdx+2,data:row});
+    C.GHK[keepIdx]=row;
+    idxs.slice(1).forEach(i=>toDelete.push(i));
+    merged++;
+  }
+  toDelete.sort((a,b)=>b-a);// xóa từ index lớn → nhỏ để không lệch vị trí các dòng chưa xóa
+  for(const i of toDelete){
+    await apiPost({sheet:'GianHangKho',action:'delete',row:i+2});
+    C.GHK.splice(i,1);
+  }
+  return merged;
+}
 async function moveLoai(idx,dir){
   const j=idx+dir;
   if(j<0||j>=C.LOAI.length)return false;
@@ -954,9 +1006,9 @@ function computeRevenuePeriod(ym,capDate){
   const isGhSP=(ma,ten)=>ghSP.has('m:'+ma)||ghSP.has('n:'+ten);
   C.TK.forEach(sp=>{
     const ten=sp[0],ma=sp[9]||'';
-    const giaBan=Number(sp[4]||0),giaNhap=Number(sp[3]||0);
+    const giaBan=Number(sp[4]||0),giaNhap=Number(sp[3]||0),loai=sp[13]||'',hsd=sp[5]||'';
     const cuoi=kkLastOfDm(ma,ten,ym,capDate);
-    if(!cuoi){if(isGhSP(ma,ten)){missing++;missItems.push({ten,ma,giaBan,giaNhap,reason:'chưa kiểm kê kỳ này'});}return;}
+    if(!cuoi){if(isGhSP(ma,ten)){missing++;missItems.push({ten,ma,giaBan,giaNhap,loai,reason:'chưa kiểm kê kỳ này'});}return;}
     const prevYm=kkPrevDm(ma,ten,ym);
     let dau=prevYm?kkLastOfDm(ma,ten,prevYm):null,dauUoc=false;
     // SP chưa hề có kiểm kê ở kỳ trước → lấy tạm lần kiểm kê ĐẦU TIÊN trong kỳ này làm mốc đầu
@@ -965,10 +1017,27 @@ function computeRevenuePeriod(ym,capDate){
       const f=kkFirstOfDm(ma,ten,ym);
       if(f&&f.date<cuoi.date){dau=f;dauUoc=true;}
     }
-    if(!dau||dau.date>=cuoi.date){missing++;missItems.push({ten,ma,giaBan,giaNhap,reason:'thiếu mốc đầu kỳ'});return;}
+    // Vẫn chưa có mốc đầu (SP chưa từng kiểm kê ở kỳ nào, kỳ này cũng chỉ đếm đúng 1 lần) — nếu SP đó
+    // cũng CHƯA TỪNG được Xếp hàng ra gian hàng nào TRƯỚC kỳ này (mới thật sự xuất hiện trong kỳ), coi
+    // tồn đầu kỳ = 0 (chưa từng lên kệ trước đó nên chắc chắn là 0, không phải đoán mò). Có Xếp hàng từ
+    // trước kỳ mà chưa từng kiểm kê thì KHÔNG áp dụng — tồn lúc đó là bao nhiêu không rõ, không đoán.
+    let dauZero=false;
+    if(!dau){
+      const range=dmRange(ym);
+      const coXepTruocKy=C.XH.some(r=>(ma?r[5]===ma:r[0]===ten)&&(r[3]||'')<range.from);
+      if(!coXepTruocKy){
+        const dNgay=bAddDays(range.from,-1);
+        if(dNgay<cuoi.date){dau={stock:0,date:dNgay};dauUoc=true;dauZero=true;}
+      }
+    }
+    if(!dau||dau.date>=cuoi.date){missing++;missItems.push({ten,ma,giaBan,giaNhap,loai,reason:'thiếu mốc đầu kỳ'});return;}
     const them=xhAddedInRange(ma,ten,dau.date,cuoi.date);
     const daBan=dau.stock+them-cuoi.stock;
-    items.push({ten,ma,daBan,giaBan,giaNhap,dauKy:dau.stock,them,cuoiKy:cuoi.stock,
+    // Giả định "tồn đầu kỳ = 0" (dauZero) mà vẫn ra SL bán ÂM → giả định đó sai (SP thực ra đã có tồn từ
+    // trước kỳ bằng cách khác Xếp hàng, VD sửa tay ở Đồ gian hàng, không có ngày để kiểm tra được). Không
+    // đoán mò tiếp — trả về "chưa kiểm kê" thay vì hiện số bán/doanh thu âm vô lý.
+    if(dauZero&&daBan<0){missing++;missItems.push({ten,ma,giaBan,giaNhap,loai,reason:'thiếu mốc đầu kỳ'});return;}
+    items.push({ten,ma,daBan,giaBan,giaNhap,loai,hsd,dauKy:dau.stock,them,cuoiKy:cuoi.stock,
       doanhThu:daBan*giaBan,giaVon:daBan*giaNhap,loiNhuan:daBan*(giaBan-giaNhap),
       dauDate:dau.date,cuoiDate:cuoi.date,dauDm:dauUoc?ym:prevYm,dauUoc});
   });
@@ -1002,6 +1071,24 @@ async function saveBestKy(dau,cuoi){
 }
 async function clearBestKy(){
   if((await apiGet('BestKy')).length)await apiPost({sheet:'BestKy',action:'delete',row:2});
+}
+
+// ── XUẤT EXCEL ── dùng CSV (Excel mở trực tiếp, không cần thư viện ngoài) thay vì .xlsx thật, để không phải
+// tải thêm CDN. Thêm BOM "﻿" ở đầu để Excel đọc đúng tiếng Việt có dấu (UTF-8), không bị lỗi font.
+function exportCSV(filename,headers,rows){
+  if(!rows.length){toast('Không có dữ liệu để xuất','err');return;}
+  const esc=v=>{
+    const s=String(v==null?'':v);
+    return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  };
+  const lines=[headers.map(esc).join(',')].concat(rows.map(r=>r.map(esc).join(',')));
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('Đã xuất file '+filename);
 }
 
 // ══ BỘ ICON DÙNG CHUNG (SVG nội tuyến, không phụ thuộc font/CDN ngoài) ── thay cho emoji ở sidebar/KPI —
@@ -1157,6 +1244,61 @@ async function dmHealSheet(sheet,rows,dmIdx,dateIdx){
     }
   }
   return fixed;
+}
+// Dọn 1 LẦN: bản ghi lịch sử (Xếp hàng/Đồ gian hàng/Kiểm kê/Nhập hàng) còn ghi TÊN CŨ của 1 SP đã bị đổi
+// tên ở Tồn kho, từ lúc bản ghi đó CHƯA gắn Mã SP nên không tự bám theo tên mới được → thành bản ghi "mồ
+// côi", tách ra như 1 SP riêng dù thực ra vẫn là cùng 1 SP (VD gõ thiếu dấu rồi sửa lại tên sau). Khớp theo
+// tên đã bỏ dấu (vnNorm) để bắt được đúng trường hợp đổi tên chỉ khác dấu/chính tả; CHỈ sửa khi khớp DUY
+// NHẤT 1 SP trong Tồn kho hiện tại (khớp nhiều SP → mơ hồ, bỏ qua, không đoán). Không đụng số lượng/ngày
+// tháng gì cả — chỉ viết lại đúng tên + Mã SP cho khớp Tồn kho. Trả về số dòng đã sửa.
+async function renameHealSheet(sheet,rows,nameIdx,maIdx){
+  const byNorm=new Map();
+  C.TK.forEach((t,i)=>{
+    const key=vnNorm(t[0]||'');
+    if(!byNorm.has(key))byNorm.set(key,[]);
+    byNorm.get(key).push(i);
+  });
+  let fixed=0;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    const ma=maIdx!=null?(r[maIdx]||''):'';
+    if(ma&&C.TK.some(t=>t[9]===ma))continue;// đã có Mã SP hợp lệ, khớp đúng 1 SP hiện có → khỏi sửa
+    const ten=r[nameIdx]||'';
+    const matches=byNorm.get(vnNorm(ten))||[];
+    if(matches.length!==1)continue;// không khớp SP nào, hoặc khớp nhiều SP trùng dấu → bỏ qua
+    const tk=C.TK[matches[0]];
+    if(ten===tk[0]&&ma===(tk[9]||''))continue;// đã đúng sẵn
+    const row=[...r];row[nameIdx]=tk[0];if(maIdx!=null)row[maIdx]=tk[9]||'';
+    await apiPost({sheet,action:'update',row:i+2,data:row});
+    rows[i]=row;fixed++;
+  }
+  return fixed;
+}
+// Khi ĐỔI TÊN 1 SP đã có sẵn (sửa ở Tồn kho) — đồng bộ NGAY tên mới sang mọi lịch sử liên quan (Xếp hàng/
+// Đồ gian hàng/Kiểm kê/Nhập hàng), khớp theo MÃ SP (khóa ổn định, không đổi khi đổi tên) — để các màn đó
+// hiển thị đúng tên mới ngay lập tức, không phải chờ renameHealSheet dò theo tên (chỉ bắt được khi tên cũ/
+// mới trùng dấu và không đụng SP nào khác) mới sửa được. Đọc tươi từng sheet (không dùng cache C.* có thể cũ)
+// vì đây là thao tác hiếm khi xảy ra, không cần tối ưu tốc độ. Trả về tổng số dòng đã đồng bộ.
+async function cascadeRenameSP(ma,newTen){
+  if(!ma)return 0;
+  const jobs=[
+    {sheet:'XepHang',nameIdx:0,maIdx:5},
+    {sheet:'GianHangKho',nameIdx:0,maIdx:3},
+    {sheet:'KiemKe',nameIdx:2,maIdx:1},
+    {sheet:'NhapHang',nameIdx:0,maIdx:9},
+  ];
+  let total=0;
+  for(const j of jobs){
+    const rows=await apiGet(j.sheet);
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i];
+      if(!r||r[j.maIdx]!==ma||r[j.nameIdx]===newTen)continue;
+      const row=[...r];row[j.nameIdx]=newTen;
+      await apiPost({sheet:j.sheet,action:'update',row:i+2,data:row});
+      total++;
+    }
+  }
+  return total;
 }
 // Đổ các tháng vào 1 <select>; giữ sẵn cur (thêm option riêng nếu cur nằm ngoài dải mặc định)
 function dmFillSelect(sel,cur){

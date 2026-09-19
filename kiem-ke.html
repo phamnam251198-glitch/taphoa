@@ -183,12 +183,14 @@ async function openKKEdit(){
   kkRows=[];
   rows.forEach(r=>{
     let prod=null;
+    // "Sổ sách" LUÔN lấy đúng số ĐÃ GHI của chính dòng này (r[3]), không tính lại theo số sống hiện tại —
+    // sửa phiếu là sửa lại 1 lần kiểm kê ĐÃ XẢY RA, "Sổ sách" của nó phải giữ nguyên như lúc đó.
     if(!gianHang){
       const idx=r[1]?C.TK.findIndex(t=>t[9]===r[1]):C.TK.findIndex(t=>t[0]===r[2]);
       if(idx<0){boQua++;return;}// SP không còn trong Tồn kho → không sửa được dòng này
-      prod={key:'tk'+idx,label:C.TK[idx][0],maSP:C.TK[idx][9]||'',soSach:Number(C.TK[idx][1]||0)};
+      prod={key:'tk'+idx,label:C.TK[idx][0],maSP:C.TK[idx][9]||'',soSach:Number(r[3]||0)};
     }else{
-      prod={key:'gh:'+gianHang+':'+r[2],label:r[2],maSP:r[1]||'',soSach:ghkQty(r[2],gianHang)};
+      prod={key:'gh:'+gianHang+':'+r[2],label:r[2],maSP:r[1]||'',soSach:Number(r[3]||0)};
     }
     const row=kkMakeRow(prod);
     row.tt=String(r[4]==null?'':r[4]);row.gc=r[6]||'';
@@ -330,9 +332,9 @@ function kkDmDateWarn(ngay,dm){
 // hàng. LUÔN đồng bộ về `thucTe` kể cả khi chênh lệch = 0, để dọn các điều chỉnh cũ còn sót lại khi đếm lại
 // quay về khớp số (nếu không sẽ bị: phiếu ghi chênh 0 nhưng gian hàng vẫn giữ số bị lệch của lần đếm trước).
 async function kkApplyStock(target,e,thucTe){
+  const idx=e.maSP?C.TK.findIndex(t=>t[9]===e.maSP):-1;
+  const spIdx=idx>=0?idx:C.TK.findIndex(t=>t[0]===e.label);
   if(!target){
-    const idx=e.maSP?C.TK.findIndex(t=>t[9]===e.maSP):-1;
-    const spIdx=idx>=0?idx:C.TK.findIndex(t=>t[0]===e.label);
     if(spIdx>=0&&Number(C.TK[spIdx][1]||0)!==thucTe){
       const upd=[...C.TK[spIdx]];upd[1]=thucTe;
       await apiPost({sheet:'TonKho',action:'update',row:spIdx+2,data:upd});
@@ -340,10 +342,13 @@ async function kkApplyStock(target,e,thucTe){
     }
     return;
   }
+  // Khớp dòng GianHangKho SẴN CÓ giống hệt cách do-gian-hang.html làm: ưu tiên theo Mã SP (ghkRowTKIndex),
+  // chỉ fallback theo tên khi SP không xác định được — tránh lẫn dữ liệu giữa 2 SP trùng tên khác Mã SP.
   const offset=thucTe-ghkBase(e.label,target);
-  const gi=C.GHK.findIndex(r=>r[0]===e.label&&r[1]===target);
+  const gi=C.GHK.findIndex(r=>r[1]===target&&(spIdx>=0?ghkRowTKIndex(r)===spIdx:r[0]===e.label));
   if(gi<0&&offset===0)return;// chưa có dòng điều chỉnh & không cần điều chỉnh → khỏi tạo dòng thừa
-  const grow=[e.label,target,offset];
+  const maSP=spIdx>=0?(C.TK[spIdx][9]||''):(e.maSP||'');
+  const grow=[e.label,target,offset,maSP];
   await apiPost(gi>=0?{sheet:'GianHangKho',action:'update',row:gi+2,data:grow}:{sheet:'GianHangKho',action:'append',row:grow});
   if(gi>=0)C.GHK[gi]=grow;else C.GHK.push(grow);
 }
@@ -370,12 +375,12 @@ async function saveKKNew(){
     // Đã có dòng kiểm kê cho ĐÚNG (ngày · đối tượng · MỐC KỲ · sản phẩm) → CẬP NHẬT dòng đó, không tạo trùng.
     // Khác mốc kỳ (Đầu kỳ / Cuối kỳ / không đánh dấu) trong cùng ngày → tạo bản ghi RIÊNG.
     const mi=C.KK.findIndex(r=>(r[0]||'')===ngay&&(r[8]||'')===target&&(r[9]||'')===moc&&((e.maSP&&(r[1]||'')===e.maSP)||(!e.maSP&&(r[2]||'')===e.label)));
-    // "Sổ sách" HIỆN TẠI của SP (theo Tồn kho / Đồ gian hàng lúc này)
+    // "Sổ sách" HIỆN TẠI của SP (theo Tồn kho / Đồ gian hàng lúc này) — CHỈ dùng khi thực sự tạo dòng MỚI
+    // (mi<0, chưa từng có bản ghi này). Đã CÓ dòng rồi (mi>=0, đếm lại/sửa cùng 1 lần kiểm kê) → LUÔN giữ
+    // nguyên "Sổ sách" gốc đã ghi từ trước, không tính lại — "Sổ sách" chỉ đổi khi đó là 1 lần kiểm kê MỚI
+    // thật sự, không phụ thuộc lần trước có lệch hay không (tránh 1 lần kiểm kê hiện ra 2 Sổ sách khác nhau).
     const curBook=target?ghkQty(e.label,target):(()=>{const i=e.maSP?C.TK.findIndex(t=>t[9]===e.maSP):C.TK.findIndex(t=>t[0]===e.label);return i>=0?Number(C.TK[i][1]||0):Number(e.soSach||0);})();
-    // Đếm LẠI cùng ngày mà lần trước ĐÃ lệch → giữ "Sổ sách" gốc để phiếu thể hiện chênh lệch cả ngày.
-    // Lần trước KHÔNG lệch (hoặc chưa từng đếm) → dùng "Sổ sách" hiện tại, tránh dùng số cũ đã lạc hậu do
-    // Đồ gian hàng / Tồn kho bị đổi bên ngoài (nguyên nhân lỗi: chênh 0 nhưng số không khớp thực tế).
-    const soSach=(mi>=0&&Number(C.KK[mi][5]||0)!==0)?Number(C.KK[mi][3]||0):curBook;
+    const soSach=mi>=0?Number(C.KK[mi][3]||0):curBook;
     const chenh=thucTe-soSach;
     const row=[ngay,e.maSP||(mi>=0?(C.KK[mi][1]||''):''),e.label,soSach,thucTe,chenh,e.gc||'',nguoi,target,moc,dm];
     if(mi>=0){await apiPost({sheet:'KiemKe',action:'update',row:mi+2,data:row});C.KK[mi]=row;soCapNhat++;}
@@ -418,8 +423,10 @@ async function saveKKEdit(){
     const thucTe=Math.max(0,Number(e.tt||0));
     keptSP.add(e.maSP||e.label);
     const mi=C.KK.findIndex(r=>(r[0]||'')===ngay&&(r[8]||'')===target&&(r[9]||'')===moc&&((e.maSP&&(r[1]||'')===e.maSP)||(!e.maSP&&(r[2]||'')===e.label)));
+    // Đã CÓ dòng (mi>=0, đang sửa/đếm lại cùng 1 lần kiểm kê) → LUÔN giữ nguyên "Sổ sách" gốc, không tính
+    // lại — chỉ tính theo số sống hiện tại (curBook) khi thực sự là dòng MỚI (mi<0), giống saveKKNew.
     const curBook=target?ghkQty(e.label,target):(()=>{const i=e.maSP?C.TK.findIndex(t=>t[9]===e.maSP):C.TK.findIndex(t=>t[0]===e.label);return i>=0?Number(C.TK[i][1]||0):Number(e.soSach||0);})();
-    const soSach=(mi>=0&&Number(C.KK[mi][5]||0)!==0)?Number(C.KK[mi][3]||0):curBook;
+    const soSach=mi>=0?Number(C.KK[mi][3]||0):curBook;
     const chenh=thucTe-soSach;
     const row=[ngay,e.maSP||(mi>=0?(C.KK[mi][1]||''):''),e.label,soSach,thucTe,chenh,e.gc||'',nguoi,target,moc,dm];
     if(mi>=0){await apiPost({sheet:'KiemKe',action:'update',row:mi+2,data:row});C.KK[mi]=row;soCapNhat++;}
@@ -451,8 +458,10 @@ async function loadKK(){
   document.getElementById('kk-tbl').innerHTML='<div class="ld"><div class="spin"></div></div>';
   selKK.clear();updateSelUI('kk-delsel-btn','kk-selcnt',0);
   await ensureUser();// cần sẵn danh sách người dùng để đổ vào dropdown "Người kiểm kê" ở modal
+  await ensureTK();// cần Tồn kho hiện tại để renameHealSheet nối lại bản ghi tên cũ
   const data=await apiGet('KiemKe');C.KK=data;
   await dmHealSheet('KiemKe',data,10,0);// dọn danhMucId cũ dạng "DM..." → "YYYY-MM" theo ngày kiểm kê
+  await renameHealSheet('KiemKe',data,2,1);// nối bản ghi kiểm kê ghi tên cũ (trước khi đổi tên SP) về đúng SP hiện tại
   const dmSel=document.getElementById('dm-kk');
   if(dmSel){
     const cur=dmSel.value;
@@ -605,9 +614,12 @@ async function kkRevertOne(r){
       C.TK[idx][1]=soSach;
     }
   }else{
+    // Cùng cách khớp theo Mã SP với kkApplyStock/do-gian-hang.html — tránh lẫn giữa 2 SP trùng tên khác Mã SP.
+    const spIdx=ma?C.TK.findIndex(t=>t[9]===ma):C.TK.findIndex(t=>t[0]===ten);
     const offset=soSach-ghkBase(ten,gianHang);
-    const gi=C.GHK.findIndex(x=>x[0]===ten&&x[1]===gianHang);
-    const grow=[ten,gianHang,offset];
+    const gi=C.GHK.findIndex(x=>x[1]===gianHang&&(spIdx>=0?ghkRowTKIndex(x)===spIdx:x[0]===ten));
+    const maSP=spIdx>=0?(C.TK[spIdx][9]||''):(ma||'');
+    const grow=[ten,gianHang,offset,maSP];
     await apiPost(gi>=0?{sheet:'GianHangKho',action:'update',row:gi+2,data:grow}:{sheet:'GianHangKho',action:'append',row:grow});
     if(gi>=0)C.GHK[gi]=grow;else C.GHK.push(grow);
   }

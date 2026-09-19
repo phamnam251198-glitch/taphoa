@@ -29,6 +29,7 @@
           <option value="sap">Sắp hết</option>
           <option value="hsd">Sắp hết hạn</option>
           <option value="con">Còn hàng</option>
+          <option value="thieugia">Thiếu giá bán/nhập</option>
         </select>
         <select id="loai-tk" onchange="fTK()" style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;outline:none">
           <option value="">Tất cả loại hàng</option>
@@ -203,7 +204,7 @@ function fTK(){
   const q=vnNorm(document.getElementById('q-tk').value);
   const st=document.getElementById('st-tk').value;
   const loai=document.getElementById('loai-tk')?.value||'';
-  const stMatch=r=>!st||(st==='hsd'?isHsdAlert(r):stTK(r)===st);
+  const stMatch=r=>!st||(st==='hsd'?isHsdAlert(r):st==='thieugia'?(Number(r[4]||0)<=0||Number(r[3]||0)<=0):stTK(r)===st);
   const filtered=C.TK.filter(r=>(vnNorm(r[0]).includes(q)||vnNorm(r[9]).includes(q))&&stMatch(r)&&(!loai||r[13]===loai));
   filtered.sort((a,b)=>tkCompare(a,b,tkSortCol)*tkSortDir);
   rTK(filtered);
@@ -294,6 +295,7 @@ async function saveSP(){
   const hsdSap=document.getElementById('sp-hsdsap').value, hsdGan=document.getElementById('sp-hsdgan').value;
   if(hsdSap&&hsdGan&&Number(hsdGan)>Number(hsdSap)){toast('Ngưỡng HSD "Gấp" phải ≤ ngưỡng "Sắp hết hạn"','err');return;}
   const er=document.getElementById('sp-row').value;
+  const oldTen=er?(C.TK[Number(er)-2]?.[0]||''):'';// tên TRƯỚC khi sửa, để phát hiện có đổi tên hay không
   let ma=document.getElementById('sp-ma').value.trim();
   if(!ma&&!er)ma=genNextMaSP();// SP mới mà chưa gõ mã → tự sinh, để luôn có khóa liên kết ổn định (không phụ thuộc tên nữa)
   if(!ma){toast('Thiếu Mã SP — không được để trống (sẽ làm hỏng liên kết với phiếu Nhập/Xếp hàng)','err');return;}
@@ -301,6 +303,13 @@ async function saveSP(){
   const row=[ten,Math.max(0,Number(document.getElementById('sp-sl').value)||0),document.getElementById('sp-dv').value,moneyVal(document.getElementById('sp-gn')),moneyVal(document.getElementById('sp-gb')),document.getElementById('sp-hsd').value,td(),ng,document.getElementById('sp-ncc').value,ma,gh,hsdSap,hsdGan,document.getElementById('sp-loai').value.trim()];
   toast('Đang lưu...');
   await apiPost(er?{sheet:'TonKho',action:'update',row:Number(er),data:row}:{sheet:'TonKho',action:'append',row});
+  // Đổi tên (không phải tạo mới) → đồng bộ NGAY tên mới sang mọi lịch sử liên quan (khớp theo Mã SP), tránh
+  // để lại bản ghi cũ ghi tên cũ tách thành "SP riêng" trên các màn Xếp hàng/Kiểm kê/Nhập hàng/Đồ gian hàng.
+  if(er&&oldTen&&oldTen!==ten){
+    toast('Đang đồng bộ tên mới sang lịch sử liên quan...');
+    const n=await cascadeRenameSP(ma,ten);
+    if(n)logAction('Cập nhật','Tồn kho',`Đổi tên "${oldTen}" → "${ten}": đồng bộ ${n} bản ghi lịch sử liên quan`);
+  }
   logAction(er?'Cập nhật':'Tạo mới','Tồn kho',`Sản phẩm "${ten}", SL: ${row[1]}`);
   toast(er?'Đã cập nhật':'Đã thêm sản phẩm');cm('m-sp');setTimeout(loadTK,800);
 }

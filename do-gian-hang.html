@@ -71,6 +71,11 @@ async function loadGHK(){
   let xh,ghk;
   [,,xh,ghk]=await Promise.all([ensureGH(),ensureTK(),apiGet('XepHang'),apiGet('GianHangKho')]);
   C.XH=xh;C.GHK=ghk;
+  // Nối lại các bản ghi "mồ côi" do đổi tên SP trước khi có Mã SP (VD gõ thiếu dấu rồi sửa lại tên), TRƯỚC
+  // khi gộp trùng — sau khi nối đúng Mã SP, 2 dòng cùng 1 SP mới trùng key để ghkHealDupes gộp được.
+  const soDoiTen=(await renameHealSheet('XepHang',C.XH,0,5))+(await renameHealSheet('GianHangKho',C.GHK,0,3));
+  const soDong=await ghkHealDupes();// tự dọn dòng Đồ gian hàng trùng (nếu có) trước khi vẽ danh sách
+  if(soDoiTen||soDong)toast(`Đã tự sửa ${soDoiTen} bản ghi tên cũ & gộp ${soDong} dòng Đồ gian hàng trùng (do lỗi cũ)`);
   await ensureDmKy();
   const dmSel=document.getElementById('dm-ghk');
   if(dmSel){
